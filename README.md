@@ -1,0 +1,85 @@
+# Vakera
+
+Recreación de la landing page de "Vakera", separada en dos módulos independientes:
+
+- **`server/`** — API en Node.js + Express (datos de servicios y recepción del formulario de contacto).
+- **`client/`** — Interfaz en React + Vite (todo el sitio: navbar, hero, secciones y footer).
+
+El diseño original es una imagen de referencia (foto de campo). Como esa foto es de un banco de imágenes de terceros, el hero fue recreado con una ilustración SVG propia en tonos verdes de montaña/pastizal en lugar de reutilizar la fotografía.
+
+## Estructura
+
+```
+ganaderia-los-andes/
+├── server/              # API Node.js
+│   └── src/
+│       ├── index.js
+│       ├── routes/
+│       │   ├── servicios.js
+│       │   └── contacto.js
+│       └── data/
+│           └── servicios.js
+└── client/              # App React (Vite)
+    └── src/
+        ├── App.jsx
+        ├── main.jsx
+        ├── index.css
+        ├── api/client.js
+        └── components/
+            ├── Navbar.jsx
+            ├── Hero.jsx
+            ├── QuienesSomos.jsx
+            ├── Servicios.jsx
+            ├── Ganado.jsx
+            ├── Blog.jsx
+            ├── Contacto.jsx
+            ├── Footer.jsx
+            └── Icons.jsx
+```
+
+## Cómo correrlo
+
+Necesitás dos terminales (el backend y el frontend corren por separado).
+
+### 1. Backend (Node.js)
+
+```bash
+cd server
+npm install
+npm start
+```
+
+Queda escuchando en `http://localhost:4000`. Endpoints disponibles:
+
+- `GET /api/health`
+- `GET /api/servicios`
+- `GET /api/servicios/:id`
+- `POST /api/contacto` — body JSON: `{ "nombre", "email", "mensaje" }`
+- `GET /api/contacto` — lista los mensajes recibidos
+
+### 2. Frontend (React)
+
+```bash
+cd client
+npm install
+npm run dev
+```
+
+Se abre en `http://localhost:5173`. En desarrollo, Vite redirige automáticamente las llamadas a `/api/...` hacia `http://localhost:4000` (configurado en `vite.config.js`), así que el backend tiene que estar corriendo para que la sección "Servicios" y el formulario de contacto funcionen.
+
+Para generar el build de producción del frontend:
+
+```bash
+npm run build
+```
+
+## Secciones incluidas
+
+La imagen de referencia mostraba el header y el hero con "Quiénes somos". Se agregaron el resto de las secciones para que los enlaces del menú (Nosotros, Servicios, Ganado, Blog, Contacto) tengan contenido real:
+
+- **Hero** — título, bajada y botón, sobre ilustración de paisaje.
+- **Nosotros** — texto institucional + valores (Compromiso, Experiencia, Ética) + cifras.
+- **Servicios** — las 4 tarjetas (Genética Superior, Nutrición Animal, Tecnología y Gestión, Salud y Bienestar), traídas desde la API de Node.
+- **Ganado** — razas de ejemplo.
+- **Blog** — listado de entradas de ejemplo.
+- **Contacto** — formulario que envía el mensaje al backend.
