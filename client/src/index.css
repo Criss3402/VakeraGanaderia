@@ -62,6 +62,7 @@ ul {
   html {
     scroll-behavior: auto;
   }
+
   * {
     animation-duration: 0.001ms !important;
     transition-duration: 0.001ms !important;
@@ -99,9 +100,11 @@ ul {
   background: var(--verde-brote);
   color: var(--verde-profundo);
 }
+
 .boton--relleno:hover {
   background: var(--verde-brote-oscuro);
 }
+
 .boton--relleno:disabled {
   opacity: 0.65;
   cursor: not-allowed;
@@ -112,6 +115,7 @@ ul {
   color: var(--texto-claro);
   border-color: rgba(238, 242, 233, 0.4);
 }
+
 .boton--fantasma:hover {
   border-color: var(--texto-claro);
 }
@@ -128,6 +132,7 @@ ul {
   color: var(--verde-musgo);
   margin: 0 0 10px;
 }
+
 .etiqueta--clara {
   color: var(--verde-brote);
 }
@@ -137,6 +142,7 @@ ul {
   max-width: 20ch;
   margin-bottom: 18px;
 }
+
 .titulo-seccion--claro {
   color: var(--texto-claro);
 }
@@ -149,8 +155,9 @@ ul {
   right: 0;
   z-index: 50;
   background: transparent;
-  transition: background-color 200ms ease, box-shadow 200ms ease;
+  transition: background-color 1000ms ease, box-shadow 200ms ease;
 }
+
 .navbar--scrolled {
   background: var(--verde-profundo);
   box-shadow: 0 2px 14px rgba(0, 0, 0, 0.25);
@@ -170,6 +177,7 @@ ul {
   align-items: center;
   text-decoration: none;
 }
+
 .navbar__logo-img {
   height: 38px;
   width: auto;
@@ -177,6 +185,7 @@ ul {
   object-fit: contain;
   transition: transform 160ms ease, opacity 160ms ease;
 }
+
 .navbar__marca:hover .navbar__logo-img {
   transform: scale(1.03);
   opacity: 0.92;
@@ -188,12 +197,14 @@ ul {
   margin-left: 12px;
   flex: 1;
 }
+
 .navbar__enlaces a {
   color: var(--texto-suave);
   font-size: 0.94rem;
   font-weight: 500;
   transition: color 150ms ease;
 }
+
 .navbar__enlaces a:hover {
   color: var(--texto-claro);
 }
@@ -213,6 +224,7 @@ ul {
   padding: 6px;
   cursor: pointer;
 }
+
 .navbar__hamburguesa span {
   width: 22px;
   height: 2px;
@@ -231,12 +243,15 @@ ul {
     display: none;
     gap: 14px;
   }
+
   .navbar__enlaces--abierto {
     display: flex;
   }
+
   .navbar__acciones {
     display: none;
   }
+
   .navbar__hamburguesa {
     display: flex;
   }
@@ -267,12 +282,10 @@ ul {
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: linear-gradient(
-    180deg,
-    rgba(16, 26, 19, 0.72) 0%,
-    rgba(16, 26, 19, 0.38) 45%,
-    rgba(16, 26, 19, 0.88) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(16, 26, 19, 0.72) 0%,
+      rgba(16, 26, 19, 0.38) 45%,
+      rgba(16, 26, 19, 0.88) 100%);
 }
 
 .hero__contenido {
@@ -288,6 +301,7 @@ ul {
     opacity: 0;
     transform: translateY(16px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -339,9 +353,11 @@ ul {
   padding: 12px 0;
   border-top: 1px solid rgba(22, 33, 26, 0.12);
 }
+
 .nosotros__lista li:last-child {
   border-bottom: 1px solid rgba(22, 33, 26, 0.12);
 }
+
 .nosotros__check {
   width: 20px;
   height: 20px;
@@ -448,16 +464,19 @@ ul {
   padding: 26px 0;
   border-top: 1px solid rgba(238, 242, 233, 0.16);
 }
+
 .servicios__item h3 {
   color: var(--texto-claro);
   font-size: 1.15rem;
   margin-bottom: 8px;
 }
+
 .servicios__item p {
   color: var(--texto-suave);
   font-size: 0.95rem;
   max-width: 42ch;
 }
+
 .servicios__item--placeholder {
   min-height: 130px;
   opacity: 0.35;
@@ -472,6 +491,7 @@ ul {
   color: var(--verde-brote);
   margin-bottom: 14px;
 }
+
 .servicios__icono svg {
   width: 100%;
   height: 100%;
@@ -482,15 +502,18 @@ ul {
     grid-template-columns: 1fr;
   }
 }
+
 /* ---------- FAQ (Preguntas Frecuentes) ---------- */
 .faq {
   background: var(--crema-suave);
   padding: 88px 0;
   border-top: 1px solid rgba(22, 33, 26, 0.08);
 }
+
 .faq__cabecera {
   margin-bottom: 40px;
 }
+
 .faq__intro {
   color: #4a4839;
   max-width: 62ch;
@@ -635,9 +658,11 @@ ul {
     align-items: flex-start;
     padding: 22px 20px;
   }
+
   .faq-item__boton {
     padding: 16px 18px;
   }
+
   .faq-item__contenido {
     padding: 0 18px 18px 18px;
   }
@@ -648,11 +673,13 @@ ul {
   background: var(--crema);
   padding: 88px 0;
 }
+
 .blog__lista {
   display: grid;
   gap: 0;
   margin-top: 20px;
 }
+
 .blog__entrada {
   display: grid;
   grid-template-columns: 140px 1fr auto;
@@ -661,17 +688,21 @@ ul {
   padding: 20px 0;
   border-top: 1px solid rgba(22, 33, 26, 0.14);
 }
+
 .blog__lista .blog__entrada:last-child {
   border-bottom: 1px solid rgba(22, 33, 26, 0.14);
 }
+
 .blog__entrada time {
   color: #6b6852;
   font-size: 0.88rem;
 }
+
 .blog__entrada h3 {
   font-size: 1.05rem;
   font-weight: 600;
 }
+
 .blog__leer {
   color: var(--verde-musgo);
   font-weight: 600;
@@ -692,11 +723,13 @@ ul {
   padding: 88px 0;
   color: var(--texto-claro);
 }
+
 .contacto__grid {
   display: grid;
   grid-template-columns: 0.9fr 1.1fr;
   gap: 56px;
 }
+
 .contacto__texto {
   color: var(--texto-suave);
   max-width: 42ch;
@@ -706,12 +739,14 @@ ul {
   display: grid;
   gap: 16px;
 }
+
 .contacto__form label {
   display: grid;
   gap: 6px;
   font-size: 0.9rem;
   color: var(--texto-suave);
 }
+
 .contacto__form input,
 .contacto__form textarea {
   font-family: var(--fuente-texto);
@@ -723,10 +758,12 @@ ul {
   color: var(--texto-claro);
   resize: vertical;
 }
+
 .contacto__form input::placeholder,
 .contacto__form textarea::placeholder {
   color: rgba(238, 242, 233, 0.45);
 }
+
 .contacto__form .boton {
   justify-self: start;
 }
@@ -735,9 +772,11 @@ ul {
   font-size: 0.92rem;
   margin-top: -4px;
 }
+
 .contacto__aviso--ok {
   color: var(--verde-brote);
 }
+
 .contacto__aviso--error {
   color: #f0a0a0;
 }
@@ -754,6 +793,7 @@ ul {
   color: var(--texto-suave);
   padding: 56px 0 24px;
 }
+
 .footer__grid {
   display: grid;
   grid-template-columns: 1.4fr 1fr 1fr;
@@ -761,39 +801,46 @@ ul {
   padding-bottom: 32px;
   border-bottom: 1px solid rgba(238, 242, 233, 0.12);
 }
+
 .footer__marca {
   display: flex;
   flex-direction: column;
   gap: 12px;
   color: var(--texto-claro);
 }
+
 .footer__logo-img {
   height: 38px;
   width: auto;
   object-fit: contain;
   align-self: flex-start;
 }
+
 .footer__marca p {
   font-family: var(--fuente-texto);
   font-size: 0.88rem;
   color: var(--texto-suave);
   max-width: 32ch;
 }
+
 .footer h4 {
   font-family: var(--fuente-texto);
   color: var(--texto-claro);
   font-size: 0.92rem;
   margin: 0 0 12px;
 }
+
 .footer div a {
   display: block;
   font-size: 0.9rem;
   padding: 4px 0;
   color: var(--texto-suave);
 }
+
 .footer div a:hover {
   color: var(--texto-claro);
 }
+
 .footer__copy {
   text-align: center;
   font-size: 0.82rem;
