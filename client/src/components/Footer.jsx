@@ -16,7 +16,7 @@ export default function Footer() {
           <a href="#inicio">Inicio</a>
           <a href="#nosotros">Nosotros</a>
           <a href="#servicios">Servicios</a>
-          <a href="#ganado">Ganado</a>
+          <a href="#faq">Preguntas</a>
         </div>
 
         <div>

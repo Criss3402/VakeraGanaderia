@@ -75,11 +75,10 @@ npm run build
 
 ## Secciones incluidas
 
-La imagen de referencia mostraba el header y el hero con "Quiénes somos". Se agregaron el resto de las secciones para que los enlaces del menú (Nosotros, Servicios, Ganado, Blog, Contacto) tengan contenido real:
+La landing page cuenta con las siguientes secciones:
 
 - **Hero** — título, bajada y botón, sobre ilustración de paisaje.
-- **Nosotros** — texto institucional + valores (Compromiso, Experiencia, Ética) + cifras.
+- **Nosotros** — texto institucional + valores (Compromiso, Experiencia, Ética) + gestión por cuentas y roles.
 - **Servicios** — las 4 tarjetas (Genética Superior, Nutrición Animal, Tecnología y Gestión, Salud y Bienestar), traídas desde la API de Node.
-- **Ganado** — razas de ejemplo.
-- **Blog** — listado de entradas de ejemplo.
+- **Preguntas Frecuentes (FAQ)** — acordeón interactivo que responde dudas sobre conectividad offline, importación desde Excel, caravanas electrónicas RFID, roles de usuario y reportes oficiales.
 - **Contacto** — formulario que envía el mensaje al backend.
