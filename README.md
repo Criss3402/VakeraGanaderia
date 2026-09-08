@@ -5,8 +5,6 @@ Recreación de la landing page de "Vakera", separada en dos módulos independien
 - **`server/`** — API en Node.js + Express (datos de servicios y recepción del formulario de contacto).
 - **`client/`** — Interfaz en React + Vite (todo el sitio: navbar, hero, secciones y footer).
 
-El diseño original es una imagen de referencia (foto de campo). Como esa foto es de un banco de imágenes de terceros, el hero fue recreado con una ilustración SVG propia en tonos verdes de montaña/pastizal en lugar de reutilizar la fotografía.
-
 ## Estructura
 
 ```
