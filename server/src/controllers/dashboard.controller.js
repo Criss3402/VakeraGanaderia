@@ -74,6 +74,17 @@ class DashboardController {
       return error(res, err.message, 404);
     }
   }
+
+  static async obtenerClima(req, res) {
+    try {
+      const WeatherService = require("../services/weather.service");
+      const { lat, lon } = req.query;
+      const clima = await WeatherService.obtenerCondicionesActuales({ lat, lon });
+      return exito(res, clima, "Condiciones climáticas obtenidas con éxito.");
+    } catch (err) {
+      return error(res, "No se pudo obtener la información climática: " + err.message, 500);
+    }
+  }
 }
 
 module.exports = DashboardController;

@@ -29,3 +29,8 @@ export async function actualizarEstadoParte(id, estado) {
     body: JSON.stringify({ estado }),
   });
 }
+
+export async function obtenerClimaActual(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return request(`/dashboard/clima${query ? `?${query}` : ""}`);
+}

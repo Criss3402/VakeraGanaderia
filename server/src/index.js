@@ -1,6 +1,13 @@
 const express = require("express");
 const cors = require("cors");
 
+// Carga nativa de archivo .env si existe (Node.js 20.6+)
+if (typeof process.loadEnvFile === "function") {
+  try {
+    process.loadEnvFile();
+  } catch (_) {}
+}
+
 // Enrutadores modulares por cada parte del sistema
 const presentacionRoutes = require("./routes/presentacion.routes");
 const authRoutes = require("./routes/auth.routes");

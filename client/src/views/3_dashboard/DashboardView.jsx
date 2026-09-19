@@ -5,6 +5,7 @@ import {
   obtenerAlertasSanitarias,
   obtenerInsumosCriticos,
   obtenerPartesDiarios,
+  obtenerClimaActual,
 } from "../../api/dashboard.api";
 
 export default function DashboardView({ alCambiarVista }) {
@@ -13,6 +14,8 @@ export default function DashboardView({ alCambiarVista }) {
   const [alertas, setAlertas] = useState([]);
   const [insumos, setInsumos] = useState([]);
   const [partes, setPartes] = useState([]);
+  const [clima, setClima] = useState(null);
+  const [cargandoClima, setCargandoClima] = useState(true);
 
   const doughnutCanvasRef = useRef(null);
   const lineCanvasRef = useRef(null);
@@ -26,12 +29,15 @@ export default function DashboardView({ alCambiarVista }) {
       obtenerAlertasSanitarias().catch(() => null),
       obtenerInsumosCriticos().catch(() => null),
       obtenerPartesDiarios().catch(() => null),
-    ]).then(([resMetricas, resAlertas, resInsumos, resPartes]) => {
+      obtenerClimaActual().catch(() => null),
+    ]).then(([resMetricas, resAlertas, resInsumos, resPartes, resClima]) => {
       if (!activo) return;
       if (resMetricas?.data) setMetricas(resMetricas.data);
       if (resAlertas?.data) setAlertas(resAlertas.data);
       if (resInsumos?.data) setInsumos(resInsumos.data);
       if (resPartes?.data) setPartes(resPartes.data);
+      if (resClima?.data) setClima(resClima.data);
+      setCargandoClima(false);
     });
 
     return () => {
@@ -199,13 +205,42 @@ export default function DashboardView({ alCambiarVista }) {
           </div>
 
           <div className="hidden md:flex flex-col items-end text-right">
-            <div className="flex items-center gap-3 mb-3 bg-[#132219]/60 backdrop-blur-sm px-4 py-2 rounded-xl border border-[#8fb56b]/20">
-              <i className="fa-solid fa-sun text-amber-400 text-2xl"></i>
+            <div className="flex items-center gap-3.5 mb-2 bg-[#132219]/70 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-[#8fb56b]/25 shadow-lg">
+              {/* Ícono de clima */}
+              <div className="text-2xl">
+                {clima?.iconoUrl ? (
+                  <img src={clima.iconoUrl} alt={clima.descripcion} className="w-8 h-8 object-contain" />
+                ) : (
+                  <i className={clima?.iconoFontAwesome || "fa-solid fa-sun text-amber-400"}></i>
+                )}
+              </div>
+
               <div>
-                <p className="text-xl font-bold text-white leading-none">18°C</p>
-                <p className="text-xs text-[#8fb56b]">Cielo despejado</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-2xl font-extrabold text-white leading-none">
+                    {clima ? `${clima.temperatura}°C` : "21°C"}
+                  </p>
+                  <span className="text-[10px] bg-[#1e3828] text-[#8fb56b] font-bold px-1.5 py-0.5 rounded border border-[#8fb56b]/30">
+                    {clima?.esEnVivo ? "Google Weather" : "Establecimiento"}
+                  </span>
+                </div>
+                <p className="text-xs text-[#8fb56b] font-medium mt-0.5">
+                  {clima?.descripcion || "Cielo despejado"}
+                </p>
               </div>
             </div>
+
+            {/* Micro-datos agropecuarios: ST, Humedad, Viento */}
+            {clima && (
+              <div className="flex items-center gap-3 text-[11px] text-[#f1ecdd]/80 bg-[#182920]/60 backdrop-blur-sm px-3 py-1 rounded-xl border border-[#f1ecdd]/10 mb-2">
+                <span>ST: <strong className="text-white">{clima.sensacionTermica}°C</strong></span>
+                <span className="text-[#8fb56b]">·</span>
+                <span>Humedad: <strong className="text-white">{clima.humedad}%</strong></span>
+                <span className="text-[#8fb56b]">·</span>
+                <span>Viento: <strong className="text-white">{clima.vientoKmH} km/h</strong></span>
+              </div>
+            )}
+
             <p className="text-xs text-[#f1ecdd]/80 italic max-w-xs border-r-2 border-[#8fb56b] pr-3">
               "El campo siempre da más<br />a quienes lo cuidan."
             </p>

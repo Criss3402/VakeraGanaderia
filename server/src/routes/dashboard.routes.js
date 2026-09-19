@@ -18,6 +18,9 @@ router.get("/alertas", DashboardController.obtenerAlertas);
 // Insumos críticos y alertas de stock
 router.get("/insumos-criticos", DashboardController.obtenerInsumosCriticos);
 
+// Condiciones climáticas (Google Weather API / Contingencia)
+router.get("/clima", DashboardController.obtenerClima);
+
 // Partes diarios de novedades
 router.get("/partes", DashboardController.obtenerPartes);
 
