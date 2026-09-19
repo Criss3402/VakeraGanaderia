@@ -86,7 +86,10 @@ function AppContenido() {
             <GestionUsuariosView />
           </ProtectedRoute>
         ) : (
-          <DashboardView seccionActiva={subVistaApp} />
+          <DashboardView
+            seccionActiva={subVistaApp}
+            alCambiarVista={(nuevaSubVista) => setSubVistaApp(nuevaSubVista)}
+          />
         )}
       </PrivateLayout>
     </ProtectedRoute>
