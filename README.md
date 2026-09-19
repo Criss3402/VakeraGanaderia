@@ -1,5 +1,7 @@
 # Vakera
 
+> 📋 **Plan de Trabajo Completo:** Para consultar el alcance, matriz de roles (RBAC), objetivos y hoja de ruta detallada del sistema, consulta el documento [PLAN_DE_TRABAJO.md](./PLAN_DE_TRABAJO.md).
+
 Recreación de la landing page de "Vakera", separada en dos módulos independientes:
 
 - **`server/`** — API en Node.js + Express (datos de servicios y recepción del formulario de contacto).
