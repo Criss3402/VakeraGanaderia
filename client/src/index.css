@@ -866,7 +866,7 @@ ul {
   justify-content: center;
   padding: 32px 16px;
   background: radial-gradient(circle at 10% 20%, rgba(143, 181, 107, 0.12) 0%, transparent 60%),
-              linear-gradient(135deg, var(--verde-profundo) 0%, #0f1c15 100%);
+    linear-gradient(135deg, var(--verde-profundo) 0%, #0f1c15 100%);
 }
 
 .auth-caja {
@@ -1111,6 +1111,7 @@ ul {
   background: #a93226;
   color: #ffffff;
 }
+
 .boton--peligro:hover {
   background: #922b21;
 }
@@ -1119,6 +1120,7 @@ ul {
   background: #2e7d32;
   color: #ffffff;
 }
+
 .boton--exito:hover {
   background: #1b5e20;
 }
@@ -1941,4 +1943,111 @@ ul {
   text-align: center;
   padding: 60px;
   color: #607164;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   ESTILOS PRIVADOS VAKERA: ARMONÍA VERDE PROFUNDO + CREMA
+   ══════════════════════════════════════════════════════════════════ */
+.tarjeta-ui {
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #ded7c4;
+  padding: 24px;
+  box-shadow: 0 2px 10px rgba(24, 41, 32, 0.04);
+}
+
+.tarjeta-ui--destacada {
+  border-top: 4px solid var(--verde-profundo);
+}
+
+.tarjeta-ui__titulo {
+  font-family: var(--fuente-display);
+  font-size: 1.35rem;
+  color: var(--verde-profundo);
+  font-weight: 700;
+}
+
+.tarjeta-ui__subtitulo {
+  font-size: 0.86rem;
+  color: #5a6d5f;
+  margin-top: 2px;
+}
+
+.tabla-vakera {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.tabla-vakera th {
+  background: #f1ecdd;
+  color: #182920;
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 12px 16px;
+  border-bottom: 2px solid #ded7c4;
+}
+
+.tabla-vakera td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #e8e1d2;
+  color: #182920;
+}
+
+.tabla-vakera tr:hover td {
+  background: #faf8f3;
+}
+
+.tabla-subtexto {
+  color: #6a7d6e;
+  font-size: 0.8rem;
+  display: block;
+}
+
+.matriz-rol-card {
+  border: 1px solid #ded7c4;
+  border-radius: 12px;
+  padding: 18px;
+  background: #fcfbf8;
+  box-shadow: 0 1px 4px rgba(24, 41, 32, 0.03);
+}
+
+.matriz-rol-card__header h4 {
+  font-family: var(--fuente-display);
+  font-size: 1.05rem;
+  color: var(--verde-profundo);
+  font-weight: 700;
+}
+
+.matriz-rol-card__desc {
+  font-size: 0.82rem;
+  color: #5a6d5f;
+  margin-bottom: 12px;
+  min-height: 36px;
+}
+
+.matriz-rol-card__sub {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #33512f;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+/* Scrollbar personalizada para el panel */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1ecdd;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #c8bfae;
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #182920;
 }
