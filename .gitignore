@@ -1,3 +1,15 @@
 node_modules/
 dist/
+
+# Variables de entorno (todas las variantes locales)
 .env
+.env*.local
+.env.development
+.env.production
+
+# Logs de error de npm
+npm-debug.log*
+
+# Archivos temporales del sistema operativo
+Thumbs.db
+.DS_Store
