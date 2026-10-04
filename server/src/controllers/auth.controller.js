@@ -12,14 +12,14 @@ function generarToken(usuario) {
 }
 
 class AuthController {
-  static login(req, res) {
+  static async login(req, res) {
     const { email, password } = req.body || {};
 
     if (!email || !password) {
       return error(res, "Email y contraseña son obligatorios.", 400);
     }
 
-    const usuario = UsuarioModel.buscarPorEmail(email);
+    const usuario = await UsuarioModel.buscarPorEmail(email);
 
     if (!usuario || usuario.password !== password) {
       return error(res, "Credenciales incorrectas. Verifique email y contraseña.", 401);
@@ -34,7 +34,7 @@ class AuthController {
     }, "Inicio de sesión exitoso.");
   }
 
-  static registro(req, res) {
+  static async registro(req, res) {
     const { nombre, email, password, rol, cargo, establecimiento } = req.body || {};
 
     if (!nombre || !email || !password) {
@@ -42,7 +42,7 @@ class AuthController {
     }
 
     try {
-      const nuevoUsuario = UsuarioModel.crear({
+      const nuevoUsuario = await UsuarioModel.crear({
         nombre,
         email,
         password,
@@ -69,8 +69,9 @@ class AuthController {
     return exito(res, { usuario: req.usuario });
   }
 
-  static obtenerUsuariosDemo(req, res) {
-    const usuariosDemo = UsuarioModel.listarTodos().map((u) => ({
+  static async obtenerUsuariosDemo(req, res) {
+    const lista = await UsuarioModel.listarTodos();
+    const usuariosDemo = lista.map((u) => ({
       id: u.id,
       nombre: u.nombre,
       email: u.email,

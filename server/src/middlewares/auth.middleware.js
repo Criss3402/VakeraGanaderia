@@ -1,7 +1,7 @@
 const UsuarioModel = require("../models/usuario.model");
 const { error } = require("../utils/apiResponse");
 
-function authMiddleware(req, res, next) {
+async function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -25,7 +25,7 @@ function authMiddleware(req, res, next) {
       }
     }
 
-    const usuario = UsuarioModel.buscarPorId(userId);
+    const usuario = await UsuarioModel.buscarPorId(userId);
 
     if (!usuario) {
       return error(res, "Sesión inválida o expirada.", 401);

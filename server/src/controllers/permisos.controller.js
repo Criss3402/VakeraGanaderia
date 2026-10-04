@@ -78,12 +78,12 @@ class PermisosController {
     });
   }
 
-  static obtenerUsuarios(req, res) {
-    const usuarios = UsuarioModel.listarTodos();
+  static async obtenerUsuarios(req, res) {
+    const usuarios = await UsuarioModel.listarTodos();
     return exito(res, usuarios);
   }
 
-  static cambiarRolUsuario(req, res) {
+  static async cambiarRolUsuario(req, res) {
     const { id } = req.params;
     const { nuevoRol } = req.body;
 
@@ -92,7 +92,7 @@ class PermisosController {
     }
 
     try {
-      const usuarioActualizado = UsuarioModel.actualizarRol(id, nuevoRol);
+      const usuarioActualizado = await UsuarioModel.actualizarRol(id, nuevoRol);
       return exito(
         res,
         usuarioActualizado,
