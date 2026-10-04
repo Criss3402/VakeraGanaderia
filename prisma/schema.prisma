@@ -1,3 +1,5 @@
+// Configuración de Prisma ORM para el Sistema Ganadero "Vakera"
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -5,4 +7,169 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------
+// ENUMS DE DOMINIO GANADERO Y CONTROL DE ACCESO (RBAC)
+// ----------------------------------------------------
+
+enum Rol {
+  DUENO
+  CAPATAZ
+  PEON
+  OFICINA
+  VETERINARIO
+}
+
+enum EstadoSanitario {
+  SALUDABLE
+  OBSERVACION
+  EN_TRATAMIENTO
+}
+
+enum EstadoParte {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+}
+
+// ----------------------------------------------------
+// MODELOS DE DATOS
+// ----------------------------------------------------
+
+// 1. Usuarios y Control de Acceso (RBAC)
+model Usuario {
+  id              String   @id @default(cuid())
+  nombre          String
+  email           String   @unique
+  password        String   // Hash con bcrypt
+  rol             Rol      @default(PEON)
+  cargo           String?
+  telefono        String?
+  establecimiento String?  @default("El Rancho, Goya, Corrientes")
+  fechaRegistro   DateTime @default(now())
+
+  // Relaciones
+  partesCreados   ParteDiario[]   @relation("PeonPartes")
+  partesRevisados ParteDiario[]   @relation("RevisorPartes")
+  eventosACargo   SanidadEvento[] @relation("ResponsableEventos")
+
+  @@map("usuarios")
+}
+
+// 2. Potreros / Divisiones del Campo
+model Potrero {
+  id            String        @id @default(cuid())
+  nombre        String        @unique
+  descripcion   String?
+  superficieHas Float?
+  capacidad     Int?
+  
+  // Relaciones
+  animales      Ganado[]
+  partes        ParteDiario[]
+
+  @@map("potreros")
+}
+
+// 3. Ganado y Rodeo
+model Ganado {
+  id              String          @id @default(cuid())
+  caravana        String          @unique
+  categoria       String          // Vacas, Toros, Novillos, Terneras, Vaquillonas
+  raza            String
+  sexo            String          // Hembra / Macho
+  pesoKg          Float
+  estadoSanitario EstadoSanitario @default(SALUDABLE)
+  fechaNacimiento DateTime?
+  fechaRegistro   DateTime        @default(now())
+
+  // Relación con Potrero
+  potreroId       String?
+  potrero         Potrero?        @relation(fields: [potreroId], references: [id], onDelete: SetNull)
+
+  // Historial sanitario individual opcional
+  eventosSanitarios SanidadEvento[]
+
+  @@map("ganado")
+}
+
+// 4. Módulo Sanitario y Calendario de Vacunación
+model SanidadEvento {
+  id              String   @id @default(cuid())
+  evento          String   // e.g. "Vacunación Antiaftosa", "Control de Carbunclo"
+  tipo            String   // "Vacunación", "Tratamiento", "Mantenimiento"
+  lote            String?  // Nombre del lote / potrero o grupo
+  fechaProgramada DateTime
+  estado          String   @default("Pendiente") // "Pendiente", "Próximo", "Completado", "Programado"
+  prioridad       String   @default("Normal")    // "Alta", "Urgente", "Normal"
+  icono           String?  @default("fa-syringe")
+  notas           String?
+  fechaRegistro   DateTime @default(now())
+
+  // Relación con Animal específico (opcional)
+  ganadoId        String?
+  ganado          Ganado?  @relation(fields: [ganadoId], references: [id], onDelete: SetNull)
+
+  // Relación con Responsable (Usuario)
+  responsableId   String?
+  responsable     Usuario? @relation("ResponsableEventos", fields: [responsableId], references: [id], onDelete: SetNull)
+
+  @@map("sanidad_eventos")
+}
+
+// 5. Inventario de Insumos y Herramientas
+model Insumo {
+  id                 String   @id @default(cuid())
+  nombre             String
+  categoria          String   // "Fármaco", "Nutrición", "Herramientas"
+  stockActual        Float
+  stockMinimo        Float
+  unidad             String   // "Dosis", "Frascos", "Kg", "Bolsas", "Unidades"
+  ubicacion          String
+  estado             String   @default("OK") // "OK", "Bajo Stock", "Crítico"
+  requiereReposicion Boolean  @default(false)
+  icono              String?  @default("fa-box-archive")
+  fechaRegistro      DateTime @default(now())
+
+  @@map("insumos")
+}
+
+// 6. Partes Diarios de Novedades de Campo
+model ParteDiario {
+  id                String      @id @default(cuid())
+  fecha             DateTime    @default(now())
+  novedades         String
+  animalesRevisados Int         @default(0)
+  solicitudInsumos  String?
+  estado            EstadoParte @default(PENDIENTE)
+  fechaCarga        DateTime    @default(now())
+  fechaRevision     DateTime?
+
+  // Operario que carga el parte (Peón)
+  peonId            String
+  peon              Usuario     @relation("PeonPartes", fields: [peonId], references: [id], onDelete: Cascade)
+
+  // Supervisor que aprueba el parte (Capataz)
+  revisadoPorId     String?
+  revisadoPor       Usuario?    @relation("RevisorPartes", fields: [revisadoPorId], references: [id], onDelete: SetNull)
+
+  // Potrero sobre el que se reporta
+  potreroId         String?
+  potrero           Potrero?    @relation(fields: [potreroId], references: [id], onDelete: SetNull)
+
+  @@map("partes_diarios")
+}
+
+// 7. Contactos de la Landing Page
+model MensajeContacto {
+  id         String   @id @default(cuid())
+  nombre     String
+  email      String
+  telefono   String?
+  mensaje    String
+  leido      Boolean  @default(false)
+  fechaEnvio DateTime @default(now())
+
+  @@map("mensajes_contacto")
 }

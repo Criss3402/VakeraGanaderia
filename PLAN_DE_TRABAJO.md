@@ -232,45 +232,122 @@ client/
 
 ---
 
+### 6.3. Arquitectura de Datos y Persistencia (Docker, PostgreSQL y Prisma ORM)
+
+Para garantizar la persistencia de datos y el escalado del sistema, se sustituye el almacenamiento temporal en memoria por una base de datos relacional PostgreSQL contenida en Docker y administrada mediante el ORM Prisma.
+
+#### 6.3.1. Modelo Entidad-Relación (DER) y Tablas del Sistema:
+
+```
+┌─────────────────┐        ┌──────────────────┐        ┌─────────────────┐
+│     USUARIO     │ 1    N │   PARTE_DIARIO   │ N    1 │     POTRERO     │
+│─────────────────│◄───────│──────────────────│───────►│─────────────────│
+│ id (PK)         │(peon)  │ id (PK)          │(campo) │ id (PK)         │
+│ email (UQ)      │        │ novedades        │        │ nombre (UQ)     │
+│ password (Hash) │ 1    N │ animalesRev (Int)│        │ superficieHas   │
+│ rol (ENUM RBAC) │◄───────│ estado (ENUM)    │        │ capacidad       │
+│ establecimiento │(revisor│ peonId (FK)      │        └────────┬────────┘
+└────────┬────────┘        │ potreroId (FK)   │                 │ 1
+         │                 │ revisadoPorId(FK)│                 │
+         │ 1               └──────────────────┘                 │ N
+         │                                                      ▼
+         │ N               ┌──────────────────┐        ┌─────────────────┐
+         └────────────────►│  SANIDAD_EVENTO  │ N    1 │     GANADO      │
+           (responsable)   │──────────────────│───────►│─────────────────│
+                           │ id (PK)          │(animal)│ id (PK)         │
+                           │ evento           │        │ caravana (UQ)   │
+                           │ tipo/lote        │        │ categoria/raza  │
+                           │ fechaProgramada  │        │ pesoKg (Float)  │
+                           │ estado/prioridad │        │ estadoSanitario │
+                           │ responsableId(FK)│        │ potreroId (FK)  │
+                           │ ganadoId (FK)    │        └─────────────────┘
+                           └──────────────────┘
+
+┌─────────────────┐        ┌──────────────────┐
+│     INSUMO      │        │ MENSAJE_CONTACTO │
+│─────────────────│        │──────────────────│
+│ id (PK)         │        │ id (PK)          │
+│ nombre (VarChar)│        │ nombre / email   │
+│ categoria       │        │ telefono         │
+│ stockActual/Min │        │ mensaje          │
+│ requiereRep (B) │        │ leido (Boolean)  │
+└─────────────────┘        └──────────────────┘
+```
+
+#### 6.3.2. Detalle de Modelos Prisma (`prisma/schema.prisma`):
+1. **`Usuario`**: Autenticación segura (contraseña cifrada con `bcrypt`), perfiles y control de acceso basado en el Enum `Rol` (`DUENO`, `CAPATAZ`, `PEON`, `OFICINA`, `VETERINARIO`).
+2. **`Potrero`**: Divisiones geográficas del establecimiento con registro de hectáreas y capacidad ganadera.
+3. **`Ganado`**: Registro individual con caravana única, raza, categoría, peso actual, estado sanitario y potrero asignado.
+4. **`SanidadEvento`**: Calendario sanitario preventivo, alertas de vacunación por vencer, tratamientos y responsable asignado.
+5. **`Insumo`**: Control de stock de medicamentos, raciones y herramientas con semáforo de reposición automática.
+6. **`ParteDiario`**: Reportes de novedades cargados por peones, vinculados al potrero inspeccionado y con flujo de aprobación por capataz.
+7. **`MensajeContacto`**: Almacenamiento de consultas recibidas a través de la landing institucional pública.
+
+#### 6.3.3. Ciclo de Vida y Comandos de Base de Datos:
+```bash
+# 1. Iniciar el contenedor de PostgreSQL en segundo plano
+docker compose up -d
+
+# 2. Generar el cliente de Prisma sincronizado con los modelos
+npx prisma generate
+
+# 3. Crear y aplicar las migraciones a PostgreSQL
+npx prisma migrate dev --name init_vakera_schema
+
+# 4. Poblar la base de datos con los datos semilla (usuarios demo, ganado, insumos)
+npx prisma db seed
+
+# 5. Explorador visual web de tablas y datos (opcional)
+npx prisma studio
+```
+
+---
+
 ## 7. Fases de Implementación (Roadmap)
 
 ```
 [FASE 1] Landing Page & Presentación (COMPLETADO)
     │
     ▼
-[FASE 2] Login, Registro & Permisos RBAC (Autenticación y Seguridad)
+[FASE 2] Persistencia (Docker + PostgreSQL + Prisma) & Autenticación RBAC
     │
     ▼
-[FASE 3] Dashboard Principal (KPIs, Métricas y Alertas)
+[FASE 3] Dashboard Principal (KPIs, Métricas y Alertas con Datos Reales)
     │
     ▼
-[FASE 4] Gestión de Ganado y Potreros (Ficha individual y por lote)
+[FASE 4] Gestión de Ganado y Potreros (ABM completo y traslados)
     │
     ▼
 [FASE 5] Módulo Sanitario y Vacunación (Alertas y vencimientos)
     │
     ▼
-[FASE 6] Inventario de Insumos y Herramientas (Control de stock)
+[FASE 6] Inventario de Insumos y Herramientas (Control de stock y reposición)
     │
     ▼
 [FASE 7] Partes Diarios y Flujo Operativo (Peón -> Capataz -> Veterinario)
     │
     ▼
-[FASE 8] Auditoría Ejecutiva, Pruebas y Despliegue
+[FASE 8] Auditoría Ejecutiva, Pruebas y Despliegue en Producción
 ```
 
 ### Detalle de Fases:
 
 #### Fase 1: Inicio y Presentación Institucional *(Estado: Finalizado)*
 - Landing page responsiva completa.
-- Formulario de contacto con persistencia en backend.
+- Formulario de contacto conectado con backend.
 - Catálogo de servicios provisto por API Express.
 
-#### Fase 2: Autenticación, Registro y Matriz de Permisos (RBAC) *(Próximo paso)*
-- Creación del modelo de usuarios con roles definidos (`peon`, `capataz`, `oficina`, `dueno`, `veterinario`).
-- Endpoints en backend: registro, login, emisión y verificación de token JWT.
-- Vistas de Frontend: pantallas de Login y Registro con validaciones.
-- `AuthContext` y `ProtectedRoute` en React para proteger vistas internas según el rol del usuario.
+#### Fase 2: Persistencia (Docker + PostgreSQL + Prisma) y Autenticación RBAC *(Próximo paso)*
+- **Infraestructura de Datos:**
+  - Contenedor PostgreSQL 16 activo vía Docker (`vakera_db`).
+  - Creación y ejecución de migraciones con Prisma ORM (`prisma/schema.prisma`).
+  - Carga de semillas iniciales (`prisma/seed.js`) con las 5 cuentas demo y animales de prueba.
+  - Conexión del cliente Prisma en `server/src/config/prisma.js`.
+- **Autenticación y Seguridad:**
+  - Cifrado de contraseñas con `bcryptjs`.
+  - Endpoints en backend: registro, login, emisión y verificación de token JWT.
+  - Vistas de Frontend: pantallas de Login y Registro con validaciones.
+  - `AuthContext` y `ProtectedRoute` en React para proteger vistas internas según el rol del usuario.
 
 #### Fase 3: Dashboard Central y Tablero de Control
 - Vista de Dashboard con KPIs clave:
