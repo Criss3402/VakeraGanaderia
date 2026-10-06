@@ -1,5 +1,8 @@
+const jwt = require("jsonwebtoken");
 const UsuarioModel = require("../models/usuario.model");
 const { error } = require("../utils/apiResponse");
+
+const JWT_SECRET = process.env.JWT_SECRET || "vakera_dev_secret_no_usar_en_produccion";
 
 async function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -11,30 +14,26 @@ async function authMiddleware(req, res, next) {
   const token = authHeader.split(" ")[1];
 
   try {
-    let userId = null;
+    // Verificación criptográfica del JWT
+    const decoded = jwt.verify(token, JWT_SECRET);
 
-    // Soporte para tokens firmados base64 o tokens tipo "vakera-usr-1"
-    if (token.startsWith("vakera-token-")) {
-      userId = token.replace("vakera-token-", "");
-    } else {
-      try {
-        const decoded = JSON.parse(Buffer.from(token, "base64").toString("utf-8"));
-        userId = decoded.id;
-      } catch {
-        userId = token;
-      }
-    }
-
-    const usuario = await UsuarioModel.buscarPorId(userId);
+    // Buscar el usuario en la base de datos para verificar que aún existe
+    const usuario = await UsuarioModel.buscarPorId(decoded.id);
 
     if (!usuario) {
-      return error(res, "Sesión inválida o expirada.", 401);
+      return error(res, "Sesión inválida: el usuario ya no existe.", 401);
     }
 
     req.usuario = usuario;
     next();
   } catch (err) {
-    return error(res, "Error al autenticar sesión.", 401, err.message);
+    if (err.name === "TokenExpiredError") {
+      return error(res, "La sesión ha expirado. Por favor, volvé a iniciar sesión.", 401);
+    }
+    if (err.name === "JsonWebTokenError") {
+      return error(res, "Token de sesión inválido.", 401);
+    }
+    return error(res, "Error al verificar la sesión.", 401);
   }
 }
 

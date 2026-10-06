@@ -10,7 +10,8 @@ function rbacMiddleware(...rolesPermitidos) {
       return error(res, "Autenticación requerida para acceder a este recurso.", 401);
     }
 
-    if (!rolesPermitidos.includes(req.usuario.rol)) {
+    const rolNormalizado = (req.usuario.rol || "").toLowerCase();
+    if (!rolesPermitidos.includes(rolNormalizado)) {
       return error(
         res,
         `Acceso denegado. Se requiere uno de los siguientes roles: [${rolesPermitidos.join(", ")}]. Tu rol actual es '${req.usuario.rol}'.`,

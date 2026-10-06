@@ -1,10 +1,18 @@
 const { PrismaClient } = require("@prisma/client");
+const bcrypt = require("bcryptjs");
 const prisma = new PrismaClient();
+
+const SALT_ROUNDS = 10;
+const PASSWORD_DEMO = "password123";
 
 async function main() {
   console.log("Iniciando carga de semillas (Seed) para Vakera Ganadería...");
 
-  // 1. Limpieza ordenada de tablas existentes
+  // Hashear contraseña de demostración una sola vez
+  const passwordHasheada = await bcrypt.hash(PASSWORD_DEMO, SALT_ROUNDS);
+  console.log("- Contraseñas hasheadas con bcrypt.");
+
+  // 1. Limpieza ordenada de tablas existentes (respetando claves foráneas)
   await prisma.mensajeContacto.deleteMany();
   await prisma.parteDiario.deleteMany();
   await prisma.sanidadEvento.deleteMany();
@@ -15,13 +23,13 @@ async function main() {
 
   console.log("- Tablas limpiadas con éxito.");
 
-  // 2. Usuarios con roles RBAC
+  // 2. Usuarios con roles RBAC (contraseñas hasheadas)
   const usuariosSeed = [
     {
       id: "usr-1",
       nombre: "Cristian Joaquín",
       email: "dueno@vakera.com",
-      password: "password123", // Para producción se hashea con bcrypt
+      password: passwordHasheada,
       rol: "DUENO",
       cargo: "Propietario / Director",
       telefono: "+54 9 11 4567-8901",
@@ -31,7 +39,7 @@ async function main() {
       id: "usr-2",
       nombre: "Martín Benítez",
       email: "capataz@vakera.com",
-      password: "password123",
+      password: passwordHasheada,
       rol: "CAPATAZ",
       cargo: "Capataz General",
       telefono: "+54 9 11 5678-1234",
@@ -41,7 +49,7 @@ async function main() {
       id: "usr-3",
       nombre: "Lucas Giménez",
       email: "peon@vakera.com",
-      password: "password123",
+      password: passwordHasheada,
       rol: "PEON",
       cargo: "Peón de Campo",
       telefono: "+54 9 11 6789-2345",
@@ -51,7 +59,7 @@ async function main() {
       id: "usr-4",
       nombre: "Valeria Rossi",
       email: "oficina@vakera.com",
-      password: "password123",
+      password: passwordHasheada,
       rol: "OFICINA",
       cargo: "Administración y Compras",
       telefono: "+54 9 11 7890-3456",
@@ -61,7 +69,7 @@ async function main() {
       id: "usr-5",
       nombre: "Dra. Sofía Navarro",
       email: "veterinario@vakera.com",
-      password: "password123",
+      password: passwordHasheada,
       rol: "VETERINARIO",
       cargo: "Médica Veterinaria (Mat. 4892)",
       telefono: "+54 9 11 8901-4567",
@@ -72,7 +80,7 @@ async function main() {
   for (const u of usuariosSeed) {
     await prisma.usuario.create({ data: u });
   }
-  console.log(`- ${usuariosSeed.length} usuarios creados.`);
+  console.log(`- ${usuariosSeed.length} usuarios creados (contraseña demo: "${PASSWORD_DEMO}").`);
 
   // 3. Potreros
   const potrerosSeed = [
@@ -269,7 +277,8 @@ async function main() {
       fecha: new Date("2026-09-19"),
       peonId: "usr-3", // Lucas Giménez
       potreroId: "pot-2",
-      novedades: "Nacimiento de 2 terneros machos en buen estado. Alambrado perimetral este con hilo caído por viento.",
+      novedades:
+        "Nacimiento de 2 terneros machos en buen estado. Alambrado perimetral este con hilo caído por viento.",
       animalesRevisados: 85,
       solicitudInsumos: "Se necesitan 10 metros de alambre y varillas.",
       estado: "PENDIENTE",
@@ -279,7 +288,8 @@ async function main() {
       fecha: new Date("2026-09-18"),
       peonId: "usr-3",
       potreroId: "pot-5",
-      novedades: "Novillo AR-84922 apartado con renguera en pata trasera derecha. Se apartó a corralillo.",
+      novedades:
+        "Novillo AR-84922 apartado con renguera en pata trasera derecha. Se apartó a corralillo.",
       animalesRevisados: 120,
       solicitudInsumos: null,
       estado: "APROBADO",
@@ -294,6 +304,10 @@ async function main() {
   console.log(`- ${partesSeed.length} partes diarios cargados.`);
 
   console.log("¡Carga de semillas completada exitosamente!");
+  console.log(`\nCredenciales de acceso demo:`);
+  console.log(`  Email: dueno@vakera.com | Contraseña: ${PASSWORD_DEMO}`);
+  console.log(`  Email: capataz@vakera.com | Contraseña: ${PASSWORD_DEMO}`);
+  console.log(`  Email: peon@vakera.com | Contraseña: ${PASSWORD_DEMO}`);
 }
 
 main()

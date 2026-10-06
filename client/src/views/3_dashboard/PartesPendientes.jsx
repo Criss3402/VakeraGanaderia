@@ -77,7 +77,13 @@ export default function PartesPendientes({ partes = [], cargando = false, alActu
       ) : (
         <div className="lista-partes">
           {partes.map((p) => {
-            const esPendiente = p.estado === "Pendiente";
+            const estadoMayus = (p.estado || "").toUpperCase();
+            const esPendiente = estadoMayus === "PENDIENTE";
+            const varianteBadge =
+              estadoMayus === "APROBADO" ? "exito" : estadoMayus === "RECHAZADO" ? "peligro" : "alerta";
+            const textoEstado =
+              estadoMayus === "APROBADO" ? "Aprobado" : estadoMayus === "RECHAZADO" ? "Rechazado" : "Pendiente";
+
             return (
               <article
                 key={p.id}
@@ -88,17 +94,8 @@ export default function PartesPendientes({ partes = [], cargando = false, alActu
                     <span className="parte-card__fecha">📅 {p.fecha}</span> •{" "}
                     <strong>{p.potrero}</strong>
                   </div>
-                  <Badge
-                    variante={
-                      p.estado === "Aprobado"
-                        ? "exito"
-                        : p.estado === "Rechazado"
-                        ? "peligro"
-                        : "alerta"
-                    }
-                    tamano="sm"
-                  >
-                    {p.estado}
+                  <Badge variante={varianteBadge} tamano="sm">
+                    {textoEstado}
                   </Badge>
                 </div>
 
@@ -131,14 +128,14 @@ export default function PartesPendientes({ partes = [], cargando = false, alActu
                     <Button
                       variante="exito"
                       tamano="sm"
-                      onClick={() => manejarCambioEstado(p.id, "Aprobado")}
+                      onClick={() => manejarCambioEstado(p.id, "APROBADO")}
                     >
                       ✓ Aprobar Novedades
                     </Button>
                     <Button
                       variante="peligro"
                       tamano="sm"
-                      onClick={() => manejarCambioEstado(p.id, "Rechazado")}
+                      onClick={() => manejarCambioEstado(p.id, "RECHAZADO")}
                     >
                       ✕ Rechazar / Observar
                     </Button>
