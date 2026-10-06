@@ -12,7 +12,9 @@ class PresentacionController {
 
   static obtenerServicioPorId(req, res) {
     const { id } = req.params;
-    const servicio = servicios.find((s) => s.id === id);
+    const servicio = servicios.find(
+      (s, idx) => s.id === id || String(idx + 1) === id
+    );
     if (!servicio) {
       return error(res, "Servicio no encontrado", 404);
     }
