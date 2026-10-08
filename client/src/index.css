@@ -213,6 +213,92 @@ ul {
   display: flex;
   gap: 10px;
   flex-shrink: 0;
+  position: relative;
+}
+
+.navbar__login-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.login-dropdown {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  width: 370px;
+  max-width: calc(100vw - 32px);
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 24px 22px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: var(--carbon);
+  z-index: 100;
+  animation: desplegarMenuLogin 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: top right;
+}
+
+@keyframes desplegarMenuLogin {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.login-dropdown::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  right: 30px;
+  width: 12px;
+  height: 12px;
+  background: #ffffff;
+  transform: rotate(45deg);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.login-dropdown__cabecera {
+  margin-bottom: 16px;
+}
+
+.login-dropdown__titulo {
+  font-family: var(--fuente-display);
+  font-size: 1.35rem;
+  color: var(--verde-profundo);
+  margin-bottom: 4px;
+}
+
+.login-dropdown__subtitulo {
+  font-size: 0.84rem;
+  color: #667069;
+  line-height: 1.35;
+}
+
+.login-dropdown__form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.login-dropdown__olvido {
+  display: flex;
+  justify-content: flex-end;
+  font-size: 0.82rem;
+  margin-top: -4px;
+}
+
+.login-dropdown__pie {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #edf0ec;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #555;
 }
 
 .navbar__hamburguesa {

@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
+import LoginDropdown from "./LoginDropdown";
 
 const ENLACES = [
   { href: "#inicio", label: "Inicio" },
@@ -9,16 +10,49 @@ const ENLACES = [
   { href: "#contacto", label: "Contacto" },
 ];
 
-export default function NavbarLanding({ alIniciarSesion, alRegistrarse, alIrAlDashboard }) {
+export default function NavbarLanding({
+  alIniciarSesion,
+  alRegistrarse,
+  alIrAlDashboard,
+  alIrARecuperar,
+  loginAbierto,
+  setLoginAbierto,
+}) {
   const { estaAutenticado, usuario, rol } = useAuth();
   const [scrolled, setScrolled] = useState(false);
   const [menuAbierto, setMenuAbierto] = useState(false);
+  const [loginAbiertoInterno, setLoginAbiertoInterno] = useState(false);
+  const loginRef = useRef(null);
+
+  const esLoginAbierto = loginAbierto !== undefined ? loginAbierto : loginAbiertoInterno;
+  const cambiarLoginAbierto = setLoginAbierto || setLoginAbiertoInterno;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    function handleClickAfuera(e) {
+      if (loginRef.current && !loginRef.current.contains(e.target)) {
+        cambiarLoginAbierto(false);
+      }
+    }
+    function handleKeyDown(e) {
+      if (e.key === "Escape") {
+        cambiarLoginAbierto(false);
+      }
+    }
+    if (esLoginAbierto) {
+      document.addEventListener("mousedown", handleClickAfuera);
+      document.addEventListener("keydown", handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickAfuera);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [esLoginAbierto, cambiarLoginAbierto]);
 
   return (
     <header className={`navbar ${scrolled ? "navbar--scrolled" : ""}`}>
@@ -50,17 +84,41 @@ export default function NavbarLanding({ alIniciarSesion, alRegistrarse, alIrAlDa
             </button>
           ) : (
             <>
-              <button
-                type="button"
-                className="boton boton--fantasma"
-                onClick={alIniciarSesion}
-              >
-                Iniciar sesión
-              </button>
+              <div className="navbar__login-wrapper" ref={loginRef}>
+                <button
+                  type="button"
+                  className={`boton ${esLoginAbierto ? "boton--relleno" : "boton--fantasma"}`}
+                  onClick={() => cambiarLoginAbierto(!esLoginAbierto)}
+                  aria-expanded={esLoginAbierto}
+                  aria-haspopup="dialog"
+                >
+                  Iniciar sesión
+                </button>
+
+                {esLoginAbierto && (
+                  <LoginDropdown
+                    alIrARegistro={() => {
+                      cambiarLoginAbierto(false);
+                      alRegistrarse();
+                    }}
+                    alIrARecuperar={() => {
+                      cambiarLoginAbierto(false);
+                      if (alIrARecuperar) alIrARecuperar();
+                      else if (alIniciarSesion) alIniciarSesion();
+                    }}
+                    alIniciarExito={alIrAlDashboard}
+                    alCerrar={() => cambiarLoginAbierto(false)}
+                  />
+                )}
+              </div>
+
               <button
                 type="button"
                 className="boton boton--relleno"
-                onClick={alRegistrarse}
+                onClick={() => {
+                  cambiarLoginAbierto(false);
+                  alRegistrarse();
+                }}
               >
                 Registrarse
               </button>

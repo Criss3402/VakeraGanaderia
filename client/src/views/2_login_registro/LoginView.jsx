@@ -3,10 +3,9 @@ import { useAuth } from "../../context/AuthContext";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import Alert from "../../components/ui/Alert";
-import Badge from "../../components/ui/Badge";
 
 export default function LoginView({ alIrARegistro, alIrARecuperar, alIrALanding, alIniciarExito }) {
-  const { iniciarSesion, loginRapido, usuariosDemo } = useAuth();
+  const { iniciarSesion } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [cargando, setCargando] = useState(false);
@@ -22,19 +21,6 @@ export default function LoginView({ alIrARegistro, alIrARecuperar, alIrALanding,
       if (alIniciarExito) alIniciarExito();
     } catch (err) {
       setError(err.message || "Error al iniciar sesión.");
-    } finally {
-      setCargando(false);
-    }
-  }
-
-  async function manejarLoginRapido(rol) {
-    setError("");
-    setCargando(true);
-    try {
-      await loginRapido(rol);
-      if (alIniciarExito) alIniciarExito();
-    } catch (err) {
-      setError(err.message || "Error con el acceso rápido.");
     } finally {
       setCargando(false);
     }
@@ -105,79 +91,6 @@ export default function LoginView({ alIrARegistro, alIrARecuperar, alIrALanding,
             Iniciar Sesión
           </Button>
         </form>
-
-        {/* Acceso rápido por rol para demostraciones y pruebas fluidas */}
-        <div className="auth-demo-roles">
-          <div className="auth-demo-roles__divisor">
-            <span>O ingresá con 1-clic de prueba</span>
-          </div>
-
-          <p className="auth-demo-roles__nota">
-            Haz clic en cualquiera de los 5 roles del sistema para probar la experiencia correspondiente:
-          </p>
-
-          <div className="auth-demo-roles__grid">
-            <button
-              type="button"
-              onClick={() => manejarLoginRapido("dueno")}
-              className="auth-demo-card"
-            >
-              <span className="auth-demo-card__icono">👑</span>
-              <div>
-                <strong>Dueño</strong>
-                <small>Visión total & auditoría</small>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => manejarLoginRapido("capataz")}
-              className="auth-demo-card"
-            >
-              <span className="auth-demo-card__icono">🤠</span>
-              <div>
-                <strong>Capataz</strong>
-                <small>Aprobación & campo</small>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => manejarLoginRapido("peon")}
-              className="auth-demo-card"
-            >
-              <span className="auth-demo-card__icono">🚜</span>
-              <div>
-                <strong>Peón</strong>
-                <small>Carga de novedades</small>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => manejarLoginRapido("oficina")}
-              className="auth-demo-card"
-            >
-              <span className="auth-demo-card__icono">💼</span>
-              <div>
-                <strong>Oficina</strong>
-                <small>Compras & insumos</small>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => manejarLoginRapido("veterinario")}
-              className="auth-demo-card"
-            >
-              <span className="auth-demo-card__icono">🩺</span>
-              <div>
-                <strong>Veterinario</strong>
-                <small>Sanidad & vacunas</small>
-              </div>
-            </button>
-          </div>
-        </div>
 
         <div className="auth-caja__pie">
           <p>
