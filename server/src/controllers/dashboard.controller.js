@@ -2,6 +2,7 @@ const GanadoModel = require("../models/ganado.model");
 const SanidadModel = require("../models/sanidad.model");
 const InsumoModel = require("../models/insumo.model");
 const ParteDiarioModel = require("../models/parteDiario.model");
+const WeatherService = require("../services/weather.service");
 const { exito, error } = require("../utils/apiResponse");
 
 class DashboardController {
@@ -180,6 +181,41 @@ class DashboardController {
       return exito(res, parteActualizado, `Parte diario marcado como ${estadoNormalizado}.`);
     } catch (err) {
       return error(res, "Error al actualizar estado del parte diario: " + err.message, 500);
+    }
+  }
+
+  // 6. Condiciones Climáticas (Google Weather API / Contingencia)
+  static async obtenerClima(req, res) {
+    try {
+      const { lat, lon } = req.query || {};
+      const clima = await WeatherService.obtenerCondicionesActuales({ lat, lon });
+      return exito(res, clima, "Condiciones climáticas obtenidas con éxito.");
+    } catch (err) {
+      return error(res, "Error al consultar condiciones climáticas: " + err.message, 500);
+    }
+  }
+
+  // 7. Reportes Consolidados (Dueño / Oficina / Capataz / Veterinario)
+  static async obtenerReportes(req, res) {
+    try {
+      const [metricasGanado, insumosCriticos, partes] = await Promise.all([
+        GanadoModel.obtenerMetricas(),
+        InsumoModel.obtenerCriticos(),
+        ParteDiarioModel.listarTodos(),
+      ]);
+
+      const reporte = {
+        resumenGanado: metricasGanado,
+        insumosCriticos,
+        totalPartes: partes.length,
+        partesAprobados: partes.filter((p) => (p.estado || "").toUpperCase() === "APROBADO").length,
+        partesPendientes: partes.filter((p) => (p.estado || "").toUpperCase() === "PENDIENTE").length,
+        fechaGeneracion: new Date().toISOString(),
+      };
+
+      return exito(res, reporte, "Reportes consolidados generados exitosamente.");
+    } catch (err) {
+      return error(res, "Error al generar reportes: " + err.message, 500);
     }
   }
 }

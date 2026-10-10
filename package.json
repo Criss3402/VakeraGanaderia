@@ -8,7 +8,13 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
-    "db:generate": "prisma generate"
+    "db:generate": "prisma generate",
+    "server:node": "npm --prefix server run dev",
+    "server:py": "python server_py/manage.py runserver 8000",
+    "client:dev": "npm --prefix client run dev",
+    "client:build": "npm --prefix client run build",
+    "py:check": "python server_py/manage.py check",
+    "py:test": "python server_py/manage.py test core nutricion reportes"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

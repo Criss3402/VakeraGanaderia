@@ -17,5 +17,21 @@ services:
       timeout: 5s
       retries: 5
 
+  backend-python:
+    build:
+      context: ./server_py
+      dockerfile: Dockerfile
+    container_name: vakera-django
+    restart: on-failure
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/vakera_db?schema=public
+      - JWT_SECRET=vakera_super_secret_jwt_key_2026
+      - DJANGO_DEBUG=True
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   pgdata:
