@@ -1,3 +1,4 @@
+import { useState } from "react";
 import NavbarLanding from "./NavbarLanding";
 import Hero from "./Hero";
 import QuienesSomos from "./QuienesSomos";
@@ -11,21 +12,30 @@ export default function LandingView({
   alRegistrarse,
   alIrAlDashboard,
 }) {
+  const [loginAbierto, setLoginAbierto] = useState(false);
+
+  function abrirLogin() {
+    setLoginAbierto(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   return (
     <div className="landing-view">
       <NavbarLanding
-        alIniciarSesion={alIniciarSesion}
+        alIniciarSesion={abrirLogin}
         alRegistrarse={alRegistrarse}
         alIrAlDashboard={alIrAlDashboard}
+        loginAbierto={loginAbierto}
+        setLoginAbierto={setLoginAbierto}
       />
       <main>
-        <Hero alIniciarSesion={alIniciarSesion} />
+        <Hero alIniciarSesion={abrirLogin} />
         <QuienesSomos />
         <Servicios />
         <Faq />
         <Contacto />
       </main>
-      <FooterLanding alIniciarSesion={alIniciarSesion} />
+      <FooterLanding alIniciarSesion={abrirLogin} />
     </div>
   );
 }

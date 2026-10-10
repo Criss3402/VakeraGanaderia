@@ -9,33 +9,72 @@ const router = express.Router();
 // Todas las rutas del dashboard requieren autenticación
 router.use(authMiddleware);
 
-// Métricas generales y KPIs
+// 1. Métricas generales y KPIs (Todos los roles autenticados)
 router.get("/metricas", DashboardController.obtenerMetricas);
 
-// Alertas sanitarias y vacunaciones
-router.get("/alertas", DashboardController.obtenerAlertas);
-
-// Insumos críticos y alertas de stock
-router.get("/insumos-criticos", DashboardController.obtenerInsumosCriticos);
-
-// Condiciones climáticas (Google Weather API / Contingencia)
+// 2. Condiciones climáticas (Google Weather API / Contingencia)
 router.get("/clima", DashboardController.obtenerClima);
 
-// Partes diarios de novedades
-router.get("/partes", DashboardController.obtenerPartes);
+// 3. Módulo de Ganado y Potreros
+router.get("/ganado", DashboardController.obtenerGanado);
+router.get("/potreros", DashboardController.obtenerPotreros);
+router.post(
+  "/ganado",
+  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ),
+  DashboardController.registrarGanado
+);
+router.patch(
+  "/ganado/:id",
+  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ, ROLES.VETERINARIO),
+  DashboardController.actualizarGanado
+);
 
-// Carga de partes diarios (Peón, Capataz, Dueño)
+// 4. Módulo Sanitario y Vacunaciones
+router.get("/alertas", DashboardController.obtenerAlertas);
+router.get("/sanidad", DashboardController.obtenerAlertas);
+router.post(
+  "/sanidad",
+  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ, ROLES.VETERINARIO),
+  DashboardController.registrarEventoSanitario
+);
+router.patch(
+  "/sanidad/:id/estado",
+  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ, ROLES.VETERINARIO),
+  DashboardController.actualizarEstadoSanitario
+);
+
+// 5. Módulo de Insumos y Stock
+router.get("/insumos", DashboardController.obtenerInsumosCriticos);
+router.get("/insumos-criticos", DashboardController.obtenerInsumosCriticos);
+router.post(
+  "/insumos",
+  rbacMiddleware(ROLES.DUENO, ROLES.OFICINA),
+  DashboardController.registrarInsumo
+);
+router.patch(
+  "/insumos/:id/stock",
+  rbacMiddleware(ROLES.DUENO, ROLES.OFICINA, ROLES.CAPATAZ),
+  DashboardController.actualizarStockInsumo
+);
+
+// 6. Partes diarios de novedades de campo
+router.get("/partes", DashboardController.obtenerPartes);
 router.post(
   "/partes",
   rbacMiddleware(ROLES.PEON, ROLES.CAPATAZ, ROLES.DUENO),
   DashboardController.registrarParteDiario
 );
-
-// Aprobación de partes diarios (Capataz, Dueño)
 router.patch(
   "/partes/:id/estado",
   rbacMiddleware(ROLES.CAPATAZ, ROLES.DUENO),
   DashboardController.actualizarEstadoParte
+);
+
+// 7. Reportes y Balances (Dueño y Oficina, Capataz y Veterinario en lectura)
+router.get(
+  "/reportes",
+  rbacMiddleware(ROLES.DUENO, ROLES.OFICINA, ROLES.CAPATAZ, ROLES.VETERINARIO),
+  DashboardController.obtenerReportes
 );
 
 module.exports = router;

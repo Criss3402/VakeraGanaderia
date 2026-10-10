@@ -4,10 +4,10 @@ const db = require("../config/db");
 class InsumoModel {
   static async listarTodos() {
     try {
-      const insumos = await prisma.insumo.findMany({
+      const lista = await prisma.insumo.findMany({
         orderBy: { nombre: "asc" },
       });
-      return insumos;
+      return lista;
     } catch (err) {
       console.warn("[InsumoModel] Fallo al consultar Prisma, usando fallback en memoria:", err.message);
       return db.insumos;
@@ -16,29 +16,39 @@ class InsumoModel {
 
   static async obtenerCriticos() {
     try {
-      const todos = await this.listarTodos();
-      return todos.filter(
-        (item) => item.requiereReposicion || Number(item.stockActual) <= Number(item.stockMinimo)
-      );
+      const lista = await prisma.insumo.findMany({
+        where: {
+          OR: [
+            { requiereReposicion: true },
+            { estado: "Bajo Stock" },
+            { estado: "Crítico" },
+          ],
+        },
+      });
+      return lista;
     } catch {
       return db.insumos.filter(
-        (item) => item.requiereReposicion || item.stockActual <= item.stockMinimo
+        (item) => item.requiereReposicion || Number(item.stockActual) <= Number(item.stockMinimo)
       );
     }
   }
 
   static async registrar(insumo) {
-    const esCritico = Number(insumo.stockActual) <= Number(insumo.stockMinimo);
+    const stockActual = parseFloat(insumo.stockActual) || 0;
+    const stockMinimo = parseFloat(insumo.stockMinimo) || 5;
+    const esCritico = stockActual <= stockMinimo;
+    const estado = esCritico ? "Crítico" : "OK";
+
     try {
       const nuevo = await prisma.insumo.create({
         data: {
           nombre: insumo.nombre,
-          categoria: insumo.categoria || "Herramientas",
-          stockActual: Number(insumo.stockActual) || 0,
-          stockMinimo: Number(insumo.stockMinimo) || 5,
+          categoria: insumo.categoria || "Fármaco",
+          stockActual,
+          stockMinimo,
           unidad: insumo.unidad || "Unidades",
           ubicacion: insumo.ubicacion || "Depósito Central",
-          estado: esCritico ? "Crítico" : "OK",
+          estado,
           requiereReposicion: esCritico,
           icono: insumo.icono || "fa-box-archive",
         },
@@ -49,11 +59,49 @@ class InsumoModel {
       const nuevo = {
         id: `ins-${Date.now()}`,
         ...insumo,
-        estado: esCritico ? "Crítico" : "Normal",
+        stockActual,
+        stockMinimo,
+        estado,
         requiereReposicion: esCritico,
       };
       db.insumos.push(nuevo);
       return nuevo;
+    }
+  }
+
+  static async actualizarStock(id, cantidadCambio, operacion = "sumar") {
+    try {
+      const actual = await prisma.insumo.findUnique({ where: { id } });
+      if (!actual) throw new Error("Insumo no encontrado");
+
+      const delta = parseFloat(cantidadCambio) || 0;
+      const nuevoStock = operacion === "sumar"
+        ? actual.stockActual + delta
+        : Math.max(0, actual.stockActual - delta);
+
+      const requiereReposicion = nuevoStock <= actual.stockMinimo;
+      const estado = requiereReposicion ? "Bajo Stock" : "OK";
+
+      return await prisma.insumo.update({
+        where: { id },
+        data: {
+          stockActual: nuevoStock,
+          requiereReposicion,
+          estado,
+        },
+      });
+    } catch (e) {
+      const insumo = db.insumos.find((i) => i.id === id);
+      if (insumo) {
+        const delta = parseFloat(cantidadCambio) || 0;
+        insumo.stockActual = operacion === "sumar"
+          ? insumo.stockActual + delta
+          : Math.max(0, insumo.stockActual - delta);
+        insumo.requiereReposicion = insumo.stockActual <= insumo.stockMinimo;
+        insumo.estado = insumo.requiereReposicion ? "Bajo Stock" : "OK";
+        return insumo;
+      }
+      throw e;
     }
   }
 }
