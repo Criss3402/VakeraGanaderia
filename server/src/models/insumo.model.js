@@ -1,13 +1,68 @@
 const prisma = require("../config/prisma");
 const db = require("../config/db");
 
+// Solicitudes en memoria sincronizadas con la sesión
+let solicitudesInsumos = [
+  {
+    id: "sol-1",
+    insumoId: "ins-9",
+    insumoNombre: "Rollo de Alambre Alta Resistencia 1000m",
+    cantidad: 2,
+    unidad: "Rollos",
+    motivo: "Reparación de alambrado perimetral este en Potrero 2 tras vientos",
+    urgencia: "Alta",
+    solicitanteNombre: "Lucas Giménez",
+    solicitanteRol: "peon",
+    sector: "Pertenencias de Peón",
+    estado: "Pendiente",
+    fecha: "2026-10-09",
+  },
+  {
+    id: "sol-2",
+    insumoId: "ins-1",
+    insumoNombre: "Vacuna Antiaftosa Bivalente",
+    cantidad: 50,
+    unidad: "Dosis",
+    motivo: "Inicio de Campaña de Vacunación Oficial de Primavera SENASA",
+    urgencia: "Urgente",
+    solicitanteNombre: "Dra. Sofía Navarro",
+    solicitanteRol: "veterinario",
+    sector: "Botiquín Veterinario",
+    estado: "Aprobado",
+    fecha: "2026-10-08",
+  },
+  {
+    id: "sol-3",
+    insumoId: "ins-8",
+    insumoNombre: "Electrificador Solar Boyero 12V",
+    cantidad: 1,
+    unidad: "Unidades",
+    motivo: "Instalación de boyero para rotación de pasturas en Potrero 5",
+    urgencia: "Normal",
+    solicitanteNombre: "Martín Benítez",
+    solicitanteRol: "capataz",
+    sector: "Campo y Taller (Capataz)",
+    estado: "Entregado",
+    fecha: "2026-10-07",
+  },
+];
+
 class InsumoModel {
   static async listarTodos() {
     try {
       const lista = await prisma.insumo.findMany({
         orderBy: { nombre: "asc" },
       });
-      return lista;
+      return lista.map((item) => ({
+        ...item,
+        sectorCustodia: item.ubicacion.includes("Peón")
+          ? "peon"
+          : item.ubicacion.includes("Capataz")
+          ? "capataz"
+          : item.ubicacion.includes("Veterin")
+          ? "veterinario"
+          : "oficina",
+      }));
     } catch (e) {
       console.warn("Fallback memoria para listar insumos:", e.message);
       return db.insumos;
@@ -42,7 +97,7 @@ class InsumoModel {
     try {
       const nuevo = await prisma.insumo.create({
         data: {
-          nombre: insumo.nombre,
+          nombre: insumo.nombre.trim(),
           categoria: insumo.categoria || "Fármaco",
           stockActual,
           stockMinimo,
@@ -75,9 +130,18 @@ class InsumoModel {
       if (!actual) throw new Error("Insumo no encontrado");
 
       const delta = parseFloat(cantidadCambio) || 0;
-      const nuevoStock = operacion === "sumar"
-        ? actual.stockActual + delta
-        : Math.max(0, actual.stockActual - delta);
+      let nuevoStock = actual.stockActual;
+
+      if (operacion === "conteo") {
+        // Conteo físico directo de pertenencias
+        nuevoStock = Math.max(0, delta);
+      } else if (operacion === "sumar") {
+        // Añadir productos / reponer al stock
+        nuevoStock = actual.stockActual + delta;
+      } else if (operacion === "restar") {
+        // Descontar consumo
+        nuevoStock = Math.max(0, actual.stockActual - delta);
+      }
 
       const requiereReposicion = nuevoStock <= actual.stockMinimo;
       const estado = requiereReposicion ? "Bajo Stock" : "OK";
@@ -94,15 +158,73 @@ class InsumoModel {
       const insumo = db.insumos.find((i) => i.id === id);
       if (insumo) {
         const delta = parseFloat(cantidadCambio) || 0;
-        insumo.stockActual = operacion === "sumar"
-          ? insumo.stockActual + delta
-          : Math.max(0, insumo.stockActual - delta);
+        if (operacion === "conteo") {
+          insumo.stockActual = Math.max(0, delta);
+        } else if (operacion === "sumar") {
+          insumo.stockActual = insumo.stockActual + delta;
+        } else if (operacion === "restar") {
+          insumo.stockActual = Math.max(0, insumo.stockActual - delta);
+        }
         insumo.requiereReposicion = insumo.stockActual <= insumo.stockMinimo;
         insumo.estado = insumo.requiereReposicion ? "Bajo Stock" : "OK";
         return insumo;
       }
       throw e;
     }
+  }
+
+  // --- SOLICITUDES DE INSUMOS (PEÓN, CAPATAZ, VETERINARIO) ---
+  static listarSolicitudes() {
+    return solicitudesInsumos;
+  }
+
+  static registrarSolicitud({
+    insumoId,
+    insumoNombre,
+    cantidad,
+    unidad = "Unidades",
+    motivo,
+    urgencia = "Normal",
+    solicitanteNombre = "Operario",
+    solicitanteRol = "peon",
+    sector = "Campo",
+  }) {
+    const nueva = {
+      id: `sol-${Date.now()}`,
+      insumoId: insumoId || null,
+      insumoNombre,
+      cantidad: parseFloat(cantidad) || 1,
+      unidad,
+      motivo: motivo || "Reposición de herramientas de trabajo",
+      urgencia,
+      solicitanteNombre,
+      solicitanteRol,
+      sector,
+      estado: "Pendiente",
+      fecha: new Date().toISOString().split("T")[0],
+    };
+    solicitudesInsumos.unshift(nueva);
+    return nueva;
+  }
+
+  static async actualizarEstadoSolicitud(id, nuevoEstado, revisadoPor = "Administración") {
+    const sol = solicitudesInsumos.find((s) => s.id === id);
+    if (!sol) throw new Error("Solicitud no encontrada.");
+
+    sol.estado = nuevoEstado;
+    sol.revisadoPor = revisadoPor;
+    sol.fechaRevision = new Date().toISOString().split("T")[0];
+
+    // Si se entrega, y tiene un insumoId asociado, sumar al stock de pertenencias
+    if (nuevoEstado === "Entregado" && sol.insumoId) {
+      try {
+        await this.actualizarStock(sol.insumoId, sol.cantidad, "sumar");
+      } catch (e) {
+        console.warn("No se pudo auto-sumar stock:", e.message);
+      }
+    }
+
+    return sol;
   }
 }
 

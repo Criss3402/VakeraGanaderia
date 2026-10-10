@@ -17,7 +17,13 @@ router.get("/clima", DashboardController.obtenerClima);
 
 // 3. Módulo de Ganado y Potreros
 router.get("/ganado", DashboardController.obtenerGanado);
+router.get("/ganado/:id", DashboardController.obtenerFichaAnimal);
 router.get("/potreros", DashboardController.obtenerPotreros);
+router.post(
+  "/potreros",
+  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ),
+  DashboardController.registrarPotrero
+);
 router.post(
   "/ganado",
   rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ),
@@ -27,6 +33,16 @@ router.patch(
   "/ganado/:id",
   rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ, ROLES.VETERINARIO),
   DashboardController.actualizarGanado
+);
+router.delete(
+  "/ganado/:id",
+  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ),
+  DashboardController.darDeBajaAnimal
+);
+router.post(
+  "/ganado/traslado-masivo",
+  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ),
+  DashboardController.trasladoMasivoGanado
 );
 
 // 4. Módulo Sanitario y Vacunaciones
@@ -55,6 +71,26 @@ router.patch(
   "/insumos/:id/stock",
   rbacMiddleware(ROLES.DUENO, ROLES.OFICINA, ROLES.CAPATAZ),
   DashboardController.actualizarStockInsumo
+);
+
+// Solicitudes de Insumos (Peón, Capataz y Veterinario solicitan; Oficina, Capataz y Dueño aprueban/entregan)
+router.get("/insumos/solicitudes", DashboardController.obtenerSolicitudesInsumos);
+router.post(
+  "/insumos/solicitudes",
+  rbacMiddleware(ROLES.PEON, ROLES.CAPATAZ, ROLES.VETERINARIO, ROLES.DUENO),
+  DashboardController.crearSolicitudInsumo
+);
+router.patch(
+  "/insumos/solicitudes/:id/estado",
+  rbacMiddleware(ROLES.OFICINA, ROLES.CAPATAZ, ROLES.DUENO),
+  DashboardController.actualizarEstadoSolicitudInsumo
+);
+
+// Conteo físico de pertenencias y herramientas asignadas
+router.patch(
+  "/insumos/:id/conteo",
+  rbacMiddleware(ROLES.PEON, ROLES.CAPATAZ, ROLES.VETERINARIO, ROLES.OFICINA, ROLES.DUENO),
+  DashboardController.conteoPertenencias
 );
 
 // 6. Partes diarios de novedades de campo

@@ -5,29 +5,47 @@ import {
   obtenerPotreros,
   obtenerSanidad,
   obtenerInsumosCriticos,
+  obtenerInsumos,
+  obtenerSolicitudesInsumos,
 } from "../../../api/dashboard.api";
 
 export default function PanelCapataz({ alCambiarVista }) {
   const [partes, setPartes] = useState([]);
   const [potreros, setPotreros] = useState([]);
   const [sanidad, setSanidad] = useState([]);
-  const [insumos, setInsumos] = useState([]);
+  const [insumosCriticos, setInsumosCriticos] = useState([]);
+  const [misHerramientas, setMisHerramientas] = useState([]);
+  const [solicitudesPendientes, setSolicitudesPendientes] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [procesandoId, setProcesandoId] = useState(null);
   const [mensaje, setMensaje] = useState("");
 
   async function cargarDatos() {
     try {
-      const [resPartes, resPotreros, resSanidad, resInsumos] = await Promise.all([
+      const [resPartes, resPotreros, resSanidad, resCrit, resTodos, resSol] = await Promise.all([
         obtenerPartesDiarios(),
         obtenerPotreros(),
         obtenerSanidad(),
         obtenerInsumosCriticos(),
+        obtenerInsumos(),
+        obtenerSolicitudesInsumos(),
       ]);
       if (resPartes?.data) setPartes(resPartes.data);
       if (resPotreros?.data) setPotreros(resPotreros.data);
       if (resSanidad?.data) setSanidad(resSanidad.data);
-      if (resInsumos?.data) setInsumos(resInsumos.data);
+      if (resCrit?.data) setInsumosCriticos(resCrit.data);
+      if (resTodos?.data) {
+        setMisHerramientas(
+          resTodos.data.filter(
+            (i) =>
+              i.ubicacion?.toLowerCase().includes("capataz") ||
+              i.ubicacion?.toLowerCase().includes("taller")
+          )
+        );
+      }
+      if (resSol?.data) {
+        setSolicitudesPendientes(resSol.data.filter((s) => s.estado === "Pendiente"));
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -267,9 +285,69 @@ export default function PanelCapataz({ alCambiarVista }) {
 
           <div className="mt-4 pt-3 border-t border-[#ded7c4] flex justify-between items-center text-xs">
             <span className="text-[#6b7c6d]">Insumos críticos a reponer:</span>
-            <span className="font-bold text-red-700">{insumos.length} productos bajos</span>
+            <span className="font-bold text-red-700">{insumosCriticos.length} productos bajos</span>
           </div>
         </div>
+      </div>
+
+      {/* Custodia de Herramientas del Taller & Solicitudes de Insumos */}
+      <div className="bg-white rounded-2xl p-6 border border-[#ded7c4] shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-[#ded7c4]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#8fb56b]/20 text-[#182920] flex items-center justify-center text-lg font-bold">
+              <i className="fa-solid fa-screwdriver-wrench text-[#33512f]"></i>
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-[#182920] font-['Fraunces',serif]">
+                Custodia de Herramientas de Taller & Pedidos de Insumos
+              </h3>
+              <p className="text-xs text-[#6b7c6d]">
+                Conteo de pertenencias a cargo del Capataz y despacho de pedidos enviados por peones
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => alCambiarVista && alCambiarVista("insumos")}
+              className="bg-[#182920] hover:bg-[#284835] text-[#f1ecdd] font-bold text-xs px-4 py-2 rounded-xl transition-colors flex items-center gap-1.5"
+            >
+              <i className="fa-solid fa-boxes-stacked text-[#8fb56b]"></i> Conteo & Gestión de Insumos ({solicitudesPendientes.length} por entregar)
+            </button>
+          </div>
+        </div>
+
+        {misHerramientas.length === 0 ? (
+          <p className="text-xs text-[#6b7c6d] py-3 text-center">
+            No tienes herramientas registradas bajo tu custodia en este momento.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {misHerramientas.map((item) => (
+              <div
+                key={item.id}
+                className="p-3.5 rounded-xl bg-[#f8f5eb] border border-[#ded7c4] flex items-center justify-between hover:border-[#8fb56b] transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-white border border-[#ded7c4] flex items-center justify-center text-[#182920]">
+                    <i className={`fa-solid ${item.icono || "fa-screwdriver-wrench"}`}></i>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-[#182920]">{item.nombre}</p>
+                    <p className="text-[10px] text-[#6b7c6d]">{item.ubicacion}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm font-extrabold text-[#182920]">
+                    {item.stockActual}
+                  </span>
+                  <span className="text-[10px] text-[#6b7c6d] block">{item.unidad}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

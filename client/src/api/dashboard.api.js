@@ -33,6 +33,31 @@ export async function actualizarGanado(id, datos) {
   });
 }
 
+export async function obtenerFichaAnimal(id) {
+  return request(`/dashboard/ganado/${id}`);
+}
+
+export async function eliminarGanado(id, motivo = "Venta") {
+  return request(`/dashboard/ganado/${id}`, {
+    method: "DELETE",
+    body: JSON.stringify({ motivo }),
+  });
+}
+
+export async function trasladoMasivoGanado({ animalIds, potreroDestinoId }) {
+  return request("/dashboard/ganado/traslado-masivo", {
+    method: "POST",
+    body: JSON.stringify({ animalIds, potreroDestinoId }),
+  });
+}
+
+export async function registrarPotrero(datos) {
+  return request("/dashboard/potreros", {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
 // Sanidad y Vacunaciones
 export async function obtenerAlertasSanitarias() {
   return request("/dashboard/alertas");
@@ -76,6 +101,33 @@ export async function actualizarStockInsumo(id, cantidad, operacion = "sumar") {
   return request(`/dashboard/insumos/${id}/stock`, {
     method: "PATCH",
     body: JSON.stringify({ cantidad, operacion }),
+  });
+}
+
+// Solicitudes de Insumos y Reposición
+export async function obtenerSolicitudesInsumos() {
+  return request("/dashboard/insumos/solicitudes");
+}
+
+export async function crearSolicitudInsumo(datos) {
+  return request("/dashboard/insumos/solicitudes", {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export async function actualizarEstadoSolicitudInsumo(id, estado) {
+  return request(`/dashboard/insumos/solicitudes/${id}/estado`, {
+    method: "PATCH",
+    body: JSON.stringify({ estado }),
+  });
+}
+
+// Conteo Físico de Pertenencias
+export async function registrarConteoPertenencias(id, stockContado) {
+  return request(`/dashboard/insumos/${id}/conteo`, {
+    method: "PATCH",
+    body: JSON.stringify({ stockContado }),
   });
 }
 

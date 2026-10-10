@@ -4,12 +4,14 @@ import {
   registrarParteDiario,
   obtenerPotreros,
   obtenerGanado,
+  obtenerInsumos,
 } from "../../../api/dashboard.api";
 
 export default function PanelPeon({ alCambiarVista }) {
   const [partes, setPartes] = useState([]);
   const [potreros, setPotreros] = useState([]);
   const [ganado, setGanado] = useState([]);
+  const [misHerramientas, setMisHerramientas] = useState([]);
   const [cargando, setCargando] = useState(true);
 
   // Formulario rápido de parte
@@ -22,10 +24,11 @@ export default function PanelPeon({ alCambiarVista }) {
 
   async function cargarDatos() {
     try {
-      const [resPartes, resPotreros, resGanado] = await Promise.all([
+      const [resPartes, resPotreros, resGanado, resInsumos] = await Promise.all([
         obtenerPartesDiarios(),
         obtenerPotreros(),
         obtenerGanado(),
+        obtenerInsumos(),
       ]);
       if (resPartes?.data) setPartes(resPartes.data);
       if (resPotreros?.data) {
@@ -35,6 +38,15 @@ export default function PanelPeon({ alCambiarVista }) {
         }
       }
       if (resGanado?.data) setGanado(resGanado.data);
+      if (resInsumos?.data) {
+        setMisHerramientas(
+          resInsumos.data.filter(
+            (i) =>
+              i.ubicacion?.toLowerCase().includes("peón") ||
+              i.ubicacion?.toLowerCase().includes("peon")
+          )
+        );
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -257,6 +269,66 @@ export default function PanelPeon({ alCambiarVista }) {
             <i className="fa-solid fa-cow text-[#33512f]"></i> Ver Todo el Ganado
           </button>
         </div>
+      </div>
+
+      {/* Mis Pertenencias y Herramientas Asignadas (Conteo y Solicitud) */}
+      <div className="bg-white rounded-2xl p-6 border border-[#ded7c4] shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-[#ded7c4]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#8fb56b]/20 text-[#182920] flex items-center justify-center text-lg font-bold">
+              <i className="fa-solid fa-toolbox text-[#33512f]"></i>
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-[#182920] font-['Fraunces',serif]">
+                Mis Pertenencias y Herramientas Asignadas
+              </h3>
+              <p className="text-xs text-[#6b7c6d]">
+                Control de inventario en mano, conteo físico y solicitud de reposición al Capataz
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => alCambiarVista && alCambiarVista("insumos")}
+              className="bg-[#182920] hover:bg-[#284835] text-[#f1ecdd] font-bold text-xs px-4 py-2 rounded-xl transition-colors flex items-center gap-1.5"
+            >
+              <i className="fa-solid fa-calculator text-[#8fb56b]"></i> Realizar Conteo / Solicitar Stock
+            </button>
+          </div>
+        </div>
+
+        {misHerramientas.length === 0 ? (
+          <p className="text-xs text-[#6b7c6d] py-3 text-center">
+            No tienes herramientas registradas bajo tu custodia en este momento.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {misHerramientas.map((item) => (
+              <div
+                key={item.id}
+                className="p-3.5 rounded-xl bg-[#f8f5eb] border border-[#ded7c4] flex items-center justify-between hover:border-[#8fb56b] transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-white border border-[#ded7c4] flex items-center justify-center text-[#182920]">
+                    <i className={`fa-solid ${item.icono || "fa-gavel"}`}></i>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-[#182920]">{item.nombre}</p>
+                    <p className="text-[10px] text-[#6b7c6d]">{item.ubicacion}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm font-extrabold text-[#182920]">
+                    {item.stockActual}
+                  </span>
+                  <span className="text-[10px] text-[#6b7c6d] block">{item.unidad}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Historial de Partes Enviados por el Peón */}

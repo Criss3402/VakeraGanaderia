@@ -12,6 +12,7 @@ export default function PanelVeterinario({ alCambiarVista }) {
   const [eventos, setEventos] = useState([]);
   const [ganado, setGanado] = useState([]);
   const [fármacos, setFármacos] = useState([]);
+  const [misPertenencias, setMisPertenencias] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [modalAbierto, setModalAbierto] = useState(false);
   const [mensaje, setMensaje] = useState("");
@@ -38,6 +39,13 @@ export default function PanelVeterinario({ alCambiarVista }) {
       if (resGan?.data) setGanado(resGan.data);
       if (resIns?.data) {
         setFármacos(resIns.data.filter((i) => i.categoria === "Fármaco"));
+        setMisPertenencias(
+          resIns.data.filter(
+            (i) =>
+              i.ubicacion?.toLowerCase().includes("veterin") ||
+              i.ubicacion?.toLowerCase().includes("sanitario")
+          )
+        );
       }
     } catch (e) {
       console.error(e);
@@ -292,6 +300,81 @@ export default function PanelVeterinario({ alCambiarVista }) {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Botiquín Veterinario & Equipamiento Asignado */}
+      <div className="bg-white rounded-2xl p-6 border border-[#ded7c4] shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-[#ded7c4]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center justify-center text-lg">
+              <i className="fa-solid fa-kit-medical"></i>
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-[#182920] font-['Fraunces',serif]">
+                Botiquín Veterinario & Equipamiento Asignado
+              </h3>
+              <p className="text-xs text-[#6b7c6d]">
+                Inventario de fármacos, jeringas y equipos bajo custodia de la veterinaria
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => alCambiarVista && alCambiarVista("insumos")}
+              className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs px-4 py-2 rounded-xl transition-colors flex items-center gap-1.5"
+            >
+              <i className="fa-solid fa-clipboard-list"></i> Conteo de Botiquín / Solicitar Stock
+            </button>
+          </div>
+        </div>
+
+        {misPertenencias.length === 0 ? (
+          <div className="py-4 text-center">
+            <i className="fa-solid fa-box-open text-[#ded7c4] text-2xl mb-2 block"></i>
+            <p className="text-xs text-[#6b7c6d]">
+              No hay equipamiento registrado bajo custodia veterinaria todavía.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {misPertenencias.map((item) => {
+              const esBajoStock = item.stockActual <= item.stockMinimo;
+              return (
+                <div
+                  key={item.id}
+                  className={`p-3.5 rounded-xl border flex items-center justify-between transition-all ${
+                    esBajoStock
+                      ? "bg-red-50 border-red-200 hover:border-red-400"
+                      : "bg-[#f8f5eb] border-[#ded7c4] hover:border-[#8fb56b]"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-white border border-[#ded7c4] flex items-center justify-center text-[#182920]">
+                      <i className={`fa-solid ${item.icono || "fa-syringe"}`}></i>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-[#182920]">{item.nombre}</p>
+                      <p className="text-[10px] text-[#6b7c6d]">{item.ubicacion}</p>
+                      {esBajoStock && (
+                        <span className="text-[9px] font-bold text-red-700">
+                          ⚠ Bajo mínimo requerido
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className={`text-sm font-extrabold ${esBajoStock ? "text-red-700" : "text-[#182920]"}`}>
+                      {item.stockActual}
+                    </span>
+                    <span className="text-[10px] text-[#6b7c6d] block">{item.unidad}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Modal para Crear Evento Sanitario */}

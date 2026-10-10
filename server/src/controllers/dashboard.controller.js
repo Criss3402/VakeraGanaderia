@@ -64,6 +64,47 @@ class DashboardController {
     }
   }
 
+  static async obtenerFichaAnimal(req, res) {
+    try {
+      const { id } = req.params;
+      const animal = await GanadoModel.buscarPorId(id);
+      if (!animal) return error(res, "Animal no encontrado.", 404);
+      return exito(res, animal);
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  static async darDeBajaAnimal(req, res) {
+    try {
+      const { id } = req.params;
+      const { motivo } = req.body || {};
+      const baja = await GanadoModel.darDeBaja(id, motivo);
+      return exito(res, baja, `Baja del animal registrada con éxito (${motivo || "Venta"}).`);
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
+  static async trasladoMasivoGanado(req, res) {
+    try {
+      const { animalIds, potreroDestinoId } = req.body || {};
+      const resultado = await GanadoModel.trasladoMasivo(animalIds, potreroDestinoId);
+      return exito(res, resultado, `Traslado masivo completado exitosamente.`);
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
+  static async registrarPotrero(req, res) {
+    try {
+      const nuevo = await GanadoModel.crearPotrero(req.body);
+      return exito(res, nuevo, "Potrero creado exitosamente.", 201);
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
   // 3. Sanidad y Calendario
   static async obtenerAlertas(req, res) {
     try {
@@ -119,6 +160,75 @@ class DashboardController {
       const { cantidad, operacion } = req.body;
       const actualizado = await InsumoModel.actualizarStock(id, cantidad, operacion);
       return exito(res, actualizado, "Stock de insumo actualizado correctamente.");
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
+  // Solicitudes de Insumos (Peón, Capataz, Veterinario)
+  static obtenerSolicitudesInsumos(req, res) {
+    try {
+      const solicitudes = InsumoModel.listarSolicitudes();
+      return exito(res, solicitudes);
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  static crearSolicitudInsumo(req, res) {
+    try {
+      const { insumoId, insumoNombre, cantidad, unidad, motivo, urgencia, sector } = req.body || {};
+
+      if (!insumoNombre) {
+        return error(res, "Debe especificar el insumo o herramienta a solicitar.", 400);
+      }
+
+      const solicitanteNombre = req.usuario ? req.usuario.nombre : "Operario";
+      const solicitanteRol = req.usuario ? req.usuario.rol : "peon";
+
+      const nueva = InsumoModel.registrarSolicitud({
+        insumoId,
+        insumoNombre,
+        cantidad,
+        unidad,
+        motivo,
+        urgencia,
+        solicitanteNombre,
+        solicitanteRol,
+        sector: sector || (solicitanteRol === "veterinario" ? "Botiquín Veterinario" : solicitanteRol === "capataz" ? "Campo y Taller" : "Pertenencias de Peón"),
+      });
+
+      return exito(res, nueva, "Solicitud de insumos enviada con éxito.", 201);
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
+  static async actualizarEstadoSolicitudInsumo(req, res) {
+    try {
+      const { id } = req.params;
+      const { estado } = req.body;
+      const revisadoPor = req.usuario ? `${req.usuario.nombre} (${req.usuario.rol})` : "Administración";
+
+      const actualizada = await InsumoModel.actualizarEstadoSolicitud(id, estado, revisadoPor);
+      return exito(res, actualizada, `Solicitud marcada como ${estado}.`);
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
+  // Conteo Físico de Pertenencias
+  static async conteoPertenencias(req, res) {
+    try {
+      const { id } = req.params;
+      const { stockContado } = req.body;
+
+      if (stockContado === undefined || stockContado === null) {
+        return error(res, "Debe ingresar la cantidad física contada.", 400);
+      }
+
+      const actualizado = await InsumoModel.actualizarStock(id, stockContado, "conteo");
+      return exito(res, actualizado, `Conteo de pertenencias actualizado a ${stockContado} ${actualizado.unidad}.`);
     } catch (err) {
       return error(res, err.message, 400);
     }
