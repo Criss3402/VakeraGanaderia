@@ -1,17 +1,85 @@
 import { request } from "./client.js";
 
+// Métricas y Clima
 export async function obtenerMetricas() {
   return request("/dashboard/metricas");
 }
 
+export async function obtenerClimaActual(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return request(`/dashboard/clima${query ? `?${query}` : ""}`);
+}
+
+// Ganado y Potreros
+export async function obtenerGanado() {
+  return request("/dashboard/ganado");
+}
+
+export async function obtenerPotreros() {
+  return request("/dashboard/potreros");
+}
+
+export async function registrarGanado(datos) {
+  return request("/dashboard/ganado", {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export async function actualizarGanado(id, datos) {
+  return request(`/dashboard/ganado/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(datos),
+  });
+}
+
+// Sanidad y Vacunaciones
 export async function obtenerAlertasSanitarias() {
   return request("/dashboard/alertas");
 }
 
+export async function obtenerSanidad() {
+  return request("/dashboard/sanidad");
+}
+
+export async function registrarEventoSanitario(datos) {
+  return request("/dashboard/sanidad", {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export async function actualizarEstadoSanitario(id, estado) {
+  return request(`/dashboard/sanidad/${id}/estado`, {
+    method: "PATCH",
+    body: JSON.stringify({ estado }),
+  });
+}
+
+// Insumos y Stock
 export async function obtenerInsumosCriticos() {
   return request("/dashboard/insumos-criticos");
 }
 
+export async function obtenerInsumos() {
+  return request("/dashboard/insumos");
+}
+
+export async function registrarInsumo(datos) {
+  return request("/dashboard/insumos", {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export async function actualizarStockInsumo(id, cantidad, operacion = "sumar") {
+  return request(`/dashboard/insumos/${id}/stock`, {
+    method: "PATCH",
+    body: JSON.stringify({ cantidad, operacion }),
+  });
+}
+
+// Partes Diarios
 export async function obtenerPartesDiarios() {
   return request("/dashboard/partes");
 }
@@ -30,7 +98,7 @@ export async function actualizarEstadoParte(id, estado) {
   });
 }
 
-export async function obtenerClimaActual(params = {}) {
-  const query = new URLSearchParams(params).toString();
-  return request(`/dashboard/clima${query ? `?${query}` : ""}`);
+// Reportes Consolidados
+export async function obtenerReportes() {
+  return request("/dashboard/reportes");
 }
