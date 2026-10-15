@@ -1,6 +1,9 @@
+const bcrypt = require("bcryptjs");
 const prisma = require("../config/prisma");
 const db = require("../config/db");
 const { ROLES, ROLES_LIST } = require("../utils/roles.constants");
+
+const SALT_ROUNDS = 10;
 
 class UsuarioModel {
   static async listarTodos() {
@@ -10,15 +13,20 @@ class UsuarioModel {
       });
       return usuarios.map(({ password, ...u }) => ({
         ...u,
+        // Normalizar a lowercase para consistencia en frontend y RBAC
         rol: (u.rol || "").toLowerCase(),
       }));
     } catch (e) {
       console.warn("Fallo al consultar Prisma, usando fallback en memoria:", e.message);
-      return db.usuarios.map(({ password, ...u }) => u);
+      return db.usuarios.map(({ password, ...u }) => ({
+        ...u,
+        rol: (u.rol || "").toLowerCase(),
+      }));
     }
   }
 
   static async buscarPorId(id) {
+    if (!id) return null;
     try {
       const usuario = await prisma.usuario.findUnique({ where: { id } });
       if (!usuario) return null;
@@ -28,11 +36,15 @@ class UsuarioModel {
       const usuario = db.usuarios.find((u) => u.id === id);
       if (!usuario) return null;
       const { password, ...resto } = usuario;
-      return resto;
+      return { ...resto, rol: (resto.rol || "").toLowerCase() };
     }
   }
 
-  static async buscarPorEmail(email) {
+  /**
+   * Busca usuario incluyendo la contraseña hasheada (solo para autenticación).
+   * No usar este método para devolver datos al cliente.
+   */
+  static async buscarPorEmailConPassword(email) {
     if (!email) return null;
     const emailNormalizado = email.toLowerCase().trim();
     try {
@@ -44,7 +56,27 @@ class UsuarioModel {
       }
       return null;
     } catch {
-      return db.usuarios.find((u) => u.email.toLowerCase() === emailNormalizado);
+      return db.usuarios.find((u) => u.email.toLowerCase() === emailNormalizado) || null;
+    }
+  }
+
+  static async buscarPorEmail(email) {
+    if (!email) return null;
+    const emailNormalizado = email.toLowerCase().trim();
+    try {
+      const usuario = await prisma.usuario.findUnique({
+        where: { email: emailNormalizado },
+      });
+      if (usuario) {
+        const { password, ...resto } = usuario;
+        return { ...resto, rol: (usuario.rol || "").toLowerCase() };
+      }
+      return null;
+    } catch {
+      const usuario = db.usuarios.find((u) => u.email.toLowerCase() === emailNormalizado);
+      if (!usuario) return null;
+      const { password, ...resto } = usuario;
+      return { ...resto, rol: (resto.rol || "").toLowerCase() };
     }
   }
 
@@ -63,14 +95,21 @@ class UsuarioModel {
       throw new Error("Ya existe un usuario registrado con ese correo electrónico.");
     }
 
+    // Validar que el rol sea válido
     const rolMayus = (rol || "PEON").toUpperCase();
+    if (!ROLES_LIST.includes(rolMayus.toLowerCase())) {
+      throw new Error(`Rol inválido: ${rol}. Roles permitidos: ${ROLES_LIST.join(", ")}`);
+    }
+
+    // Hashear contraseña antes de persistir
+    const passwordHasheada = await bcrypt.hash(password, SALT_ROUNDS);
 
     try {
       const nuevo = await prisma.usuario.create({
         data: {
           nombre,
           email: emailNormalizado,
-          password,
+          password: passwordHasheada,
           rol: rolMayus,
           cargo,
           establecimiento,
@@ -86,7 +125,7 @@ class UsuarioModel {
         id: `usr-${Date.now()}`,
         nombre,
         email: emailNormalizado,
-        password,
+        password: passwordHasheada,
         rol: (rol || "peon").toLowerCase(),
         cargo,
         establecimiento,
@@ -96,27 +135,37 @@ class UsuarioModel {
 
       db.usuarios.push(nuevoUsuario);
       const { password: _, ...usuarioCreado } = nuevoUsuario;
-      return usuarioCreado;
+      return { ...usuarioCreado, rol: (usuarioCreado.rol || "").toLowerCase() };
     }
   }
 
   static async actualizarRol(id, nuevoRol) {
-    const rolMayus = nuevoRol.toUpperCase();
+    // Validar que el nuevo rol sea válido
+    const rolNormalizado = nuevoRol.toUpperCase();
+    if (!ROLES_LIST.includes(rolNormalizado.toLowerCase())) {
+      throw new Error(`Rol inválido: ${nuevoRol}. Roles permitidos: ${ROLES_LIST.join(", ")}`);
+    }
+
     try {
       const usuario = await prisma.usuario.update({
         where: { id },
-        data: { rol: rolMayus },
+        data: { rol: rolNormalizado },
       });
       const { password, ...usuarioActualizado } = usuario;
       return { ...usuarioActualizado, rol: (usuario.rol || "").toLowerCase() };
-    } catch {
+    } catch (err) {
+      // Si Prisma falla con "Record not found", mensaje más claro
+      if (err.code === "P2025") {
+        throw new Error("Usuario no encontrado.");
+      }
+      // Fallback en memoria
       const usuario = db.usuarios.find((u) => u.id === id);
       if (!usuario) {
         throw new Error("Usuario no encontrado.");
       }
       usuario.rol = nuevoRol.toLowerCase();
       const { password, ...usuarioActualizado } = usuario;
-      return usuarioActualizado;
+      return { ...usuarioActualizado, rol: (usuarioActualizado.rol || "").toLowerCase() };
     }
   }
 }

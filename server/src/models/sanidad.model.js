@@ -10,24 +10,23 @@ class SanidadModel {
       });
       return eventos.map((ev) => ({
         ...ev,
-        fecha: ev.fechaProgramada.toISOString().split("T")[0],
+        fecha: ev.fechaProgramada ? ev.fechaProgramada.toISOString().split("T")[0] : null,
+        fechaProgramada: ev.fechaProgramada ? ev.fechaProgramada.toISOString().split("T")[0] : null,
         responsableNombre: ev.responsable ? ev.responsable.nombre : "Sin asignar",
         caravanaAnimal: ev.ganado ? ev.ganado.caravana : null,
       }));
-    } catch (e) {
-      console.warn("Fallback memoria para sanidad:", e.message);
+    } catch (err) {
+      console.warn("[SanidadModel] Fallo al consultar Prisma, usando fallback en memoria:", err.message);
       return db.sanidad;
     }
   }
 
   static async obtenerAlertasActivas() {
     try {
-      const activas = await prisma.sanidadEvento.findMany({
-        where: { estado: { not: "Completado" } },
-      });
-      return activas;
+      const todos = await this.listarAlertasYEventos();
+      return todos.filter((item) => item.estado !== "Completado" && item.estado !== "Hecho");
     } catch {
-      return db.sanidad.filter((item) => item.estado !== "Completado");
+      return db.sanidad.filter((item) => item.estado !== "Completado" && item.estado !== "Hecho");
     }
   }
 
@@ -36,9 +35,9 @@ class SanidadModel {
       const nuevo = await prisma.sanidadEvento.create({
         data: {
           evento: evento.evento,
-          tipo: evento.tipo || "Vacunación",
+          tipo: evento.tipo || "Tratamiento",
           lote: evento.lote || "Rodeo General",
-          fechaProgramada: new Date(evento.fechaProgramada || Date.now()),
+          fechaProgramada: evento.fechaProgramada ? new Date(evento.fechaProgramada) : new Date(),
           estado: evento.estado || "Pendiente",
           prioridad: evento.prioridad || "Normal",
           icono: evento.icono || "fa-syringe",
@@ -47,9 +46,13 @@ class SanidadModel {
           ganadoId: evento.ganadoId || null,
         },
       });
-      return nuevo;
-    } catch (e) {
-      console.warn("Fallback memoria para registrar evento sanitario:", e.message);
+      return {
+        ...nuevo,
+        fecha: nuevo.fechaProgramada ? nuevo.fechaProgramada.toISOString().split("T")[0] : null,
+        fechaProgramada: nuevo.fechaProgramada ? nuevo.fechaProgramada.toISOString().split("T")[0] : null,
+      };
+    } catch (err) {
+      console.warn("[SanidadModel] Fallo al guardar en Prisma, usando fallback:", err.message);
       const nuevo = {
         id: `san-${Date.now()}`,
         ...evento,
@@ -63,10 +66,14 @@ class SanidadModel {
 
   static async actualizarEstado(id, nuevoEstado) {
     try {
-      return await prisma.sanidadEvento.update({
+      const act = await prisma.sanidadEvento.update({
         where: { id },
         data: { estado: nuevoEstado },
       });
+      return {
+        ...act,
+        fechaProgramada: act.fechaProgramada ? act.fechaProgramada.toISOString().split("T")[0] : null,
+      };
     } catch (e) {
       const ev = db.sanidad.find((s) => s.id === id);
       if (ev) {

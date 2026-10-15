@@ -10,9 +10,10 @@ export default function Servicios() {
     let activo = true;
 
     obtenerServicios()
-      .then((data) => {
+      .then((res) => {
         if (!activo) return;
-        setServicios(data);
+        const lista = Array.isArray(res) ? res : (res?.data || []);
+        setServicios(lista);
         setEstado("listo");
       })
       .catch(() => {
@@ -24,6 +25,8 @@ export default function Servicios() {
       activo = false;
     };
   }, []);
+
+  const listaServicios = Array.isArray(servicios) ? servicios : (servicios?.data || []);
 
   return (
     <section id="servicios" className="servicios">
@@ -41,14 +44,14 @@ export default function Servicios() {
         )}
 
         <div className="servicios__grid">
-          {(estado === "cargando" ? Array.from({ length: 4 }) : servicios).map(
+          {(estado === "cargando" ? Array.from({ length: 4 }) : listaServicios).map(
             (servicio, i) => {
               if (!servicio) {
                 return <div key={i} className="servicios__item servicios__item--placeholder" />;
               }
               const Icono = ICONOS_SERVICIOS[servicio.icono];
               return (
-                <div key={servicio.id} className="servicios__item">
+                <div key={servicio.id || i} className="servicios__item">
                   <div className="servicios__icono">
                     {Icono && <Icono aria-hidden="true" />}
                   </div>

@@ -55,16 +55,16 @@ class InsumoModel {
       });
       return lista.map((item) => ({
         ...item,
-        sectorCustodia: item.ubicacion.includes("Peón")
+        sectorCustodia: (item.ubicacion || "").includes("Peón")
           ? "peon"
-          : item.ubicacion.includes("Capataz")
+          : (item.ubicacion || "").includes("Capataz")
           ? "capataz"
-          : item.ubicacion.includes("Veterin")
+          : (item.ubicacion || "").includes("Veterin")
           ? "veterinario"
           : "oficina",
       }));
-    } catch (e) {
-      console.warn("Fallback memoria para listar insumos:", e.message);
+    } catch (err) {
+      console.warn("[InsumoModel] Fallo al consultar Prisma, usando fallback en memoria:", err.message);
       return db.insumos;
     }
   }
@@ -83,16 +83,16 @@ class InsumoModel {
       return lista;
     } catch {
       return db.insumos.filter(
-        (item) => item.requiereReposicion || item.stockActual <= item.stockMinimo
+        (item) => item.requiereReposicion || Number(item.stockActual) <= Number(item.stockMinimo)
       );
     }
   }
 
   static async registrar(insumo) {
     const stockActual = parseFloat(insumo.stockActual) || 0;
-    const stockMinimo = parseFloat(insumo.stockMinimo) || 10;
-    const requiereReposicion = stockActual <= stockMinimo;
-    const estado = requiereReposicion ? "Bajo Stock" : "OK";
+    const stockMinimo = parseFloat(insumo.stockMinimo) || 5;
+    const esCritico = stockActual <= stockMinimo;
+    const estado = esCritico ? "Crítico" : "OK";
 
     try {
       const nuevo = await prisma.insumo.create({
@@ -104,20 +104,20 @@ class InsumoModel {
           unidad: insumo.unidad || "Unidades",
           ubicacion: insumo.ubicacion || "Depósito Central",
           estado,
-          requiereReposicion,
+          requiereReposicion: esCritico,
           icono: insumo.icono || "fa-box-archive",
         },
       });
       return nuevo;
-    } catch (e) {
-      console.warn("Fallback memoria para registrar insumo:", e.message);
+    } catch (err) {
+      console.warn("[InsumoModel] Fallo al guardar en Prisma, usando fallback:", err.message);
       const nuevo = {
         id: `ins-${Date.now()}`,
         ...insumo,
         stockActual,
         stockMinimo,
         estado,
-        requiereReposicion,
+        requiereReposicion: esCritico,
       };
       db.insumos.push(nuevo);
       return nuevo;

@@ -173,7 +173,47 @@ server/
 
 ---
 
-### 6.2. Estructura del Frontend (`client/src/`)
+### 6.2. Estructura del Backend Analítico y Documental (`server_py/`)
+
+Microservicio especializado en Python (Django 6.1 + Django REST Framework) que coexiste con Node.js bajo el prefijo `/api/py/`:
+
+```text
+server_py/
+├── manage.py                         # Punto de entrada de comandos Django
+├── requirements.txt                  # Dependencias (Django, DRF, ReportLab, openpyxl, PyJWT)
+├── Dockerfile                        # Despliegue contenerizado del servicio
+│
+├── vakera_backend/                   # Configuración del proyecto Django
+│   ├── settings.py                   # Conexión Postgres, JWT compartido, CORS y DRF
+│   ├── urls.py                       # Ruteo maestro (/api/py/health, /reportes, /nutricion)
+│   └── wsgi.py
+│
+├── core/                             # Utilidades transversales y seguridad
+│   ├── authentication.py             # Validador de tokens JWT de Node.js (PyJWT, HS256)
+│   ├── permissions.py                # RBAC de roles (IsDueno, IsCapataz, CanAccessReports)
+│   ├── responses.py                  # Formato unificado de respuesta ({ ok, data, error })
+│   └── exceptions.py                 # Manejo global de excepciones y fallas de BD
+│
+├── legacy_models/                    # Modelos reflejados de Prisma (managed = False)
+│   └── models.py                     # Mapeo de tablas 'usuarios', 'ganado', 'insumos', etc.
+│
+├── reportes/                         # Generación y exportación de documentos
+│   ├── views.py                      # Resumen ejecutivo, exportar PDF, exportar Excel
+│   ├── urls.py
+│   └── services/
+│       ├── pdf_service.py            # Generador formal de informes PDF con ReportLab
+│       └── excel_service.py          # Generador de planillas de cálculo con openpyxl
+│
+└── nutricion/                        # Motor bio-nutricional y proyecciones
+    ├── views.py                      # Cálculo de raciones y curvas de crecimiento
+    ├── urls.py
+    └── services/
+        └── racion_calculator.py      # Modelo bio-matemático de nutrición bovina (CMS, PB)
+```
+
+---
+
+### 6.3. Estructura del Frontend (`client/src/`)
 
 Organización modular en React orientada a vistas y componentes, ordenada para las 4 partes requeridas:
 
@@ -232,7 +272,7 @@ client/
 
 ---
 
-### 6.3. Arquitectura de Datos y Persistencia (Docker, PostgreSQL y Prisma ORM)
+### 6.4. Arquitectura de Datos y Persistencia (Docker, PostgreSQL y Prisma ORM)
 
 Para garantizar la persistencia de datos y el escalado del sistema, se sustituye el almacenamiento temporal en memoria por una base de datos relacional PostgreSQL contenida en Docker y administrada mediante el ORM Prisma.
 
@@ -380,11 +420,23 @@ npx prisma studio
 - Bandeja de revisión y aprobación para el Capataz.
 - Canal de notificación directa para el Veterinario cuando se reporte un animal enfermo.
 
-#### Fase 8: Reportes, Auditoría y Salida a Producción
-- Generación de reportes ejecutivos en PDF/Excel para el Dueño y la Oficina.
-- Historial de auditoría para trazabilidad de quién registró o modificó cada dato.
-- Pruebas de usabilidad en dispositivos móviles bajo condiciones de campo.
-- Configuración de entorno de despliegue (hosting, variables de entorno y base de datos de producción).
+#### Fase 8: Reportes Ejecutivos, Analítica y Modelos Nutricionales (Coexistencia con Python/Django)
+- **Subsistema Python (`server_py/`):**
+  - Conexión no invasiva a PostgreSQL mediante modelos Django con `managed = False` (Prisma como único dueño DDL).
+  - Autenticación interoperable con validación del Bearer Token emitido por Node.js (`UnifiedJWTAuthentication`).
+  - Resumen ejecutivo consolidado de hacienda, mortalidad y rotación de insumos (`/api/py/reportes/resumen-ejecutivo`).
+  - Generación formal de informes oficiales de hacienda en PDF con membrete institucional mediante `ReportLab` (`/api/py/reportes/exportar-pdf`).
+  - Exportación de inventario general de rodeo y stock a planillas Excel (.xlsx) con `openpyxl` (`/api/py/reportes/exportar-excel`).
+  - Motor de balance nutricional bovino (requerimiento de Materia Seca, Proteína Bruta y reparto forraje/concentrado) (`/api/py/nutricion/calcular-racion`).
+  - Curvas de proyección de ganancia diaria de peso (ADG) a 30, 60, 90 y 120 días (`/api/py/nutricion/proyeccion-peso`).
+- **Enrutamiento Frontend:**
+  - Proxy unificado en `vite.config.js` (`/api/py/` hacia Django en :8000 y `/api/` hacia Express en :4000).
+  - Servicio de cliente HTTP en `client/src/api/reportesPy.api.js`.
+
+#### Fase 9: Auditoría, Pruebas y Despliegue en Producción
+- Pruebas integrales de interoperabilidad cruzada (Node.js + Django + React).
+- Verificación de usabilidad en dispositivos móviles bajo condiciones de conectividad de campo.
+- Configuración de variables de entorno de producción y contenedorización completa con Docker Compose.
 
 ---
 

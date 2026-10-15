@@ -1,9 +1,14 @@
 /**
  * Base de Datos en Memoria con Semillas (Seed Data)
- * Permite la persistencia de estado durante la ejecución y pruebas de rol inmediatas.
+ * Fallback cuando Prisma / PostgreSQL no están disponibles.
+ * Las contraseñas son hashes bcrypt de "password123".
  */
 
+const bcrypt = require("bcryptjs");
 const { ROLES } = require("../utils/roles.constants");
+
+// Hash de "password123" generado con 10 rondas de salt (compatible con bcrypt.compare)
+const PASSWORD_HASH = bcrypt.hashSync("password123", 10);
 
 const db = {
   usuarios: [
@@ -11,7 +16,7 @@ const db = {
       id: "usr-1",
       nombre: "Cristian Joaquín",
       email: "dueno@vakera.com",
-      password: "password123",
+      password: PASSWORD_HASH,
       rol: ROLES.DUENO,
       cargo: "Propietario / Director",
       telefono: "+54 9 11 4567-8901",
@@ -22,7 +27,7 @@ const db = {
       id: "usr-2",
       nombre: "Martín Benítez",
       email: "capataz@vakera.com",
-      password: "password123",
+      password: PASSWORD_HASH,
       rol: ROLES.CAPATAZ,
       cargo: "Capataz General",
       telefono: "+54 9 11 5678-1234",
@@ -33,7 +38,7 @@ const db = {
       id: "usr-3",
       nombre: "Lucas Giménez",
       email: "peon@vakera.com",
-      password: "password123",
+      password: PASSWORD_HASH,
       rol: ROLES.PEON,
       cargo: "Peón de Campo",
       telefono: "+54 9 11 6789-2345",
@@ -44,7 +49,7 @@ const db = {
       id: "usr-4",
       nombre: "Valeria Rossi",
       email: "oficina@vakera.com",
-      password: "password123",
+      password: PASSWORD_HASH,
       rol: ROLES.OFICINA,
       cargo: "Administración y Compras",
       telefono: "+54 9 11 7890-3456",
@@ -55,7 +60,7 @@ const db = {
       id: "usr-5",
       nombre: "Dra. Sofía Navarro",
       email: "veterinario@vakera.com",
-      password: "password123",
+      password: PASSWORD_HASH,
       rol: ROLES.VETERINARIO,
       cargo: "Médica Veterinaria (Mat. 4892)",
       telefono: "+54 9 11 8901-4567",
@@ -73,7 +78,7 @@ const db = {
       sexo: "Hembra",
       pesoKg: 460,
       potrero: "Potrero 3 - El Trébol",
-      estadoSanitario: "Saludable",
+      estadoSanitario: "SALUDABLE",
       fechaNacimiento: "2022-09-14",
     },
     {
@@ -84,7 +89,7 @@ const db = {
       sexo: "Macho",
       pesoKg: 780,
       potrero: "Potrero 1 - Los Eucaliptos",
-      estadoSanitario: "Saludable",
+      estadoSanitario: "SALUDABLE",
       fechaNacimiento: "2021-04-20",
     },
     {
@@ -95,7 +100,7 @@ const db = {
       sexo: "Macho",
       pesoKg: 390,
       potrero: "Potrero 5 - La Aguada",
-      estadoSanitario: "En Tratamiento",
+      estadoSanitario: "EN_TRATAMIENTO",
       fechaNacimiento: "2023-10-05",
     },
     {
@@ -106,7 +111,7 @@ const db = {
       sexo: "Hembra",
       pesoKg: 145,
       potrero: "Potrero 2 - La Loma",
-      estadoSanitario: "Saludable",
+      estadoSanitario: "SALUDABLE",
       fechaNacimiento: "2024-03-12",
     },
     {
@@ -117,7 +122,7 @@ const db = {
       sexo: "Hembra",
       pesoKg: 320,
       potrero: "Potrero 4 - Bajo Hondo",
-      estadoSanitario: "Observación",
+      estadoSanitario: "OBSERVACION",
       fechaNacimiento: "2023-08-18",
     },
   ],
@@ -241,7 +246,7 @@ const db = {
       novedades: "Nacimiento de 2 terneros machos en buen estado. Alambrado perimetral este con hilo caído por viento.",
       animalesRevisados: 85,
       solicitudInsumos: "Se necesitan 10 metros de alambre y varillas.",
-      estado: "Pendiente",
+      estado: "PENDIENTE",
       fechaCarga: "2026-09-19T08:15:00Z",
     },
     {
@@ -252,7 +257,7 @@ const db = {
       novedades: "Novillo AR-84922 apartado con renguera en pata trasera derecha. Se apartó a corralillo.",
       animalesRevisados: 120,
       solicitudInsumos: null,
-      estado: "Aprobado",
+      estado: "APROBADO",
       revisadoPor: "Martín Benítez (Capataz)",
       fechaCarga: "2026-09-18T17:40:00Z",
     },

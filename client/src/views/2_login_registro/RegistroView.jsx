@@ -12,8 +12,8 @@ export default function RegistroView({ alIrALogin, alIrALanding, alRegistroExito
     password: "",
     confirmarPassword: "",
     establecimiento: "",
-    rol: "dueno",
-    cargo: "Propietario",
+    rol: "peon",
+    cargo: "Operario de Campo",
   });
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");

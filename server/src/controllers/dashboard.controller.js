@@ -2,16 +2,19 @@ const GanadoModel = require("../models/ganado.model");
 const SanidadModel = require("../models/sanidad.model");
 const InsumoModel = require("../models/insumo.model");
 const ParteDiarioModel = require("../models/parteDiario.model");
+const WeatherService = require("../services/weather.service");
 const { exito, error } = require("../utils/apiResponse");
 
 class DashboardController {
   // 1. Métricas Globales
   static async obtenerMetricas(req, res) {
     try {
-      const metricasGanado = await GanadoModel.obtenerMetricas();
-      const alertasSanitarias = await SanidadModel.obtenerAlertasActivas();
-      const insumosCriticos = await InsumoModel.obtenerCriticos();
-      const partesPendientes = await ParteDiarioModel.obtenerPendientes();
+      const [metricasGanado, alertasSanitarias, insumosCriticos, partesPendientes] = await Promise.all([
+        GanadoModel.obtenerMetricas(),
+        SanidadModel.obtenerAlertasActivas(),
+        InsumoModel.obtenerCriticos(),
+        ParteDiarioModel.obtenerPendientes(),
+      ]);
 
       return exito(res, {
         resumenGanado: metricasGanado,
@@ -22,7 +25,7 @@ class DashboardController {
         establecimiento: req.usuario ? req.usuario.establecimiento : "El Rancho, Goya, Corrientes",
       });
     } catch (err) {
-      return error(res, err.message, 500);
+      return error(res, "Error al calcular métricas: " + err.message, 500);
     }
   }
 
@@ -111,7 +114,7 @@ class DashboardController {
       const alertas = await SanidadModel.listarAlertasYEventos();
       return exito(res, alertas);
     } catch (err) {
-      return error(res, err.message, 500);
+      return error(res, "Error al listar alertas sanitarias: " + err.message, 500);
     }
   }
 
@@ -141,7 +144,7 @@ class DashboardController {
       const insumos = await InsumoModel.listarTodos();
       return exito(res, insumos);
     } catch (err) {
-      return error(res, err.message, 500);
+      return error(res, "Error al listar insumos: " + err.message, 500);
     }
   }
 
@@ -240,7 +243,7 @@ class DashboardController {
       const partes = await ParteDiarioModel.listarTodos();
       return exito(res, partes);
     } catch (err) {
-      return error(res, err.message, 500);
+      return error(res, "Error al listar partes diarios: " + err.message, 500);
     }
   }
 
@@ -259,15 +262,16 @@ class DashboardController {
         peonId,
         peonNombre,
         potreroId,
+        potrero,
         potreroNombre: potrero,
         novedades,
         animalesRevisados,
         solicitudInsumos,
       });
 
-      return exito(res, nuevo, "Parte diario cargado con éxito en la base de datos.", 201);
+      return exito(res, nuevo, "Parte diario cargado con éxito.", 201);
     } catch (err) {
-      return error(res, err.message, 400);
+      return error(res, "Error al registrar parte diario: " + err.message, 500);
     }
   }
 
@@ -275,69 +279,53 @@ class DashboardController {
     const { id } = req.params;
     const { estado } = req.body;
 
-    if (!estado || !["APROBADO", "RECHAZADO", "PENDIENTE", "Aprobado", "Rechazado", "Pendiente"].includes(estado)) {
-      return error(res, "Estado inválido. Debe ser Aprobado, Rechazado o Pendiente.", 400);
+    const ESTADOS_VALIDOS = ["APROBADO", "RECHAZADO", "PENDIENTE"];
+    const estadoNormalizado = (estado || "").toUpperCase();
+
+    if (!ESTADOS_VALIDOS.includes(estadoNormalizado)) {
+      return error(res, `Estado inválido. Debe ser uno de: ${ESTADOS_VALIDOS.join(", ")}.`, 400);
     }
 
     try {
-      const revisadoPorId = req.usuario ? req.usuario.id : null;
-      const parteActualizado = await ParteDiarioModel.cambiarEstado(id, estado, revisadoPorId);
-      return exito(res, parteActualizado, `Parte diario marcado como ${estado}.`);
+      const parteActualizado = await ParteDiarioModel.cambiarEstado(id, estadoNormalizado, req.usuario);
+      return exito(res, parteActualizado, `Parte diario marcado como ${estadoNormalizado}.`);
     } catch (err) {
-      return error(res, err.message, 404);
+      return error(res, "Error al actualizar estado del parte diario: " + err.message, 500);
     }
   }
 
-  // 6. Reportes y Trazabilidad Ejecutiva / Administrativa
-  static async obtenerReportes(req, res) {
-    try {
-      const ganado = await GanadoModel.listarTodos();
-      const insumos = await InsumoModel.listarTodos();
-      const partes = await ParteDiarioModel.listarTodos();
-      const eventos = await SanidadModel.listarAlertasYEventos();
-
-      const totalCabezas = ganado.length;
-      const pesoPromedio = totalCabezas > 0
-        ? Math.round(ganado.reduce((acc, g) => acc + (g.pesoKg || 0), 0) / totalCabezas)
-        : 0;
-
-      // Estimación financiera (valor de hacienda según peso y precio de referencia por kg vivo)
-      const precioKgVivoRef = 2400; // ARS por kg promedio
-      const valorHaciendaEstimado = ganado.reduce((acc, g) => acc + (g.pesoKg * precioKgVivoRef), 0);
-
-      const insumosCriticos = insumos.filter((i) => i.requiereReposicion || i.stockActual <= i.stockMinimo);
-      const partesAprobados = partes.filter((p) => String(p.estado).toUpperCase() === "APROBADO").length;
-      const tratamientosCompletados = eventos.filter((e) => e.estado === "Completado").length;
-
-      return exito(res, {
-        resumenGeneral: {
-          totalCabezas,
-          pesoPromedio,
-          valorHaciendaEstimado,
-          tasaMortalidad: "0.8%",
-          partesProcesados: partes.length,
-          partesAprobados,
-          insumosCriticosCount: insumosCriticos.length,
-          tratamientosCompletados,
-        },
-        distribucionPotreros: await GanadoModel.listarPotreros(),
-        haciendaDetalle: ganado,
-        alertasHistoricas: eventos,
-      });
-    } catch (err) {
-      return error(res, err.message, 500);
-    }
-  }
-
-  // 7. Clima
+  // 6. Condiciones Climáticas (Google Weather API / Contingencia)
   static async obtenerClima(req, res) {
     try {
-      const WeatherService = require("../services/weather.service");
-      const { lat, lon } = req.query;
+      const { lat, lon } = req.query || {};
       const clima = await WeatherService.obtenerCondicionesActuales({ lat, lon });
       return exito(res, clima, "Condiciones climáticas obtenidas con éxito.");
     } catch (err) {
-      return error(res, "No se pudo obtener la información climática: " + err.message, 500);
+      return error(res, "Error al consultar condiciones climáticas: " + err.message, 500);
+    }
+  }
+
+  // 7. Reportes Consolidados (Dueño / Oficina / Capataz / Veterinario)
+  static async obtenerReportes(req, res) {
+    try {
+      const [metricasGanado, insumosCriticos, partes] = await Promise.all([
+        GanadoModel.obtenerMetricas(),
+        InsumoModel.obtenerCriticos(),
+        ParteDiarioModel.listarTodos(),
+      ]);
+
+      const reporte = {
+        resumenGanado: metricasGanado,
+        insumosCriticos,
+        totalPartes: partes.length,
+        partesAprobados: partes.filter((p) => (p.estado || "").toUpperCase() === "APROBADO").length,
+        partesPendientes: partes.filter((p) => (p.estado || "").toUpperCase() === "PENDIENTE").length,
+        fechaGeneracion: new Date().toISOString(),
+      };
+
+      return exito(res, reporte, "Reportes consolidados generados exitosamente.");
+    } catch (err) {
+      return error(res, "Error al generar reportes: " + err.message, 500);
     }
   }
 }

@@ -1,11 +1,24 @@
 const express = require("express");
 const cors = require("cors");
 
+const path = require("path");
+const fs = require("fs");
+
 // Carga nativa de archivo .env si existe (Node.js 20.6+)
 if (typeof process.loadEnvFile === "function") {
-  try {
-    process.loadEnvFile();
-  } catch (_) {}
+  const envPaths = [
+    path.resolve(process.cwd(), ".env"),
+    path.resolve(__dirname, "../.env"),
+    path.resolve(__dirname, "../../.env"),
+  ];
+  for (const p of envPaths) {
+    if (fs.existsSync(p)) {
+      try {
+        process.loadEnvFile(p);
+        break;
+      } catch (_) {}
+    }
+  }
 }
 
 // Enrutadores modulares por cada parte del sistema
@@ -16,9 +29,31 @@ const permisosRoutes = require("./routes/permisos.routes");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
-app.use(cors());
-app.use(express.json());
+// --- CORS: restringir orígenes en producción ---
+const origenesPermitidos = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(",").map((o) => o.trim())
+  : ["http://localhost:5173", "http://localhost:5174", "http://localhost:4000"];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Permitir peticiones sin origin (ej: Postman, curl, SSR) y orígenes conocidos
+      if (!origin || origenesPermitidos.includes(origin)) {
+        callback(null, true);
+      } else if (!IS_PRODUCTION) {
+        // En desarrollo, permitir cualquier origen con una advertencia
+        callback(null, true);
+      } else {
+        callback(new Error(`Origen no permitido por política CORS: ${origin}`));
+      }
+    },
+    credentials: true,
+  })
+);
+
+app.use(express.json({ limit: "1mb" }));
 
 // Endpoint de verificación de salud del servidor
 app.get("/api/health", (req, res) => {
@@ -51,13 +86,13 @@ app.use((req, res) => {
   });
 });
 
-// Manejador global de errores
+// Manejador global de errores — no expone detalles internos en producción
 app.use((err, req, res, next) => {
   console.error("Error no controlado:", err);
-  res.status(500).json({
+  res.status(err.status || 500).json({
     ok: false,
-    error: "Error interno del servidor",
-    detalle: err.message,
+    error: IS_PRODUCTION ? "Error interno del servidor." : (err.message || "Error interno del servidor"),
+    ...(IS_PRODUCTION ? {} : { detalle: err.stack }),
   });
 });
 

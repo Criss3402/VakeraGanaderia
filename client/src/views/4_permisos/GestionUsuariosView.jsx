@@ -121,7 +121,7 @@ export default function GestionUsuariosView() {
                     {esDueno && (
                       <td>
                         <select
-                          value={u.rol}
+                          value={u.rol?.toLowerCase() || "peon"}
                           disabled={actualizandoId === u.id}
                           onChange={(e) => manejarCambioRol(u.id, e.target.value)}
                           className="campo-formulario__input campo-formulario__input--sm"

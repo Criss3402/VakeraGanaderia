@@ -6,7 +6,12 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // Reenvía las llamadas /api al backend de Node.js durante el desarrollo
+      // Reenvía llamadas analíticas /api/py al backend de Python (Django)
+      "/api/py": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+      // Reenvía las llamadas operativas /api al backend de Node.js (Express)
       "/api": {
         target: "http://localhost:4000",
         changeOrigin: true,

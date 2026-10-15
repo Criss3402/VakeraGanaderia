@@ -1,14 +1,21 @@
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 const UsuarioModel = require("../models/usuario.model");
 const { exito, error } = require("../utils/apiResponse");
 
+const JWT_SECRET = process.env.JWT_SECRET || "vakera_dev_secret_no_usar_en_produccion";
+const JWT_EXPIRES_IN = "8h";
+
 function generarToken(usuario) {
-  const payload = {
-    id: usuario.id,
-    email: usuario.email,
-    rol: usuario.rol,
-    timestamp: Date.now(),
-  };
-  return Buffer.from(JSON.stringify(payload)).toString("base64");
+  return jwt.sign(
+    {
+      id: usuario.id,
+      email: usuario.email,
+      rol: usuario.rol,
+    },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
 }
 
 class AuthController {
@@ -19,10 +26,17 @@ class AuthController {
       return error(res, "Email y contraseña son obligatorios.", 400);
     }
 
-    const usuario = await UsuarioModel.buscarPorEmail(email);
+    // Obtener usuario con password (método especial)
+    const usuario = await UsuarioModel.buscarPorEmailConPassword(email);
 
-    if (!usuario || usuario.password !== password) {
-      return error(res, "Credenciales incorrectas. Verifique email y contraseña.", 401);
+    if (!usuario) {
+      // Mensaje genérico para no revelar qué campo es incorrecto
+      return error(res, "Credenciales incorrectas.", 401);
+    }
+
+    const passwordValida = await bcrypt.compare(password, usuario.password);
+    if (!passwordValida) {
+      return error(res, "Credenciales incorrectas.", 401);
     }
 
     const token = generarToken(usuario);
@@ -39,6 +53,16 @@ class AuthController {
 
     if (!nombre || !email || !password) {
       return error(res, "Nombre, email y contraseña son obligatorios.", 400);
+    }
+
+    if (password.length < 6) {
+      return error(res, "La contraseña debe tener al menos 6 caracteres.", 400);
+    }
+
+    // Validación básica de formato de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return error(res, "El formato del correo electrónico no es válido.", 400);
     }
 
     try {
@@ -69,7 +93,15 @@ class AuthController {
     return exito(res, { usuario: req.usuario });
   }
 
+  /**
+   * Solo disponible en modo de desarrollo/demo.
+   * No expone contraseñas — solo devuelve datos públicos del usuario.
+   */
   static async obtenerUsuariosDemo(req, res) {
+    if (process.env.NODE_ENV === "production") {
+      return error(res, "Endpoint no disponible en producción.", 403);
+    }
+
     const lista = await UsuarioModel.listarTodos();
     const usuariosDemo = lista.map((u) => ({
       id: u.id,
@@ -77,6 +109,7 @@ class AuthController {
       email: u.email,
       rol: u.rol,
       cargo: u.cargo,
+      // La contraseña demo es pública por diseño en entorno de desarrollo
       passwordDemo: "password123",
     }));
 
