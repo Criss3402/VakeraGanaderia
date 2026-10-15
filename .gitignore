@@ -13,3 +13,8 @@ npm-debug.log*
 # Archivos temporales del sistema operativo
 Thumbs.db
 .DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
