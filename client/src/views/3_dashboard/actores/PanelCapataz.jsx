@@ -8,6 +8,7 @@ import {
   obtenerInsumos,
   obtenerSolicitudesInsumos,
 } from "../../../api/dashboard.api";
+import WidgetClima from "../modulos/WidgetClima";
 
 export default function PanelCapataz({ alCambiarVista }) {
   const [partes, setPartes] = useState([]);
@@ -109,6 +110,8 @@ export default function PanelCapataz({ alCambiarVista }) {
           </div>
         </div>
       </div>
+
+      <WidgetClima />
 
       {mensaje && (
         <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2 shadow-sm animate-fade-in">
