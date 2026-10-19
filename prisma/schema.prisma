@@ -46,8 +46,13 @@ model Usuario {
   rol             Rol      @default(PEON)
   cargo           String?
   telefono        String?
-  establecimiento String?  @default("El Rancho, Goya, Corrientes")
-  fechaRegistro   DateTime @default(now())
+  establecimiento        String?   @default("El Rancho, Goya, Corrientes")
+  fechaRegistro          DateTime  @default(now())
+  emailVerificado        Boolean   @default(false)
+  tokenVerificacion      String?
+  tokenExpiracion        DateTime?
+  tokenRecuperacion      String?
+  expiracionRecuperacion DateTime?
 
   // Relaciones
   partesCreados   ParteDiario[]   @relation("PeonPartes")

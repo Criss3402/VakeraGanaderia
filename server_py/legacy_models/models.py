@@ -16,6 +16,11 @@ class Usuario(models.Model):
     telefono = models.CharField(max_length=50, null=True, blank=True)
     establecimiento = models.CharField(max_length=150, null=True, blank=True)
     fecha_registro = models.DateTimeField(db_column="fechaRegistro")
+    email_verificado = models.BooleanField(db_column="emailVerificado", default=False)
+    token_verificacion = models.CharField(max_length=255, db_column="tokenVerificacion", null=True, blank=True)
+    token_expiracion = models.DateTimeField(db_column="tokenExpiracion", null=True, blank=True)
+    token_recuperacion = models.CharField(max_length=255, db_column="tokenRecuperacion", null=True, blank=True)
+    expiracion_recuperacion = models.DateTimeField(db_column="expiracionRecuperacion", null=True, blank=True)
 
     class Meta:
         managed = False

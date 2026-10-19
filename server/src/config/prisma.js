@@ -18,7 +18,12 @@ if (!process.env.DATABASE_URL && typeof process.loadEnvFile === "function") {
   }
 }
 
-const { PrismaClient } = require("@prisma/client");
+let PrismaClient;
+try {
+  PrismaClient = require(path.resolve(__dirname, "../../../node_modules/@prisma/client")).PrismaClient;
+} catch (err) {
+  PrismaClient = require("@prisma/client").PrismaClient;
+}
 
 // Instancia singleton de Prisma Client para evitar múltiples conexiones en desarrollo
 const prisma = new PrismaClient({

@@ -4,23 +4,35 @@ import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import Alert from "../../components/ui/Alert";
 
-export default function LoginView({ alIrARegistro, alIrARecuperar, alIrALanding, alIniciarExito }) {
+export default function LoginView({
+  alIrARegistro,
+  alIrARecuperar,
+  alIrAVerificar,
+  alIrALanding,
+  alIniciarExito,
+}) {
   const { iniciarSesion } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
+  const [necesitaVerificacion, setNecesitaVerificacion] = useState(false);
 
   async function manejarSubmit(e) {
     e.preventDefault();
     setError("");
+    setNecesitaVerificacion(false);
     setCargando(true);
 
     try {
       await iniciarSesion(email, password);
       if (alIniciarExito) alIniciarExito();
     } catch (err) {
-      setError(err.message || "Error al iniciar sesión.");
+      const msg = err.message || "Error al iniciar sesión.";
+      setError(msg);
+      if (msg.toLowerCase().includes("activada") || msg.toLowerCase().includes("verific")) {
+        setNecesitaVerificacion(true);
+      }
     } finally {
       setCargando(false);
     }
@@ -49,6 +61,18 @@ export default function LoginView({ alIrARegistro, alIrARecuperar, alIrALanding,
           <Alert tipo="error" alCerrar={() => setError("")}>
             {error}
           </Alert>
+        )}
+
+        {necesitaVerificacion && (
+          <div style={{ marginBottom: "16px", textAlign: "center" }}>
+            <Button
+              variante="borde"
+              className="boton--bloque"
+              onClick={() => (alIrAVerificar ? alIrAVerificar("", email) : null)}
+            >
+              ✉ Activar mi cuenta o reenviar correo
+            </Button>
+          </div>
         )}
 
         <form onSubmit={manejarSubmit} className="auth-form">

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import {
   login as apiLogin,
   registro as apiRegistro,
+  verificarEmail as apiVerificarEmail,
   obtenerUsuarioActual,
   logout as apiLogout,
   obtenerUsuariosDemo,
@@ -80,12 +81,23 @@ export function AuthProvider({ children }) {
 
   async function registrarse(datos) {
     const res = await apiRegistro(datos);
-    if (res?.data?.usuario) {
+    // Si viene token inmediato
+    if (res?.data?.token && res?.data?.usuario) {
       setUsuario(res.data.usuario);
       setTokenState(res.data.token);
       return res.data.usuario;
     }
-    throw new Error("Respuesta inválida al registrar");
+    return res?.data;
+  }
+
+  async function verificarEmailConToken(tokenVerif) {
+    const res = await apiVerificarEmail(tokenVerif);
+    if (res?.data?.usuario && res?.data?.token) {
+      setUsuario(res.data.usuario);
+      setTokenState(res.data.token);
+      return res.data.usuario;
+    }
+    return res?.data;
   }
 
   function cerrarSesion() {
@@ -106,6 +118,7 @@ export function AuthProvider({ children }) {
         iniciarSesion,
         loginRapido,
         registrarse,
+        verificarEmailConToken,
         cerrarSesion,
       }}
     >

@@ -4,6 +4,7 @@ import LandingView from "./views/1_inicio_presentacion/LandingView.jsx";
 import LoginView from "./views/2_login_registro/LoginView.jsx";
 import RegistroView from "./views/2_login_registro/RegistroView.jsx";
 import RecuperarPasswordView from "./views/2_login_registro/RecuperarPasswordView.jsx";
+import VerificarEmailView from "./views/2_login_registro/VerificarEmailView.jsx";
 import DashboardView from "./views/3_dashboard/DashboardView.jsx";
 import GanadoView from "./views/3_dashboard/modulos/GanadoView.jsx";
 import PartesView from "./views/3_dashboard/modulos/PartesView.jsx";
@@ -16,14 +17,30 @@ import PrivateLayout from "./components/layout/PrivateLayout.jsx";
 
 function AppContenido() {
   const { estaAutenticado, rol } = useAuth();
-  // Vistas principales: 'landing' | 'login' | 'registro' | 'recuperar' | 'app'
-  const [ruta, setRuta] = useState("landing");
+  // Vistas principales: 'landing' | 'login' | 'registro' | 'recuperar' | 'verificar' | 'app'
+  const [ruta, setRuta] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const r = params.get("ruta");
+    if (r === "verificar" || r === "recuperar" || r === "login" || r === "registro") {
+      return r;
+    }
+    return "landing";
+  });
+
+  const [paramsUrl, setParamsUrl] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return {
+      token: params.get("token") || "",
+      email: params.get("email") || "",
+    };
+  });
+
   // Sub-vista dentro de la app privada: 'metricas' | 'ganado' | 'partes' | 'sanidad' | 'insumos' | 'reportes' | 'permisos'
   const [subVistaApp, setSubVistaApp] = useState("metricas");
 
   // Si el usuario se autentica mientras está en login/registro, enviarlo al dashboard
   useEffect(() => {
-    if (estaAutenticado && (ruta === "login" || ruta === "registro")) {
+    if (estaAutenticado && (ruta === "login" || ruta === "registro" || ruta === "verificar")) {
       setRuta("app");
     }
   }, [estaAutenticado, ruta]);
@@ -54,6 +71,10 @@ function AppContenido() {
       <LoginView
         alIrARegistro={() => setRuta("registro")}
         alIrARecuperar={() => setRuta("recuperar")}
+        alIrAVerificar={(tok, em) => {
+          setParamsUrl({ token: tok || "", email: em || "" });
+          setRuta("verificar");
+        }}
         alIrALanding={() => setRuta("landing")}
         alIniciarExito={() => setRuta("app")}
       />
@@ -64,8 +85,24 @@ function AppContenido() {
     return (
       <RegistroView
         alIrALogin={() => setRuta("login")}
+        alIrAVerificar={(tok, em) => {
+          setParamsUrl({ token: tok || "", email: em || "" });
+          setRuta("verificar");
+        }}
         alIrALanding={() => setRuta("landing")}
         alRegistroExito={() => setRuta("app")}
+      />
+    );
+  }
+
+  if (ruta === "verificar") {
+    return (
+      <VerificarEmailView
+        tokenInicial={paramsUrl.token}
+        emailInicial={paramsUrl.email}
+        alIrALogin={() => setRuta("login")}
+        alIrALanding={() => setRuta("landing")}
+        alVerificacionExitosa={() => setRuta("app")}
       />
     );
   }
@@ -73,8 +110,11 @@ function AppContenido() {
   if (ruta === "recuperar") {
     return (
       <RecuperarPasswordView
+        tokenInicial={paramsUrl.token}
+        emailInicial={paramsUrl.email}
         alIrALogin={() => setRuta("login")}
         alIrALanding={() => setRuta("landing")}
+        alRestablecerExito={() => setRuta("login")}
       />
     );
   }

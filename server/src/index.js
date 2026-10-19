@@ -4,18 +4,17 @@ const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
 
-// Carga nativa de archivo .env si existe (Node.js 20.6+)
+// Carga nativa de archivos .env (Node.js 20.6+)
 if (typeof process.loadEnvFile === "function") {
   const envPaths = [
+    path.resolve(__dirname, "../../.env"), // Root .env
+    path.resolve(__dirname, "../.env"),    // server/.env
     path.resolve(process.cwd(), ".env"),
-    path.resolve(__dirname, "../.env"),
-    path.resolve(__dirname, "../../.env"),
   ];
   for (const p of envPaths) {
     if (fs.existsSync(p)) {
       try {
         process.loadEnvFile(p);
-        break;
       } catch (_) {}
     }
   }

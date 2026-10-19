@@ -34,6 +34,7 @@ async function main() {
       cargo: "Propietario / Director",
       telefono: "+54 9 11 4567-8901",
       establecimiento: "El Rancho, Goya, Corrientes",
+      emailVerificado: true,
     },
     {
       id: "usr-2",
@@ -44,6 +45,7 @@ async function main() {
       cargo: "Capataz General",
       telefono: "+54 9 11 5678-1234",
       establecimiento: "El Rancho, Goya, Corrientes",
+      emailVerificado: true,
     },
     {
       id: "usr-3",
@@ -54,6 +56,7 @@ async function main() {
       cargo: "Peón de Campo",
       telefono: "+54 9 11 6789-2345",
       establecimiento: "El Rancho, Goya, Corrientes",
+      emailVerificado: true,
     },
     {
       id: "usr-4",
@@ -64,6 +67,7 @@ async function main() {
       cargo: "Administración y Compras",
       telefono: "+54 9 11 7890-3456",
       establecimiento: "El Rancho, Goya, Corrientes",
+      emailVerificado: true,
     },
     {
       id: "usr-5",
@@ -74,6 +78,7 @@ async function main() {
       cargo: "Médica Veterinaria (Mat. 4892)",
       telefono: "+54 9 11 8901-4567",
       establecimiento: "El Rancho, Goya, Corrientes",
+      emailVerificado: true,
     },
   ];
 
