@@ -1,5 +1,10 @@
 const { PrismaClient } = require("@prisma/client");
-const bcrypt = require("bcryptjs");
+let bcrypt;
+try {
+  bcrypt = require("bcryptjs");
+} catch {
+  bcrypt = require("../server/node_modules/bcryptjs");
+}
 const prisma = new PrismaClient();
 
 const SALT_ROUNDS = 10;
@@ -33,6 +38,7 @@ async function main() {
       rol: "DUENO",
       cargo: "Propietario / Director",
       telefono: "+54 9 11 4567-8901",
+      establecimientoId: "est-el-rancho",
       establecimiento: "El Rancho, Goya, Corrientes",
       emailVerificado: true,
     },
@@ -42,9 +48,10 @@ async function main() {
       email: "capataz@vakera.com",
       password: passwordHasheada,
       rol: "CAPATAZ",
-      cargo: "Capataz General",
+      cargo: "Capataz de Campo",
       telefono: "+54 9 11 5678-1234",
-      establecimiento: "El Rancho, Goya, Corrientes",
+      establecimientoId: null,
+      establecimiento: null,
       emailVerificado: true,
     },
     {
@@ -53,9 +60,10 @@ async function main() {
       email: "peon@vakera.com",
       password: passwordHasheada,
       rol: "PEON",
-      cargo: "Peón de Campo",
+      cargo: "Peón Operario",
       telefono: "+54 9 11 6789-2345",
-      establecimiento: "El Rancho, Goya, Corrientes",
+      establecimientoId: null,
+      establecimiento: null,
       emailVerificado: true,
     },
     {
@@ -66,7 +74,8 @@ async function main() {
       rol: "OFICINA",
       cargo: "Administración y Compras",
       telefono: "+54 9 11 7890-3456",
-      establecimiento: "El Rancho, Goya, Corrientes",
+      establecimientoId: null,
+      establecimiento: null,
       emailVerificado: true,
     },
     {
@@ -77,7 +86,8 @@ async function main() {
       rol: "VETERINARIO",
       cargo: "Médica Veterinaria (Mat. 4892)",
       telefono: "+54 9 11 8901-4567",
-      establecimiento: "El Rancho, Goya, Corrientes",
+      establecimientoId: null,
+      establecimiento: null,
       emailVerificado: true,
     },
   ];

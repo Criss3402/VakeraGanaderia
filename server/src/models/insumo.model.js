@@ -16,6 +16,8 @@ let solicitudesInsumos = [
     sector: "Pertenencias de Peón",
     estado: "Pendiente",
     fecha: "2026-10-09",
+    establecimientoId: "est-el-rancho",
+    establecimiento: "El Rancho, Goya, Corrientes",
   },
   {
     id: "sol-2",
@@ -30,6 +32,8 @@ let solicitudesInsumos = [
     sector: "Botiquín Veterinario",
     estado: "Aprobado",
     fecha: "2026-10-08",
+    establecimientoId: "est-el-rancho",
+    establecimiento: "El Rancho, Goya, Corrientes",
   },
   {
     id: "sol-3",
@@ -44,13 +48,17 @@ let solicitudesInsumos = [
     sector: "Campo y Taller (Capataz)",
     estado: "Entregado",
     fecha: "2026-10-07",
+    establecimientoId: "est-el-rancho",
+    establecimiento: "El Rancho, Goya, Corrientes",
   },
 ];
 
 class InsumoModel {
-  static async listarTodos() {
+  static async listarTodos(establecimientoId) {
     try {
+      const whereClause = establecimientoId ? { establecimientoId } : {};
       const lista = await prisma.insumo.findMany({
+        where: whereClause,
         orderBy: { nombre: "asc" },
       });
       return lista.map((item) => ({
@@ -65,30 +73,50 @@ class InsumoModel {
       }));
     } catch (err) {
       console.warn("[InsumoModel] Fallo al consultar Prisma, usando fallback en memoria:", err.message);
-      return db.insumos;
+      const fuente = Array.isArray(db.insumos) ? db.insumos : [];
+      const filtrados = establecimientoId
+        ? fuente.filter((i) => i.establecimientoId === establecimientoId)
+        : fuente;
+      return filtrados.map((item) => ({
+        ...item,
+        sectorCustodia: (item.ubicacion || "").includes("Peón")
+          ? "peon"
+          : (item.ubicacion || "").includes("Capataz")
+          ? "capataz"
+          : (item.ubicacion || "").includes("Veterin")
+          ? "veterinario"
+          : "oficina",
+      }));
     }
   }
 
-  static async obtenerCriticos() {
+  static async obtenerCriticos(establecimientoId) {
     try {
+      const whereClause = {
+        OR: [
+          { requiereReposicion: true },
+          { estado: "Bajo Stock" },
+          { estado: "Crítico" },
+        ],
+      };
+      if (establecimientoId) whereClause.establecimientoId = establecimientoId;
+
       const lista = await prisma.insumo.findMany({
-        where: {
-          OR: [
-            { requiereReposicion: true },
-            { estado: "Bajo Stock" },
-            { estado: "Crítico" },
-          ],
-        },
+        where: whereClause,
       });
       return lista;
     } catch {
-      return db.insumos.filter(
+      const fuente = Array.isArray(db.insumos) ? db.insumos : [];
+      const filtrados = establecimientoId
+        ? fuente.filter((i) => i.establecimientoId === establecimientoId)
+        : fuente;
+      return filtrados.filter(
         (item) => item.requiereReposicion || Number(item.stockActual) <= Number(item.stockMinimo)
       );
     }
   }
 
-  static async registrar(insumo) {
+  static async registrar(insumo, establecimientoId, establecimiento) {
     const stockActual = parseFloat(insumo.stockActual) || 0;
     const stockMinimo = parseFloat(insumo.stockMinimo) || 5;
     const esCritico = stockActual <= stockMinimo;
@@ -106,6 +134,8 @@ class InsumoModel {
           estado,
           requiereReposicion: esCritico,
           icono: insumo.icono || "fa-box-archive",
+          establecimientoId: establecimientoId || null,
+          establecimiento: establecimiento || null,
         },
       });
       return nuevo;
@@ -118,7 +148,10 @@ class InsumoModel {
         stockMinimo,
         estado,
         requiereReposicion: esCritico,
+        establecimientoId: establecimientoId || "est-el-rancho",
+        establecimiento: establecimiento || "Mi Establecimiento",
       };
+      if (!db.insumos) db.insumos = [];
       db.insumos.push(nuevo);
       return nuevo;
     }
@@ -133,13 +166,10 @@ class InsumoModel {
       let nuevoStock = actual.stockActual;
 
       if (operacion === "conteo") {
-        // Conteo físico directo de pertenencias
         nuevoStock = Math.max(0, delta);
       } else if (operacion === "sumar") {
-        // Añadir productos / reponer al stock
         nuevoStock = actual.stockActual + delta;
       } else if (operacion === "restar") {
-        // Descontar consumo
         nuevoStock = Math.max(0, actual.stockActual - delta);
       }
 
@@ -155,7 +185,7 @@ class InsumoModel {
         },
       });
     } catch (e) {
-      const insumo = db.insumos.find((i) => i.id === id);
+      const insumo = (db.insumos || []).find((i) => i.id === id);
       if (insumo) {
         const delta = parseFloat(cantidadCambio) || 0;
         if (operacion === "conteo") {
@@ -174,8 +204,9 @@ class InsumoModel {
   }
 
   // --- SOLICITUDES DE INSUMOS (PEÓN, CAPATAZ, VETERINARIO) ---
-  static listarSolicitudes() {
-    return solicitudesInsumos;
+  static listarSolicitudes(establecimientoId) {
+    if (!establecimientoId) return solicitudesInsumos;
+    return solicitudesInsumos.filter((s) => s.establecimientoId === establecimientoId);
   }
 
   static registrarSolicitud({
@@ -188,6 +219,8 @@ class InsumoModel {
     solicitanteNombre = "Operario",
     solicitanteRol = "peon",
     sector = "Campo",
+    establecimientoId,
+    establecimiento,
   }) {
     const nueva = {
       id: `sol-${Date.now()}`,
@@ -202,6 +235,8 @@ class InsumoModel {
       sector,
       estado: "Pendiente",
       fecha: new Date().toISOString().split("T")[0],
+      establecimientoId: establecimientoId || "est-el-rancho",
+      establecimiento: establecimiento || "Mi Establecimiento",
     };
     solicitudesInsumos.unshift(nueva);
     return nueva;

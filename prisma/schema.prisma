@@ -46,6 +46,7 @@ model Usuario {
   rol             Rol      @default(PEON)
   cargo           String?
   telefono        String?
+  establecimientoId      String?   @default("est-el-rancho")
   establecimiento        String?   @default("El Rancho, Goya, Corrientes")
   fechaRegistro          DateTime  @default(now())
   emailVerificado        Boolean   @default(false)
@@ -64,11 +65,13 @@ model Usuario {
 
 // 2. Potreros / Divisiones del Campo
 model Potrero {
-  id            String        @id @default(cuid())
-  nombre        String        @unique
-  descripcion   String?
-  superficieHas Float?
-  capacidad     Int?
+  id                String        @id @default(cuid())
+  nombre            String
+  descripcion       String?
+  superficieHas     Float?
+  capacidad         Int?
+  establecimientoId String?       @default("est-el-rancho")
+  establecimiento   String?       @default("El Rancho, Goya, Corrientes")
   
   // Relaciones
   animales      Ganado[]
@@ -79,15 +82,17 @@ model Potrero {
 
 // 3. Ganado y Rodeo
 model Ganado {
-  id              String          @id @default(cuid())
-  caravana        String          @unique
-  categoria       String          // Vacas, Toros, Novillos, Terneras, Vaquillonas
-  raza            String
-  sexo            String          // Hembra / Macho
-  pesoKg          Float
-  estadoSanitario EstadoSanitario @default(SALUDABLE)
-  fechaNacimiento DateTime?
-  fechaRegistro   DateTime        @default(now())
+  id                String          @id @default(cuid())
+  caravana          String          @unique
+  categoria         String          // Vacas, Toros, Novillos, Terneras, Vaquillonas
+  raza              String
+  sexo              String          // Hembra / Macho
+  pesoKg            Float
+  estadoSanitario   EstadoSanitario @default(SALUDABLE)
+  fechaNacimiento   DateTime?
+  fechaRegistro     DateTime        @default(now())
+  establecimientoId String?         @default("est-el-rancho")
+  establecimiento   String?         @default("El Rancho, Goya, Corrientes")
 
   // Relación con Potrero
   potreroId       String?
@@ -101,16 +106,18 @@ model Ganado {
 
 // 4. Módulo Sanitario y Calendario de Vacunación
 model SanidadEvento {
-  id              String   @id @default(cuid())
-  evento          String   // e.g. "Vacunación Antiaftosa", "Control de Carbunclo"
-  tipo            String   // "Vacunación", "Tratamiento", "Mantenimiento"
-  lote            String?  // Nombre del lote / potrero o grupo
-  fechaProgramada DateTime
-  estado          String   @default("Pendiente") // "Pendiente", "Próximo", "Completado", "Programado"
-  prioridad       String   @default("Normal")    // "Alta", "Urgente", "Normal"
-  icono           String?  @default("fa-syringe")
-  notas           String?
-  fechaRegistro   DateTime @default(now())
+  id                String   @id @default(cuid())
+  evento            String   // e.g. "Vacunación Antiaftosa", "Control de Carbunclo"
+  tipo              String   // "Vacunación", "Tratamiento", "Mantenimiento"
+  lote              String?  // Nombre del lote / potrero o grupo
+  fechaProgramada   DateTime
+  estado            String   @default("Pendiente") // "Pendiente", "Próximo", "Completado", "Programado"
+  prioridad         String   @default("Normal")    // "Alta", "Urgente", "Normal"
+  icono             String?  @default("fa-syringe")
+  notas             String?
+  fechaRegistro     DateTime @default(now())
+  establecimientoId String?  @default("est-el-rancho")
+  establecimiento   String?  @default("El Rancho, Goya, Corrientes")
 
   // Relación con Animal específico (opcional)
   ganadoId        String?
@@ -136,6 +143,8 @@ model Insumo {
   requiereReposicion Boolean  @default(false)
   icono              String?  @default("fa-box-archive")
   fechaRegistro      DateTime @default(now())
+  establecimientoId  String?  @default("est-el-rancho")
+  establecimiento    String?  @default("El Rancho, Goya, Corrientes")
 
   @@map("insumos")
 }
@@ -150,6 +159,8 @@ model ParteDiario {
   estado            EstadoParte @default(PENDIENTE)
   fechaCarga        DateTime    @default(now())
   fechaRevision     DateTime?
+  establecimientoId String?     @default("est-el-rancho")
+  establecimiento   String?     @default("El Rancho, Goya, Corrientes")
 
   // Operario que carga el parte (Peón)
   peonId            String

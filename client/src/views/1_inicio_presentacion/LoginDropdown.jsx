@@ -4,16 +4,24 @@ import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import Alert from "../../components/ui/Alert";
 
-export default function LoginDropdown({ alIrARegistro, alIrARecuperar, alIniciarExito, alCerrar }) {
+export default function LoginDropdown({
+  alIrARegistro,
+  alIrARecuperar,
+  alIrAVerificar,
+  alIniciarExito,
+  alCerrar,
+}) {
   const { iniciarSesion } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
+  const [necesitaVerificacion, setNecesitaVerificacion] = useState(false);
 
   async function manejarSubmit(e) {
     e.preventDefault();
     setError("");
+    setNecesitaVerificacion(false);
     setCargando(true);
 
     try {
@@ -21,7 +29,11 @@ export default function LoginDropdown({ alIrARegistro, alIrARecuperar, alIniciar
       if (alCerrar) alCerrar();
       if (alIniciarExito) alIniciarExito();
     } catch (err) {
-      setError(err.message || "Credenciales incorrectas.");
+      const msg = err.message || "Credenciales incorrectas.";
+      setError(msg);
+      if (msg.toLowerCase().includes("activada") || msg.toLowerCase().includes("verific")) {
+        setNecesitaVerificacion(true);
+      }
     } finally {
       setCargando(false);
     }
@@ -40,6 +52,21 @@ export default function LoginDropdown({ alIrARegistro, alIrARecuperar, alIniciar
         <Alert tipo="error" alCerrar={() => setError("")}>
           {error}
         </Alert>
+      )}
+
+      {necesitaVerificacion && (
+        <div style={{ marginBottom: "12px", textAlign: "center" }}>
+          <Button
+            variante="borde"
+            className="boton--bloque"
+            onClick={() => {
+              if (alCerrar) alCerrar();
+              if (alIrAVerificar) alIrAVerificar("", email);
+            }}
+          >
+            ✉ Activar cuenta o reenviar correo
+          </Button>
+        </div>
       )}
 
       <form onSubmit={manejarSubmit} className="login-dropdown__form">
@@ -64,18 +91,16 @@ export default function LoginDropdown({ alIrARegistro, alIrARecuperar, alIniciar
         />
 
         <div className="login-dropdown__olvido">
-          {alIrARecuperar && (
-            <button
-              type="button"
-              onClick={() => {
-                if (alCerrar) alCerrar();
-                alIrARecuperar();
-              }}
-              className="auth-link"
-            >
-              ¿Olvidaste tu contraseña?
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => {
+              if (alCerrar) alCerrar();
+              if (alIrARecuperar) alIrARecuperar();
+            }}
+            className="auth-link"
+          >
+            ¿Olvidaste tu contraseña?
+          </button>
         </div>
 
         <Button

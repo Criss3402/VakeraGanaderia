@@ -2,9 +2,11 @@ const prisma = require("../config/prisma");
 const db = require("../config/db");
 
 class GanadoModel {
-  static async listarTodos() {
+  static async listarTodos(establecimientoId) {
     try {
+      const whereClause = establecimientoId ? { establecimientoId } : {};
       const lista = await prisma.ganado.findMany({
+        where: whereClause,
         include: {
           potrero: true,
           eventosSanitarios: {
@@ -23,13 +25,24 @@ class GanadoModel {
       }));
     } catch (err) {
       console.warn("[GanadoModel] Fallo al consultar Prisma, usando fallback en memoria:", err.message);
-      return db.ganado;
+      const fuente = Array.isArray(db.ganado) ? db.ganado : [];
+      const filtrados = establecimientoId
+        ? fuente.filter((g) => g.establecimientoId === establecimientoId)
+        : fuente;
+      return filtrados.map((g) => ({
+        ...g,
+        potrero: g.potreroNombre || g.potrero || "Sin potrero asignado",
+        potreroNombre: g.potreroNombre || g.potrero || "Sin potrero asignado",
+        historialSanitario: g.historialSanitario || [],
+      }));
     }
   }
 
-  static async listarPotreros() {
+  static async listarPotreros(establecimientoId) {
     try {
+      const whereClause = establecimientoId ? { establecimientoId } : {};
       const potreros = await prisma.potrero.findMany({
+        where: whereClause,
         include: { animales: true },
         orderBy: { nombre: "asc" },
       });
@@ -40,13 +53,21 @@ class GanadoModel {
       }));
     } catch (e) {
       console.warn("Fallback memoria para potreros:", e.message);
-      return [
-        { id: "pot-1", nombre: "Potrero 1 - Los Eucaliptos", superficieHas: 120, capacidad: 150, totalAnimales: 1, porcentajeCarga: 1 },
-        { id: "pot-2", nombre: "Potrero 2 - La Loma", superficieHas: 95, capacidad: 110, totalAnimales: 1, porcentajeCarga: 1 },
-        { id: "pot-3", nombre: "Potrero 3 - El Trébol", superficieHas: 140, capacidad: 180, totalAnimales: 1, porcentajeCarga: 1 },
-        { id: "pot-4", nombre: "Potrero 4 - Bajo Hondo", superficieHas: 80, capacidad: 90, totalAnimales: 1, porcentajeCarga: 1 },
-        { id: "pot-5", nombre: "Potrero 5 - La Aguada", superficieHas: 160, capacidad: 200, totalAnimales: 1, porcentajeCarga: 1 },
-      ];
+      const fuente = Array.isArray(db.potreros) ? db.potreros : [];
+      const filtrados = establecimientoId
+        ? fuente.filter((p) => p.establecimientoId === establecimientoId)
+        : fuente;
+
+      // Calcular cantidad de animales en memoria
+      const ganadoFuente = Array.isArray(db.ganado) ? db.ganado : [];
+      return filtrados.map((p) => {
+        const count = ganadoFuente.filter((g) => (g.potreroId === p.id || g.potrero === p.nombre || g.potreroNombre === p.nombre)).length;
+        return {
+          ...p,
+          totalAnimales: count,
+          porcentajeCarga: p.capacidad ? Math.min(100, Math.round((count / p.capacidad) * 100)) : 0,
+        };
+      });
     }
   }
 
@@ -70,15 +91,20 @@ class GanadoModel {
         potreroNombre: g.potrero ? g.potrero.nombre : "Sin potrero asignado",
       };
     } catch {
-      return db.ganado.find((g) => g.id === id) || null;
+      return (db.ganado || []).find((g) => g.id === id) || null;
     }
   }
 
-  static async buscarPorCaravana(caravana) {
+  static async buscarPorCaravana(caravana, establecimientoId) {
     if (!caravana) return null;
     try {
+      const whereClause = {
+        caravana: { equals: caravana, mode: "insensitive" },
+      };
+      if (establecimientoId) whereClause.establecimientoId = establecimientoId;
+
       const g = await prisma.ganado.findFirst({
-        where: { caravana: { equals: caravana, mode: "insensitive" } },
+        where: whereClause,
         include: { potrero: true },
       });
       if (!g) return null;
@@ -88,13 +114,16 @@ class GanadoModel {
         potreroNombre: g.potrero ? g.potrero.nombre : "Sin potrero asignado",
       };
     } catch {
-      return db.ganado.find((g) => g.caravana.toLowerCase() === caravana.toLowerCase()) || null;
+      return (db.ganado || []).find((g) => {
+        const matchCaravana = (g.caravana || "").toLowerCase() === caravana.toLowerCase();
+        return establecimientoId ? matchCaravana && g.establecimientoId === establecimientoId : matchCaravana;
+      }) || null;
     }
   }
 
-  static async obtenerMetricas() {
+  static async obtenerMetricas(establecimientoId) {
     try {
-      const lista = await this.listarTodos();
+      const lista = await this.listarTodos(establecimientoId);
       const total = lista.length;
 
       const porCategoria = lista.reduce((acc, curr) => {
@@ -116,40 +145,29 @@ class GanadoModel {
         porCategoria,
         porEstadoSanitario,
         pesoPromedioKg: pesoPromedio,
-        tasaMortalidadMensual: "0.8%",
+        tasaMortalidadMensual: total > 0 ? "0.8%" : "0.0%",
       };
-    } catch {
-      const total = db.ganado.length;
-      const porCategoria = db.ganado.reduce((acc, curr) => {
-        acc[curr.categoria] = (acc[curr.categoria] || 0) + 1;
-        return acc;
-      }, {});
-
-      const porEstadoSanitario = db.ganado.reduce((acc, curr) => {
-        acc[curr.estadoSanitario] = (acc[curr.estadoSanitario] || 0) + 1;
-        return acc;
-      }, {});
-
-      const pesoPromedio = total > 0
-        ? Math.round(db.ganado.reduce((acc, curr) => acc + (curr.pesoKg || 0), 0) / total)
-        : 0;
-
+    } catch (e) {
+      console.warn("[GanadoModel.obtenerMetricas] Fallback:", e.message);
       return {
-        totalCabezas: total,
-        porCategoria,
-        porEstadoSanitario,
-        pesoPromedioKg: pesoPromedio,
-        tasaMortalidadMensual: "0.8%",
+        totalCabezas: 0,
+        porCategoria: {},
+        porEstadoSanitario: {},
+        pesoPromedioKg: 0,
+        tasaMortalidadMensual: "0.0%",
       };
     }
   }
 
-  static async registrar(animal) {
+  static async registrar(animal, establecimientoId, establecimiento) {
     try {
       let potreroId = animal.potreroId;
       if (!potreroId && animal.potrero) {
         const pEncontrado = await prisma.potrero.findFirst({
-          where: { nombre: { contains: animal.potrero, mode: "insensitive" } },
+          where: {
+            nombre: { contains: animal.potrero, mode: "insensitive" },
+            ...(establecimientoId ? { establecimientoId } : {}),
+          },
         });
         if (pEncontrado) potreroId = pEncontrado.id;
       }
@@ -164,6 +182,8 @@ class GanadoModel {
           estadoSanitario: (animal.estadoSanitario || "SALUDABLE").toUpperCase(),
           potreroId: potreroId || null,
           fechaNacimiento: animal.fechaNacimiento ? new Date(animal.fechaNacimiento) : null,
+          establecimientoId: establecimientoId || null,
+          establecimiento: establecimiento || null,
         },
         include: { potrero: true },
       });
@@ -178,8 +198,14 @@ class GanadoModel {
       const nuevo = {
         id: `gan-${Date.now()}`,
         ...animal,
+        caravana: animal.caravana ? animal.caravana.trim().toUpperCase() : `AR-${Date.now()}`,
+        pesoKg: Number(animal.pesoKg) || 400,
+        estadoSanitario: (animal.estadoSanitario || "SALUDABLE").toUpperCase(),
+        establecimientoId: establecimientoId || animal.establecimientoId || "est-el-rancho",
+        establecimiento: establecimiento || animal.establecimiento || "Mi Establecimiento",
         fechaRegistro: new Date().toISOString(),
       };
+      if (!db.ganado) db.ganado = [];
       db.ganado.push(nuevo);
       return nuevo;
     }
@@ -208,7 +234,7 @@ class GanadoModel {
         potreroNombre: actualizado.potrero ? actualizado.potrero.nombre : "Sin potrero asignado",
       };
     } catch (e) {
-      const index = db.ganado.findIndex((g) => g.id === id);
+      const index = (db.ganado || []).findIndex((g) => g.id === id);
       if (index !== -1) {
         db.ganado[index] = { ...db.ganado[index], ...datos };
         return db.ganado[index];
@@ -224,7 +250,7 @@ class GanadoModel {
       });
       return { ...eliminado, motivoBaja: motivo };
     } catch (e) {
-      const index = db.ganado.findIndex((g) => g.id === id);
+      const index = (db.ganado || []).findIndex((g) => g.id === id);
       if (index !== -1) {
         const [del] = db.ganado.splice(index, 1);
         return { ...del, motivoBaja: motivo };
@@ -246,14 +272,14 @@ class GanadoModel {
       return res;
     } catch (e) {
       animalIds.forEach((id) => {
-        const animal = db.ganado.find((g) => g.id === id);
+        const animal = (db.ganado || []).find((g) => g.id === id);
         if (animal) animal.potreroId = potreroDestinoId;
       });
       return { count: animalIds.length };
     }
   }
 
-  static async crearPotrero({ nombre, descripcion, superficieHas, capacidad }) {
+  static async crearPotrero({ nombre, descripcion, superficieHas, capacidad }, establecimientoId, establecimiento) {
     try {
       return await prisma.potrero.create({
         data: {
@@ -261,6 +287,8 @@ class GanadoModel {
           descripcion: descripcion || null,
           superficieHas: superficieHas ? parseFloat(superficieHas) : null,
           capacidad: capacidad ? parseInt(capacidad, 10) : 100,
+          establecimientoId: establecimientoId || null,
+          establecimiento: establecimiento || null,
         },
       });
     } catch (e) {
@@ -268,10 +296,14 @@ class GanadoModel {
         id: `pot-${Date.now()}`,
         nombre,
         descripcion,
-        superficieHas: parseFloat(superficieHas),
+        superficieHas: parseFloat(superficieHas) || 0,
         capacidad: parseInt(capacidad, 10) || 100,
+        establecimientoId: establecimientoId || "est-el-rancho",
+        establecimiento: establecimiento || "Mi Establecimiento",
         animales: [],
       };
+      if (!db.potreros) db.potreros = [];
+      db.potreros.push(nuevo);
       return nuevo;
     }
   }

@@ -27,11 +27,11 @@ export default function Sidebar({
 
   const iniciales = usuario?.nombre
     ? usuario.nombre
-        .split(" ")
-        .map((p) => p[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
+      .split(" ")
+      .map((p) => p[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase()
     : "CJ";
 
   return (
@@ -134,9 +134,8 @@ export default function Sidebar({
                   `}
                 >
                   <i
-                    className={`fa-solid ${enlace.icono} text-base transition-colors ${
-                      activo ? "text-[#8fb56b]" : "text-[#8fb56b]/70 group-hover:text-[#8fb56b]"
-                    } ${colapsado ? "text-center" : "w-5 text-center"}`}
+                    className={`fa-solid ${enlace.icono} text-base transition-colors ${activo ? "text-[#8fb56b]" : "text-[#8fb56b]/70 group-hover:text-[#8fb56b]"
+                      } ${colapsado ? "text-center" : "w-5 text-center"}`}
                   ></i>
                   {!colapsado && (
                     <span className="text-sm truncate">{enlace.etiqueta}</span>
@@ -178,28 +177,31 @@ export default function Sidebar({
             {/* Menú de opciones de perfil */}
             {mostrarOpcionesPerfil && (
               <div className="mt-2 bg-[#16271e] border border-[#8fb56b]/30 rounded-xl p-2.5 text-xs space-y-2 shadow-2xl animate-fade-in">
-                <div className="text-[#8fb56b] px-1 font-bold text-[11px] uppercase tracking-wider flex items-center gap-1.5">
-                  <i className="fa-solid fa-user-gear"></i> Simular Rol:
-                </div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {["dueno", "capataz", "peon", "oficina", "veterinario"].map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => {
-                        loginRapido(r);
-                        setMostrarOpcionesPerfil(false);
-                      }}
-                      className={`px-2 py-1.5 rounded-lg text-left uppercase text-[10px] font-bold transition-all ${
-                        rol === r
-                          ? "bg-[#8fb56b] text-[#182920]"
-                          : "bg-[#1f3729] text-[#eef2e9] hover:bg-[#284835]"
-                      }`}
-                    >
-                      {r}
-                    </button>
-                  ))}
-                </div>
+                {(usuario?.email?.endsWith("@vakera.com") || usuario?.establecimientoId === "est-el-rancho") && (
+                  <>
+                    <div className="text-[#8fb56b] px-1 font-bold text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                      <i className="fa-solid fa-user-gear"></i> Simular Rol:
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {["dueno", "capataz", "peon", "oficina", "veterinario"].map((r) => (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => {
+                            loginRapido(r);
+                            setMostrarOpcionesPerfil(false);
+                          }}
+                          className={`px-2 py-1.5 rounded-lg text-left uppercase text-[10px] font-bold transition-all ${rol === r
+                              ? "bg-[#8fb56b] text-[#182920]"
+                              : "bg-[#1f3729] text-[#eef2e9] hover:bg-[#284835]"
+                            }`}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
                 <div className="border-t border-[#8fb56b]/15 pt-2 flex flex-col gap-1">
                   <button
                     type="button"

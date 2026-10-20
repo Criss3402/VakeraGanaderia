@@ -168,7 +168,11 @@ export default function PartesView() {
       {/* Lista de Partes */}
       <div className="bg-white rounded-2xl p-6 border border-[#ded7c4] shadow-sm space-y-4">
         {partesFiltrados.length === 0 ? (
-          <p className="text-xs text-[#6b7c6d] text-center py-8">No hay partes registrados con ese filtro.</p>
+          <div className="py-12 text-center flex flex-col items-center justify-center gap-2">
+            <i className="fa-solid fa-clipboard-list text-3xl text-[#8fb56b]/50 mb-1"></i>
+            <p className="text-sm font-semibold text-[#182920]">No hay partes diarios registrados en este establecimiento.</p>
+            <p className="text-xs text-[#526354]">Los operarios de campo podrán cargar partes diarios o podés pulsar "+ Cargar Parte Diario".</p>
+          </div>
         ) : (
           partesFiltrados.map((p) => {
             const estadoMayus = String(p.estado).toUpperCase();

@@ -32,9 +32,9 @@ export default function PanelDueno({ alCambiarVista }) {
     });
   }, []);
 
-  const totalCabezas = metricas?.resumenGanado?.totalCabezas || 5;
-  const pesoPromedio = metricas?.resumenGanado?.pesoPromedioKg || 419;
-  const valuacionHacienda = reportes?.resumenGeneral?.valorHaciendaEstimado || 5028000;
+  const totalCabezas = metricas?.resumenGanado?.totalCabezas ?? 0;
+  const pesoPromedio = metricas?.resumenGanado?.pesoPromedioKg ?? 0;
+  const valuacionHacienda = reportes?.resumenGeneral?.valorHaciendaEstimado ?? 0;
   const partesPendientes = partes.filter((p) => String(p.estado).toUpperCase() === "PENDIENTE").length;
 
   return (

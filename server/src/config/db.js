@@ -1,6 +1,7 @@
 /**
  * Base de Datos en Memoria con Semillas (Seed Data)
  * Fallback cuando Prisma / PostgreSQL no están disponibles.
+ * Incluye aislamiento de datos por establecimiento (Multi-tenancy).
  * Las contraseñas son hashes bcrypt de "password123".
  */
 
@@ -9,6 +10,8 @@ const { ROLES } = require("../utils/roles.constants");
 
 // Hash de "password123" generado con 10 rondas de salt (compatible con bcrypt.compare)
 const PASSWORD_HASH = bcrypt.hashSync("password123", 10);
+const DEMO_ESTABLECIMIENTO_ID = "est-el-rancho";
+const DEMO_ESTABLECIMIENTO_NOMBRE = "El Rancho, Goya, Corrientes";
 
 const db = {
   usuarios: [
@@ -20,7 +23,8 @@ const db = {
       rol: ROLES.DUENO,
       cargo: "Propietario / Director",
       telefono: "+54 9 11 4567-8901",
-      establecimiento: "El Rancho, Goya, Corrientes",
+      establecimientoId: DEMO_ESTABLECIMIENTO_ID,
+      establecimiento: DEMO_ESTABLECIMIENTO_NOMBRE,
       fechaRegistro: "2026-01-10T10:00:00Z",
       emailVerificado: true,
       tokenVerificacion: null,
@@ -34,9 +38,10 @@ const db = {
       email: "capataz@vakera.com",
       password: PASSWORD_HASH,
       rol: ROLES.CAPATAZ,
-      cargo: "Capataz General",
+      cargo: "Capataz de Campo",
       telefono: "+54 9 11 5678-1234",
-      establecimiento: "El Rancho, Goya, Corrientes",
+      establecimientoId: null,
+      establecimiento: null,
       fechaRegistro: "2026-01-15T08:30:00Z",
       emailVerificado: true,
       tokenVerificacion: null,
@@ -50,9 +55,10 @@ const db = {
       email: "peon@vakera.com",
       password: PASSWORD_HASH,
       rol: ROLES.PEON,
-      cargo: "Peón de Campo",
+      cargo: "Peón Operario",
       telefono: "+54 9 11 6789-2345",
-      establecimiento: "El Rancho, Goya, Corrientes",
+      establecimientoId: null,
+      establecimiento: null,
       fechaRegistro: "2026-02-01T07:00:00Z",
       emailVerificado: true,
       tokenVerificacion: null,
@@ -68,7 +74,8 @@ const db = {
       rol: ROLES.OFICINA,
       cargo: "Administración y Compras",
       telefono: "+54 9 11 7890-3456",
-      establecimiento: "El Rancho, Goya, Corrientes",
+      establecimientoId: null,
+      establecimiento: null,
       fechaRegistro: "2026-01-20T09:00:00Z",
       emailVerificado: true,
       tokenVerificacion: null,
@@ -84,7 +91,8 @@ const db = {
       rol: ROLES.VETERINARIO,
       cargo: "Médica Veterinaria (Mat. 4892)",
       telefono: "+54 9 11 8901-4567",
-      establecimiento: "El Rancho, Goya, Corrientes",
+      establecimientoId: null,
+      establecimiento: null,
       fechaRegistro: "2026-01-25T11:00:00Z",
       emailVerificado: true,
       tokenVerificacion: null,
@@ -92,6 +100,14 @@ const db = {
       tokenRecuperacion: null,
       expiracionRecuperacion: null,
     },
+  ],
+
+  potreros: [
+    { id: "pot-1", nombre: "Potrero 1 - Los Eucaliptos", superficieHas: 120, capacidad: 150, totalAnimales: 1, porcentajeCarga: 1, establecimientoId: DEMO_ESTABLECIMIENTO_ID, establecimiento: DEMO_ESTABLECIMIENTO_NOMBRE },
+    { id: "pot-2", nombre: "Potrero 2 - La Loma", superficieHas: 95, capacidad: 110, totalAnimales: 1, porcentajeCarga: 1, establecimientoId: DEMO_ESTABLECIMIENTO_ID, establecimiento: DEMO_ESTABLECIMIENTO_NOMBRE },
+    { id: "pot-3", nombre: "Potrero 3 - El Trébol", superficieHas: 140, capacidad: 180, totalAnimales: 1, porcentajeCarga: 1, establecimientoId: DEMO_ESTABLECIMIENTO_ID, establecimiento: DEMO_ESTABLECIMIENTO_NOMBRE },
+    { id: "pot-4", nombre: "Potrero 4 - Bajo Hondo", superficieHas: 80, capacidad: 90, totalAnimales: 1, porcentajeCarga: 1, establecimientoId: DEMO_ESTABLECIMIENTO_ID, establecimiento: DEMO_ESTABLECIMIENTO_NOMBRE },
+    { id: "pot-5", nombre: "Potrero 5 - La Aguada", superficieHas: 160, capacidad: 200, totalAnimales: 1, porcentajeCarga: 1, establecimientoId: DEMO_ESTABLECIMIENTO_ID, establecimiento: DEMO_ESTABLECIMIENTO_NOMBRE },
   ],
 
   ganado: [
@@ -103,8 +119,12 @@ const db = {
       sexo: "Hembra",
       pesoKg: 460,
       potrero: "Potrero 3 - El Trébol",
+      potreroNombre: "Potrero 3 - El Trébol",
+      potreroId: "pot-3",
       estadoSanitario: "SALUDABLE",
       fechaNacimiento: "2022-09-14",
+      establecimientoId: DEMO_ESTABLECIMIENTO_ID,
+      establecimiento: DEMO_ESTABLECIMIENTO_NOMBRE,
     },
     {
       id: "gan-002",
@@ -114,8 +134,12 @@ const db = {
       sexo: "Macho",
       pesoKg: 780,
       potrero: "Potrero 1 - Los Eucaliptos",
+      potreroNombre: "Potrero 1 - Los Eucaliptos",
+      potreroId: "pot-1",
       estadoSanitario: "SALUDABLE",
       fechaNacimiento: "2021-04-20",
+      establecimientoId: DEMO_ESTABLECIMIENTO_ID,
+      establecimiento: DEMO_ESTABLECIMIENTO_NOMBRE,
     },
     {
       id: "gan-003",
@@ -125,8 +149,12 @@ const db = {
       sexo: "Macho",
       pesoKg: 390,
       potrero: "Potrero 5 - La Aguada",
+      potreroNombre: "Potrero 5 - La Aguada",
+      potreroId: "pot-5",
       estadoSanitario: "EN_TRATAMIENTO",
       fechaNacimiento: "2023-10-05",
+      establecimientoId: DEMO_ESTABLECIMIENTO_ID,
+      establecimiento: DEMO_ESTABLECIMIENTO_NOMBRE,
     },
     {
       id: "gan-004",
@@ -136,8 +164,12 @@ const db = {
       sexo: "Hembra",
       pesoKg: 145,
       potrero: "Potrero 2 - La Loma",
+      potreroNombre: "Potrero 2 - La Loma",
+      potreroId: "pot-2",
       estadoSanitario: "SALUDABLE",
       fechaNacimiento: "2024-03-12",
+      establecimientoId: DEMO_ESTABLECIMIENTO_ID,
+      establecimiento: DEMO_ESTABLECIMIENTO_NOMBRE,
     },
     {
       id: "gan-005",
@@ -147,8 +179,12 @@ const db = {
       sexo: "Hembra",
       pesoKg: 320,
       potrero: "Potrero 4 - Bajo Hondo",
+      potreroNombre: "Potrero 4 - Bajo Hondo",
+      potreroId: "pot-4",
       estadoSanitario: "OBSERVACION",
       fechaNacimiento: "2023-08-18",
+      establecimientoId: DEMO_ESTABLECIMIENTO_ID,
+      establecimiento: DEMO_ESTABLECIMIENTO_NOMBRE,
     },
   ],
 
@@ -166,6 +202,8 @@ const db = {
       alertaDias: 26,
       prioridad: "Alta",
       icono: "fa-syringe",
+      establecimientoId: DEMO_ESTABLECIMIENTO_ID,
+      establecimiento: DEMO_ESTABLECIMIENTO_NOMBRE,
     },
     {
       id: "san-2",
@@ -180,6 +218,8 @@ const db = {
       alertaDias: 6,
       prioridad: "Urgente",
       icono: "fa-tags",
+      establecimientoId: DEMO_ESTABLECIMIENTO_ID,
+      establecimiento: DEMO_ESTABLECIMIENTO_NOMBRE,
     },
     {
       id: "san-3",
@@ -194,6 +234,8 @@ const db = {
       alertaDias: 0,
       prioridad: "Normal",
       icono: "fa-bottle-droplet",
+      establecimientoId: DEMO_ESTABLECIMIENTO_ID,
+      establecimiento: DEMO_ESTABLECIMIENTO_NOMBRE,
     },
     {
       id: "san-4",
@@ -208,6 +250,8 @@ const db = {
       alertaDias: 16,
       prioridad: "Normal",
       icono: "fa-clipboard-check",
+      establecimientoId: DEMO_ESTABLECIMIENTO_ID,
+      establecimiento: DEMO_ESTABLECIMIENTO_NOMBRE,
     },
   ],
 
@@ -223,6 +267,8 @@ const db = {
       estado: "Bajo Stock",
       requiereReposicion: true,
       icono: "fa-prescription-bottle-medical",
+      establecimientoId: DEMO_ESTABLECIMIENTO_ID,
+      establecimiento: DEMO_ESTABLECIMIENTO_NOMBRE,
     },
     {
       id: "ins-2",
@@ -235,6 +281,8 @@ const db = {
       estado: "Bajo Stock",
       requiereReposicion: true,
       icono: "fa-syringe",
+      establecimientoId: DEMO_ESTABLECIMIENTO_ID,
+      establecimiento: DEMO_ESTABLECIMIENTO_NOMBRE,
     },
     {
       id: "ins-3",
@@ -247,6 +295,8 @@ const db = {
       estado: "OK",
       requiereReposicion: false,
       icono: "fa-box-archive",
+      establecimientoId: DEMO_ESTABLECIMIENTO_ID,
+      establecimiento: DEMO_ESTABLECIMIENTO_NOMBRE,
     },
     {
       id: "ins-4",
@@ -259,6 +309,8 @@ const db = {
       estado: "OK",
       requiereReposicion: false,
       icono: "fa-sack-xmark",
+      establecimientoId: DEMO_ESTABLECIMIENTO_ID,
+      establecimiento: DEMO_ESTABLECIMIENTO_NOMBRE,
     },
   ],
 
@@ -273,6 +325,8 @@ const db = {
       solicitudInsumos: "Se necesitan 10 metros de alambre y varillas.",
       estado: "PENDIENTE",
       fechaCarga: "2026-09-19T08:15:00Z",
+      establecimientoId: DEMO_ESTABLECIMIENTO_ID,
+      establecimiento: DEMO_ESTABLECIMIENTO_NOMBRE,
     },
     {
       id: "pd-2",
@@ -285,6 +339,8 @@ const db = {
       estado: "APROBADO",
       revisadoPor: "Martín Benítez (Capataz)",
       fechaCarga: "2026-09-18T17:40:00Z",
+      establecimientoId: DEMO_ESTABLECIMIENTO_ID,
+      establecimiento: DEMO_ESTABLECIMIENTO_NOMBRE,
     },
   ],
 

@@ -79,7 +79,8 @@ class PermisosController {
   }
 
   static async obtenerUsuarios(req, res) {
-    const usuarios = await UsuarioModel.listarTodos();
+    const estId = req.usuario?.establecimientoId || (req.usuario?.establecimiento === "El Rancho, Goya, Corrientes" ? "est-el-rancho" : null);
+    const usuarios = await UsuarioModel.listarTodos(estId);
     return exito(res, usuarios);
   }
 
@@ -97,6 +98,56 @@ class PermisosController {
         res,
         usuarioActualizado,
         `Rol de ${usuarioActualizado.nombre} actualizado a ${nuevoRol.toUpperCase()}.`
+      );
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
+  static async solicitarEmpleado(req, res) {
+    const { email, rol, cargo, mensaje } = req.body || {};
+
+    if (!email) {
+      return error(res, "El correo electrónico del empleado es obligatorio.", 400);
+    }
+
+    const estId = req.usuario?.establecimientoId || (req.usuario?.establecimiento === "El Rancho, Goya, Corrientes" ? "est-el-rancho" : null);
+    const estNombre = req.usuario?.establecimiento || "Mi Establecimiento";
+
+    if (!estId) {
+      return error(res, "No se encontró un establecimiento activo para su usuario.", 400);
+    }
+
+    try {
+      const usuarioVinculado = await UsuarioModel.vincularEstablecimiento({
+        email,
+        establecimientoId: estId,
+        establecimiento: estNombre,
+        rol,
+        cargo,
+      });
+
+      return exito(
+        res,
+        usuarioVinculado,
+        `Solicitud procesada con éxito. ${usuarioVinculado.nombre} fue vinculado como ${(usuarioVinculado.rol || rol || "").toUpperCase()} en ${estNombre}.`,
+        201
+      );
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
+  static async desvincularEmpleado(req, res) {
+    const { id } = req.params;
+    const estId = req.usuario?.establecimientoId || (req.usuario?.establecimiento === "El Rancho, Goya, Corrientes" ? "est-el-rancho" : null);
+
+    try {
+      const usuarioDesvinculado = await UsuarioModel.desvincularEstablecimiento(id, estId);
+      return exito(
+        res,
+        usuarioDesvinculado,
+        `El usuario ${usuarioDesvinculado.nombre} ha sido desvinculado del establecimiento.`
       );
     } catch (err) {
       return error(res, err.message, 400);

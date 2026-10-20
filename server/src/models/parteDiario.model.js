@@ -19,12 +19,16 @@ class ParteDiarioModel {
       revisadoPorNombre: p.revisadoPor ? (typeof p.revisadoPor === "string" ? p.revisadoPor : p.revisadoPor.nombre) : null,
       fechaCarga: p.fechaCarga || new Date().toISOString(),
       fechaRevision: p.fechaRevision || null,
+      establecimientoId: p.establecimientoId || null,
+      establecimiento: p.establecimiento || null,
     };
   }
 
-  static async listarTodos() {
+  static async listarTodos(establecimientoId) {
     try {
+      const whereClause = establecimientoId ? { establecimientoId } : {};
       const lista = await prisma.parteDiario.findMany({
+        where: whereClause,
         include: {
           peon: true,
           revisadoPor: true,
@@ -35,21 +39,39 @@ class ParteDiarioModel {
       return lista.map((p) => this.formatearParte(p));
     } catch (err) {
       console.warn("[ParteDiarioModel] Fallo al consultar Prisma, usando fallback en memoria:", err.message);
-      return db.partesDiarios.map((p) => this.formatearParte(p));
+      const fuente = Array.isArray(db.partesDiarios) ? db.partesDiarios : [];
+      const filtrados = establecimientoId
+        ? fuente.filter((p) => p.establecimientoId === establecimientoId)
+        : fuente;
+      return filtrados.map((p) => this.formatearParte(p));
     }
   }
 
-  static async obtenerPendientes() {
-    const todos = await this.listarTodos();
+  static async obtenerPendientes(establecimientoId) {
+    const todos = await this.listarTodos(establecimientoId);
     return todos.filter((p) => p.estado === "PENDIENTE");
   }
 
-  static async registrar({ peonId, peonNombre, potreroId, potrero, potreroNombre, novedades, animalesRevisados, solicitudInsumos }) {
+  static async registrar({
+    peonId,
+    peonNombre,
+    potreroId,
+    potrero,
+    potreroNombre,
+    novedades,
+    animalesRevisados,
+    solicitudInsumos,
+    establecimientoId,
+    establecimiento,
+  }) {
     try {
       let resolvedPeonId = peonId;
       if (!resolvedPeonId) {
         const peonEncontrado = await prisma.usuario.findFirst({
-          where: peonNombre ? { nombre: { contains: peonNombre, mode: "insensitive" } } : { rol: "PEON" },
+          where: {
+            ...(peonNombre ? { nombre: { contains: peonNombre, mode: "insensitive" } } : { rol: "PEON" }),
+            ...(establecimientoId ? { establecimientoId } : {}),
+          },
         });
         resolvedPeonId = peonEncontrado ? peonEncontrado.id : "usr-3";
       }
@@ -58,7 +80,10 @@ class ParteDiarioModel {
       if (!resolvedPotreroId && (potrero || potreroNombre)) {
         const nombreBuscado = potrero || potreroNombre;
         const potEncontrado = await prisma.potrero.findFirst({
-          where: { nombre: { contains: nombreBuscado, mode: "insensitive" } },
+          where: {
+            nombre: { contains: nombreBuscado, mode: "insensitive" },
+            ...(establecimientoId ? { establecimientoId } : {}),
+          },
         });
         if (potEncontrado) resolvedPotreroId = potEncontrado.id;
       }
@@ -71,6 +96,8 @@ class ParteDiarioModel {
           estado: "PENDIENTE",
           peonId: resolvedPeonId,
           potreroId: resolvedPotreroId,
+          establecimientoId: establecimientoId || null,
+          establecimiento: establecimiento || null,
         },
         include: {
           peon: true,
@@ -86,13 +113,16 @@ class ParteDiarioModel {
         id: `pd-${Date.now()}`,
         fecha: new Date().toISOString().split("T")[0],
         peonNombre: peonNombre || "Operario de Campo",
-        potrero: potrero || potreroNombre || "Potrero 1 - Los Eucaliptos",
+        potrero: potrero || potreroNombre || "Potrero General",
         novedades,
         animalesRevisados: Number(animalesRevisados) || 0,
         solicitudInsumos: solicitudInsumos || null,
         estado: "PENDIENTE",
         fechaCarga: new Date().toISOString(),
+        establecimientoId: establecimientoId || "est-el-rancho",
+        establecimiento: establecimiento || "Mi Establecimiento",
       };
+      if (!db.partesDiarios) db.partesDiarios = [];
       db.partesDiarios.unshift(nuevo);
       return this.formatearParte(nuevo);
     }
@@ -134,7 +164,7 @@ class ParteDiarioModel {
     }
 
     // Fallback en memoria
-    const parte = db.partesDiarios.find((p) => p.id === id);
+    const parte = (db.partesDiarios || []).find((p) => p.id === id);
     if (!parte) {
       throw new Error("Parte diario no encontrado.");
     }

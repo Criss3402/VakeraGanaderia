@@ -10,6 +10,8 @@ import FooterLanding from "./FooterLanding";
 export default function LandingView({
   alIniciarSesion,
   alRegistrarse,
+  alIrARecuperar,
+  alIrAVerificar,
   alIrAlDashboard,
 }) {
   const [loginAbierto, setLoginAbierto] = useState(false);
@@ -24,6 +26,8 @@ export default function LandingView({
       <NavbarLanding
         alIniciarSesion={abrirLogin}
         alRegistrarse={alRegistrarse}
+        alIrARecuperar={alIrARecuperar}
+        alIrAVerificar={alIrAVerificar}
         alIrAlDashboard={alIrAlDashboard}
         loginAbierto={loginAbierto}
         setLoginAbierto={setLoginAbierto}

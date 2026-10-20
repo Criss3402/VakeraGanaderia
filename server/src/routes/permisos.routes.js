@@ -25,4 +25,18 @@ router.patch(
   PermisosController.cambiarRolUsuario
 );
 
+// Enviar solicitud / vincular empleado o veterinario (exclusivo para Dueño)
+router.post(
+  "/solicitar-empleado",
+  rbacMiddleware(ROLES.DUENO),
+  PermisosController.solicitarEmpleado
+);
+
+// Desvincular empleado del establecimiento (exclusivo para Dueño)
+router.delete(
+  "/usuarios/:id/desvincular",
+  rbacMiddleware(ROLES.DUENO),
+  PermisosController.desvincularEmpleado
+);
+
 module.exports = router;

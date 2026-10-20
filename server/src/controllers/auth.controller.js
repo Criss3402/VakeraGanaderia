@@ -14,6 +14,8 @@ function generarToken(usuario) {
       id: usuario.id,
       email: usuario.email,
       rol: usuario.rol,
+      establecimientoId: usuario.establecimientoId,
+      establecimiento: usuario.establecimiento,
     },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES_IN }
@@ -64,7 +66,7 @@ class AuthController {
   }
 
   static async registro(req, res) {
-    const { nombre, email, password, rol, cargo, establecimiento, telefono } = req.body || {};
+    const { nombre, email, password, rol, cargo, establecimiento, establecimientoId, telefono } = req.body || {};
 
     if (!nombre || !email || !password) {
       return error(res, "Nombre, email y contraseña son obligatorios.", 400);
@@ -88,9 +90,10 @@ class AuthController {
         nombre,
         email,
         password,
-        rol,
-        cargo,
-        establecimiento,
+        rol: rol || "dueno",
+        cargo: cargo || (rol === "dueno" ? "Propietario / Director" : "Colaborador"),
+        establecimiento: establecimiento || "Mi Establecimiento Ganadero",
+        establecimientoId,
         telefono,
         emailVerificado: false,
         tokenVerificacion,
@@ -111,6 +114,7 @@ class AuthController {
         {
           requiereVerificacion: true,
           email: nuevoUsuario.email,
+          tokenPrueba: tokenVerificacion,
           usuario: nuevoUsuario,
         },
         "Usuario registrado exitosamente. Te enviamos un correo electrónico con tu código de activación.",
@@ -321,7 +325,7 @@ class AuthController {
       return error(res, "Endpoint no disponible en producción.", 403);
     }
 
-    const lista = await UsuarioModel.listarTodos();
+    const lista = await UsuarioModel.listarTodos("est-el-rancho");
     const usuariosDemo = lista.map((u) => ({
       id: u.id,
       nombre: u.nombre,

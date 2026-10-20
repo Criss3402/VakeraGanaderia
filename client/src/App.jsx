@@ -61,6 +61,11 @@ function AppContenido() {
       <LandingView
         alIniciarSesion={() => setRuta("login")}
         alRegistrarse={() => setRuta("registro")}
+        alIrARecuperar={() => setRuta("recuperar")}
+        alIrAVerificar={(tok, em) => {
+          setParamsUrl({ token: tok || "", email: em || "" });
+          setRuta("verificar");
+        }}
         alIrAlDashboard={() => setRuta("app")}
       />
     );

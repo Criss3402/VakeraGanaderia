@@ -14,6 +14,7 @@ class Usuario(models.Model):
     rol = models.CharField(max_length=20)
     cargo = models.CharField(max_length=100, null=True, blank=True)
     telefono = models.CharField(max_length=50, null=True, blank=True)
+    establecimiento_id = models.CharField(max_length=64, db_column="establecimientoId", null=True, blank=True)
     establecimiento = models.CharField(max_length=150, null=True, blank=True)
     fecha_registro = models.DateTimeField(db_column="fechaRegistro")
     email_verificado = models.BooleanField(db_column="emailVerificado", default=False)
@@ -32,10 +33,12 @@ class Usuario(models.Model):
 
 class Potrero(models.Model):
     id = models.CharField(max_length=32, primary_key=True)
-    nombre = models.CharField(max_length=100, unique=True)
+    nombre = models.CharField(max_length=100)
     descripcion = models.TextField(null=True, blank=True)
     superficie_has = models.FloatField(db_column="superficieHas", null=True, blank=True)
     capacidad = models.IntegerField(null=True, blank=True)
+    establecimiento_id = models.CharField(max_length=64, db_column="establecimientoId", null=True, blank=True)
+    establecimiento = models.CharField(max_length=150, null=True, blank=True)
 
     class Meta:
         managed = False
@@ -56,6 +59,8 @@ class Ganado(models.Model):
     fecha_nacimiento = models.DateTimeField(db_column="fechaNacimiento", null=True, blank=True)
     fecha_registro = models.DateTimeField(db_column="fechaRegistro")
     potrero_id = models.CharField(max_length=32, db_column="potreroId", null=True, blank=True)
+    establecimiento_id = models.CharField(max_length=64, db_column="establecimientoId", null=True, blank=True)
+    establecimiento = models.CharField(max_length=150, null=True, blank=True)
 
     class Meta:
         managed = False
@@ -78,6 +83,8 @@ class SanidadEvento(models.Model):
     fecha_registro = models.DateTimeField(db_column="fechaRegistro")
     ganado_id = models.CharField(max_length=32, db_column="ganadoId", null=True, blank=True)
     responsable_id = models.CharField(max_length=32, db_column="responsableId", null=True, blank=True)
+    establecimiento_id = models.CharField(max_length=64, db_column="establecimientoId", null=True, blank=True)
+    establecimiento = models.CharField(max_length=150, null=True, blank=True)
 
     class Meta:
         managed = False
@@ -99,6 +106,8 @@ class Insumo(models.Model):
     requiere_reposicion = models.BooleanField(db_column="requiereReposicion")
     icono = models.CharField(max_length=50, null=True, blank=True)
     fecha_registro = models.DateTimeField(db_column="fechaRegistro")
+    establecimiento_id = models.CharField(max_length=64, db_column="establecimientoId", null=True, blank=True)
+    establecimiento = models.CharField(max_length=150, null=True, blank=True)
 
     class Meta:
         managed = False
@@ -120,6 +129,8 @@ class ParteDiario(models.Model):
     peon_id = models.CharField(max_length=32, db_column="peonId")
     revisado_por_id = models.CharField(max_length=32, db_column="revisadoPorId", null=True, blank=True)
     potrero_id = models.CharField(max_length=32, db_column="potreroId", null=True, blank=True)
+    establecimiento_id = models.CharField(max_length=64, db_column="establecimientoId", null=True, blank=True)
+    establecimiento = models.CharField(max_length=150, null=True, blank=True)
 
     class Meta:
         managed = False

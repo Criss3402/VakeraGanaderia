@@ -560,6 +560,21 @@ export default function GanadoView() {
                       </tr>
                     );
                   })}
+                  {ganadoFiltrado.length === 0 && (
+                    <tr>
+                      <td colSpan="8" className="py-12 text-center">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <i className="fa-solid fa-cow text-3xl text-[#8fb56b]/50"></i>
+                          <p className="text-sm font-semibold text-[#182920]">
+                            No hay animales registrados en este rodeo.
+                          </p>
+                          <p className="text-xs text-[#526354]">
+                            Hacé clic en "+ Nuevo Animal" para dar de alta la primera cabeza de ganado.
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

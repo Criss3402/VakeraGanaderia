@@ -5,15 +5,23 @@ const ParteDiarioModel = require("../models/parteDiario.model");
 const WeatherService = require("../services/weather.service");
 const { exito, error } = require("../utils/apiResponse");
 
+function obtenerEstablecimientoContexto(req) {
+  const estId = req.usuario?.establecimientoId || (req.usuario?.establecimiento === "El Rancho, Goya, Corrientes" ? "est-el-rancho" : null);
+  const estNombre = req.usuario?.establecimiento || "Mi Establecimiento";
+  return { estId, estNombre };
+}
+
 class DashboardController {
   // 1. Métricas Globales
   static async obtenerMetricas(req, res) {
     try {
+      const { estId, estNombre } = obtenerEstablecimientoContexto(req);
+
       const [metricasGanado, alertasSanitarias, insumosCriticos, partesPendientes] = await Promise.all([
-        GanadoModel.obtenerMetricas(),
-        SanidadModel.obtenerAlertasActivas(),
-        InsumoModel.obtenerCriticos(),
-        ParteDiarioModel.obtenerPendientes(),
+        GanadoModel.obtenerMetricas(estId),
+        SanidadModel.obtenerAlertasActivas(estId),
+        InsumoModel.obtenerCriticos(estId),
+        ParteDiarioModel.obtenerPendientes(estId),
       ]);
 
       return exito(res, {
@@ -22,7 +30,8 @@ class DashboardController {
         insumosCriticosCount: insumosCriticos.length,
         partesPendientesCount: partesPendientes.length,
         rolSolicitante: req.usuario ? req.usuario.rol : null,
-        establecimiento: req.usuario ? req.usuario.establecimiento : "El Rancho, Goya, Corrientes",
+        establecimiento: estNombre,
+        establecimientoId: estId,
       });
     } catch (err) {
       return error(res, "Error al calcular métricas: " + err.message, 500);
@@ -32,7 +41,8 @@ class DashboardController {
   // 2. Ganado y Potreros
   static async obtenerGanado(req, res) {
     try {
-      const lista = await GanadoModel.listarTodos();
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const lista = await GanadoModel.listarTodos(estId);
       return exito(res, lista);
     } catch (err) {
       return error(res, err.message, 500);
@@ -41,7 +51,8 @@ class DashboardController {
 
   static async obtenerPotreros(req, res) {
     try {
-      const potreros = await GanadoModel.listarPotreros();
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const potreros = await GanadoModel.listarPotreros(estId);
       return exito(res, potreros);
     } catch (err) {
       return error(res, err.message, 500);
@@ -50,7 +61,8 @@ class DashboardController {
 
   static async registrarGanado(req, res) {
     try {
-      const animal = await GanadoModel.registrar(req.body);
+      const { estId, estNombre } = obtenerEstablecimientoContexto(req);
+      const animal = await GanadoModel.registrar(req.body, estId, estNombre);
       return exito(res, animal, "Animal registrado en el rodeo exitosamente.", 201);
     } catch (err) {
       return error(res, err.message, 400);
@@ -101,7 +113,8 @@ class DashboardController {
 
   static async registrarPotrero(req, res) {
     try {
-      const nuevo = await GanadoModel.crearPotrero(req.body);
+      const { estId, estNombre } = obtenerEstablecimientoContexto(req);
+      const nuevo = await GanadoModel.crearPotrero(req.body, estId, estNombre);
       return exito(res, nuevo, "Potrero creado exitosamente.", 201);
     } catch (err) {
       return error(res, err.message, 400);
@@ -111,7 +124,8 @@ class DashboardController {
   // 3. Sanidad y Calendario
   static async obtenerAlertas(req, res) {
     try {
-      const alertas = await SanidadModel.listarAlertasYEventos();
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const alertas = await SanidadModel.listarAlertasYEventos(estId);
       return exito(res, alertas);
     } catch (err) {
       return error(res, "Error al listar alertas sanitarias: " + err.message, 500);
@@ -120,7 +134,8 @@ class DashboardController {
 
   static async registrarEventoSanitario(req, res) {
     try {
-      const nuevo = await SanidadModel.registrarEvento(req.body);
+      const { estId, estNombre } = obtenerEstablecimientoContexto(req);
+      const nuevo = await SanidadModel.registrarEvento(req.body, estId, estNombre);
       return exito(res, nuevo, "Evento sanitario registrado exitosamente.", 201);
     } catch (err) {
       return error(res, err.message, 400);
@@ -141,7 +156,8 @@ class DashboardController {
   // 4. Insumos y Stock
   static async obtenerInsumosCriticos(req, res) {
     try {
-      const insumos = await InsumoModel.listarTodos();
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const insumos = await InsumoModel.listarTodos(estId);
       return exito(res, insumos);
     } catch (err) {
       return error(res, "Error al listar insumos: " + err.message, 500);
@@ -150,7 +166,8 @@ class DashboardController {
 
   static async registrarInsumo(req, res) {
     try {
-      const nuevo = await InsumoModel.registrar(req.body);
+      const { estId, estNombre } = obtenerEstablecimientoContexto(req);
+      const nuevo = await InsumoModel.registrar(req.body, estId, estNombre);
       return exito(res, nuevo, "Insumo registrado en el inventario exitosamente.", 201);
     } catch (err) {
       return error(res, err.message, 400);
@@ -171,7 +188,8 @@ class DashboardController {
   // Solicitudes de Insumos (Peón, Capataz, Veterinario)
   static obtenerSolicitudesInsumos(req, res) {
     try {
-      const solicitudes = InsumoModel.listarSolicitudes();
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const solicitudes = InsumoModel.listarSolicitudes(estId);
       return exito(res, solicitudes);
     } catch (err) {
       return error(res, err.message, 500);
@@ -180,6 +198,7 @@ class DashboardController {
 
   static crearSolicitudInsumo(req, res) {
     try {
+      const { estId, estNombre } = obtenerEstablecimientoContexto(req);
       const { insumoId, insumoNombre, cantidad, unidad, motivo, urgencia, sector } = req.body || {};
 
       if (!insumoNombre) {
@@ -199,6 +218,8 @@ class DashboardController {
         solicitanteNombre,
         solicitanteRol,
         sector: sector || (solicitanteRol === "veterinario" ? "Botiquín Veterinario" : solicitanteRol === "capataz" ? "Campo y Taller" : "Pertenencias de Peón"),
+        establecimientoId: estId,
+        establecimiento: estNombre,
       });
 
       return exito(res, nueva, "Solicitud de insumos enviada con éxito.", 201);
@@ -240,7 +261,8 @@ class DashboardController {
   // 5. Partes Diarios
   static async obtenerPartes(req, res) {
     try {
-      const partes = await ParteDiarioModel.listarTodos();
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const partes = await ParteDiarioModel.listarTodos(estId);
       return exito(res, partes);
     } catch (err) {
       return error(res, "Error al listar partes diarios: " + err.message, 500);
@@ -255,6 +277,7 @@ class DashboardController {
     }
 
     try {
+      const { estId, estNombre } = obtenerEstablecimientoContexto(req);
       const peonId = req.usuario ? req.usuario.id : null;
       const peonNombre = req.usuario ? req.usuario.nombre : "Operario de Campo";
 
@@ -267,6 +290,8 @@ class DashboardController {
         novedades,
         animalesRevisados,
         solicitudInsumos,
+        establecimientoId: estId,
+        establecimiento: estNombre,
       });
 
       return exito(res, nuevo, "Parte diario cargado con éxito.", 201);
@@ -308,14 +333,38 @@ class DashboardController {
   // 7. Reportes Consolidados (Dueño / Oficina / Capataz / Veterinario)
   static async obtenerReportes(req, res) {
     try {
-      const [metricasGanado, insumosCriticos, partes] = await Promise.all([
-        GanadoModel.obtenerMetricas(),
-        InsumoModel.obtenerCriticos(),
-        ParteDiarioModel.listarTodos(),
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const [metricasGanado, insumosCriticos, partes, potreros, hacienda] = await Promise.all([
+        GanadoModel.obtenerMetricas(estId),
+        InsumoModel.obtenerCriticos(estId),
+        ParteDiarioModel.listarTodos(estId),
+        GanadoModel.listarPotreros(estId),
+        GanadoModel.listarTodos(estId),
       ]);
+
+      const precioKgVivo = 2400; // Referencia mercado ARS
+      const totalCabezas = metricasGanado.totalCabezas || 0;
+      const pesoPromedio = metricasGanado.pesoPromedioKg || 0;
+      const valorHaciendaEstimado = totalCabezas > 0
+        ? Math.round(hacienda.reduce((acc, a) => acc + (Number(a.pesoKg) || 0) * precioKgVivo, 0))
+        : 0;
+
+      const resumenGeneral = {
+        totalCabezas,
+        pesoPromedio,
+        valorHaciendaEstimado,
+        tasaMortalidad: metricasGanado.tasaMortalidadMensual || "0.0%",
+        tratamientosCompletados: partes.filter((p) => {
+          const txt = (p.novedades || "").toLowerCase();
+          return txt.includes("vacun") || txt.includes("curac") || txt.includes("sanit");
+        }).length,
+      };
 
       const reporte = {
         resumenGanado: metricasGanado,
+        resumenGeneral,
+        distribucionPotreros: potreros,
+        haciendaDetalle: hacienda,
         insumosCriticos,
         totalPartes: partes.length,
         partesAprobados: partes.filter((p) => (p.estado || "").toUpperCase() === "APROBADO").length,

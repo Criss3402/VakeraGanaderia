@@ -420,6 +420,17 @@ export default function InsumosView() {
 
           {/* Grid de Productos con Conteo de Pertenencias y Añadir Stock */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {insumosFiltrados.length === 0 && (
+              <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-[#ded7c4] p-8">
+                <i className="fa-solid fa-boxes-stacked text-3xl text-[#8fb56b]/50 mb-2"></i>
+                <p className="text-sm font-semibold text-[#182920]">
+                  No hay insumos registrados en este establecimiento.
+                </p>
+                <p className="text-xs text-[#526354]">
+                  Hacé clic en "+ Nuevo Insumo" para dar de alta productos, fármacos o herramientas.
+                </p>
+              </div>
+            )}
             {insumosFiltrados.map((item) => {
               const esBajo = item.requiereReposicion || item.stockActual <= item.stockMinimo;
               const esDeMiRol = coincideConRol(item, rol);

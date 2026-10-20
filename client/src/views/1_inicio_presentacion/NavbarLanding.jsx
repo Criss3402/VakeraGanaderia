@@ -15,6 +15,7 @@ export default function NavbarLanding({
   alRegistrarse,
   alIrAlDashboard,
   alIrARecuperar,
+  alIrAVerificar,
   loginAbierto,
   setLoginAbierto,
 }) {
@@ -104,7 +105,10 @@ export default function NavbarLanding({
                     alIrARecuperar={() => {
                       cambiarLoginAbierto(false);
                       if (alIrARecuperar) alIrARecuperar();
-                      else if (alIniciarSesion) alIniciarSesion();
+                    }}
+                    alIrAVerificar={(t, em) => {
+                      cambiarLoginAbierto(false);
+                      if (alIrAVerificar) alIrAVerificar(t, em);
                     }}
                     alIniciarExito={alIrAlDashboard}
                     alCerrar={() => cambiarLoginAbierto(false)}

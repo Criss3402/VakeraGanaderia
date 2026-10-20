@@ -21,10 +21,10 @@ export default function Footer() {
 
         <div>
           <h4>Contacto</h4>
-          <a href="mailto:contacto@vakera.com">
-            contacto@vakera.com
+          <a href="mailto:[EMAIL_ADDRESS]">
+            [EMAIL_ADDRESS]
           </a>
-          <a href="tel:+5490000000">+54 9 000 000 000</a>
+          <a href="tel:+5493464411698">+54 9 000 000 000</a>
         </div>
       </div>
 

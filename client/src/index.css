@@ -2059,6 +2059,21 @@ ul {
   margin-top: 2px;
 }
 
+.tarjeta-ui__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.tarjeta-ui__accion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .tabla-vakera {
   width: 100%;
   border-collapse: separate;
@@ -2136,4 +2151,183 @@ ul {
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #182920;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   MODAL FLOTANTE VAKERA (UI & Solicitud Empleados)
+   ══════════════════════════════════════════════════════════════════ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(18, 32, 24, 0.72);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+  animation: modalFadeIn 180ms ease-out;
+}
+
+.modal-contenedor {
+  background: #ffffff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 580px;
+  border: 1px solid #ded7c4;
+  box-shadow: 0 24px 48px -12px rgba(24, 41, 32, 0.35);
+  overflow: hidden;
+  animation: modalSlideIn 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  background: #182920;
+  color: #f1ecdd;
+  border-bottom: 2px solid #33512f;
+}
+
+.modal-titulo {
+  font-family: var(--fuente-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #f1ecdd;
+  margin: 0;
+}
+
+.modal-cerrar {
+  background: transparent;
+  border: none;
+  color: #ded7c4;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 6px;
+  transition: all 160ms ease;
+}
+
+.modal-cerrar:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.modal-cuerpo {
+  padding: 24px;
+  background: #fdfcf9;
+  max-height: calc(85vh - 75px);
+  overflow-y: auto;
+}
+
+.boton-anadir-empleado {
+  background: #8fb56b;
+  color: #182920;
+  font-weight: 700;
+  font-size: 0.86rem;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1px solid #7ea859;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 180ms ease;
+  box-shadow: 0 2px 8px rgba(24, 41, 32, 0.12);
+}
+
+.boton-anadir-empleado:hover {
+  background: #a1c97c;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(24, 41, 32, 0.18);
+}
+
+.boton-desvincular {
+  background: transparent;
+  border: 1px solid #d9a7a0;
+  color: #b3392a;
+  padding: 5px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 150ms ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.boton-desvincular:hover {
+  background: #fdf2f0;
+  border-color: #b3392a;
+  color: #96281b;
+}
+
+.formulario-solicitud-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.roles-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.rol-card-option {
+  border: 2px solid #ded7c4;
+  border-radius: 10px;
+  padding: 12px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 180ms ease;
+  text-align: left;
+}
+
+.rol-card-option:hover {
+  border-color: #8fb56b;
+  background: #f7f9f4;
+}
+
+.rol-card-option--activo {
+  border-color: #33512f;
+  background: #eef4e8;
+  box-shadow: 0 0 0 1px #33512f;
+}
+
+.rol-card-option__titulo {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #182920;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.rol-card-option__desc {
+  font-size: 0.74rem;
+  color: #6a7d6e;
+  line-height: 1.3;
 }

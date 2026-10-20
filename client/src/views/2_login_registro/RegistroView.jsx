@@ -116,17 +116,62 @@ export default function RegistroView({
               Por favor revisá tu bandeja de entrada o la carpeta de spam.
             </Alert>
 
-            <div style={{ marginTop: "24px", display: "flex", flexDirection: "column", gap: "10px" }}>
+            {registroCompletado?.tokenPrueba && (
+              <div
+                style={{
+                  marginTop: "16px",
+                  padding: "16px",
+                  background: "#eef4e8",
+                  border: "1px solid #c3dbc0",
+                  borderRadius: "12px",
+                  textAlign: "center",
+                }}
+              >
+                <p style={{ fontSize: "0.82rem", color: "#223d24", marginBottom: "6px" }}>
+                  Código de activación de tu cuenta:
+                </p>
+                <div
+                  style={{
+                    fontSize: "1.8rem",
+                    fontWeight: 800,
+                    letterSpacing: "5px",
+                    color: "#182920",
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {registroCompletado.tokenPrueba}
+                </div>
+                <button
+                  type="button"
+                  onClick={activarInmediato}
+                  disabled={cargandoActivacion}
+                  className="boton-anadir-empleado"
+                  style={{ marginTop: "12px", width: "100%", justifyContent: "center" }}
+                >
+                  {cargandoActivacion ? (
+                    <>
+                      <i className="fa-solid fa-spinner fa-spin"></i> Activando cuenta...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fa-solid fa-bolt"></i> Activar e ingresar directamente
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "10px" }}>
               <Button
                 variante="relleno"
                 className="boton--bloque"
                 onClick={() =>
                   alIrAVerificar
-                    ? alIrAVerificar("", registroCompletado.email)
+                    ? alIrAVerificar(registroCompletado?.tokenPrueba || "", registroCompletado.email)
                     : alIrALogin()
                 }
               >
-                Ingresar Código de Activación
+                Ingresar Código de Activación Manualmente
               </Button>
 
               <Button

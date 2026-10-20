@@ -53,23 +53,25 @@ export default function ReportesView() {
         <div className="bg-white rounded-2xl p-5 border border-[#ded7c4] shadow-sm">
           <p className="text-[11px] font-bold text-[#6b7c6d] uppercase">Valuación Hacienda Ref.</p>
           <p className="text-2xl font-extrabold text-[#182920] mt-1">
-            ${resumen.valorHaciendaEstimado ? resumen.valorHaciendaEstimado.toLocaleString("es-AR") : "5.028.000"}
+            ${(resumen.valorHaciendaEstimado ?? 0).toLocaleString("es-AR")}
           </p>
-          <span className="text-[11px] text-[#33512f]">ARS (Rodeo de {resumen.totalCabezas || 5} cabezas)</span>
+          <span className="text-[11px] text-[#33512f]">ARS (Rodeo de {resumen.totalCabezas ?? 0} cabezas)</span>
         </div>
 
         <div className="bg-white rounded-2xl p-5 border border-[#ded7c4] shadow-sm">
           <p className="text-[11px] font-bold text-[#6b7c6d] uppercase">Peso Promedio</p>
           <p className="text-3xl font-extrabold text-[#182920] mt-1">
-            {resumen.pesoPromedio || 419} kg
+            {resumen.pesoPromedio ?? 0} kg
           </p>
-          <span className="text-[11px] text-[#33512f]">Estado corporal óptimo</span>
+          <span className="text-[11px] text-[#33512f]">
+            {(resumen.totalCabezas ?? 0) > 0 ? "Estado corporal óptimo" : "Sin hacienda registrada"}
+          </span>
         </div>
 
         <div className="bg-white rounded-2xl p-5 border border-[#ded7c4] shadow-sm">
           <p className="text-[11px] font-bold text-[#6b7c6d] uppercase">Tasa de Mortalidad</p>
           <p className="text-3xl font-extrabold text-emerald-800 mt-1">
-            {resumen.tasaMortalidad || "0.8%"}
+            {resumen.tasaMortalidad || "0.0%"}
           </p>
           <span className="text-[11px] text-emerald-700">Por debajo del umbral del 2.5%</span>
         </div>
@@ -77,7 +79,7 @@ export default function ReportesView() {
         <div className="bg-white rounded-2xl p-5 border border-[#ded7c4] shadow-sm">
           <p className="text-[11px] font-bold text-[#6b7c6d] uppercase">Tratamientos Aplicados</p>
           <p className="text-3xl font-extrabold text-[#182920] mt-1">
-            {resumen.tratamientosCompletados ?? 1}
+            {resumen.tratamientosCompletados ?? 0}
           </p>
           <span className="text-[11px] text-[#33512f]">Vacunaciones y curaciones</span>
         </div>
@@ -91,20 +93,26 @@ export default function ReportesView() {
           </h3>
 
           <div className="space-y-3">
-            {potreros.map((p) => (
-              <div key={p.id} className="p-3 rounded-xl bg-[#f8f5eb] border border-[#ded7c4]">
-                <div className="flex justify-between items-center text-xs mb-1">
-                  <span className="font-bold text-[#182920]">{p.nombre}</span>
-                  <span className="font-bold text-[#33512f]">
-                    {p.totalAnimales ?? 0} cabezas ({p.superficieHas} Has)
-                  </span>
+            {potreros.length === 0 ? (
+              <p className="text-xs text-[#6b7c6d] italic p-3 bg-[#f8f5eb] rounded-xl border border-[#ded7c4]">
+                No hay potreros zonificados en este establecimiento.
+              </p>
+            ) : (
+              potreros.map((p) => (
+                <div key={p.id} className="p-3 rounded-xl bg-[#f8f5eb] border border-[#ded7c4]">
+                  <div className="flex justify-between items-center text-xs mb-1">
+                    <span className="font-bold text-[#182920]">{p.nombre}</span>
+                    <span className="font-bold text-[#33512f]">
+                      {p.totalAnimales ?? 0} cabezas ({p.superficieHas} Has)
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-[11px] text-[#6b7c6d]">
+                    <span>Capacidad máxima: {p.capacidad}</span>
+                    <span>Carga: {Math.round(((p.totalAnimales ?? 0) / (p.capacidad || 100)) * 100)}%</span>
+                  </div>
                 </div>
-                <div className="flex justify-between text-[11px] text-[#6b7c6d]">
-                  <span>Capacidad máxima: {p.capacidad}</span>
-                  <span>Carga: {Math.round(((p.totalAnimales ?? 0) / (p.capacidad || 100)) * 100)}%</span>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -114,24 +122,30 @@ export default function ReportesView() {
           </h3>
 
           <div className="space-y-2 max-h-80 overflow-y-auto pr-1 text-xs">
-            {hacienda.map((g) => (
-              <div key={g.id} className="p-2.5 rounded-xl bg-[#f8f5eb] border border-[#ded7c4] flex justify-between items-center">
-                <div>
-                  <span className="font-bold text-[#182920] block">
-                    {g.caravana} · {g.categoria}
-                  </span>
-                  <span className="text-[11px] text-[#6b7c6d]">
-                    {g.raza} ({g.sexo}) • {g.potreroNombre || "Potrero"}
-                  </span>
+            {hacienda.length === 0 ? (
+              <p className="text-xs text-[#6b7c6d] italic p-3 bg-[#f8f5eb] rounded-xl border border-[#ded7c4]">
+                No hay animales registrados en este rodeo.
+              </p>
+            ) : (
+              hacienda.map((g) => (
+                <div key={g.id} className="p-2.5 rounded-xl bg-[#f8f5eb] border border-[#ded7c4] flex justify-between items-center">
+                  <div>
+                    <span className="font-bold text-[#182920] block">
+                      {g.caravana} · {g.categoria}
+                    </span>
+                    <span className="text-[11px] text-[#6b7c6d]">
+                      {g.raza} ({g.sexo}) • {g.potreroNombre || "Potrero"}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-extrabold text-[#182920] block">{g.pesoKg} kg</span>
+                    <span className="text-[9px] font-bold text-emerald-800 uppercase">
+                      {g.estadoSanitario}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="font-extrabold text-[#182920] block">{g.pesoKg} kg</span>
-                  <span className="text-[9px] font-bold text-emerald-800 uppercase">
-                    {g.estadoSanitario}
-                  </span>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>
