@@ -5,7 +5,6 @@ import {
   verificarEmail as apiVerificarEmail,
   obtenerUsuarioActual,
   logout as apiLogout,
-  obtenerUsuariosDemo,
 } from "../api/auth.api.js";
 import { getToken } from "../api/client.js";
 
@@ -15,16 +14,8 @@ export function AuthProvider({ children }) {
   const [usuario, setUsuario] = useState(null);
   const [token, setTokenState] = useState(getToken());
   const [cargando, setCargando] = useState(true);
-  const [usuariosDemo, setUsuariosDemo] = useState([]);
 
   useEffect(() => {
-    // Cargar usuarios de prueba para selector rápido
-    obtenerUsuariosDemo()
-      .then((res) => {
-        if (res?.data) setUsuariosDemo(res.data);
-      })
-      .catch(() => {});
-
     // Verificar si hay sesión activa
     const tokenGuardado = getToken();
     if (tokenGuardado) {
@@ -62,23 +53,6 @@ export function AuthProvider({ children }) {
     throw new Error("Respuesta inválida del servidor");
   }
 
-  async function loginRapido(rolDeseado) {
-    const usuarioEncontrado = usuariosDemo.find((u) => u.rol === rolDeseado);
-    if (!usuarioEncontrado) {
-      // Fallback a credenciales conocidas
-      const correosPorRol = {
-        dueno: "dueno@vakera.com",
-        capataz: "capataz@vakera.com",
-        peon: "peon@vakera.com",
-        oficina: "oficina@vakera.com",
-        veterinario: "veterinario@vakera.com",
-      };
-      const email = correosPorRol[rolDeseado] || "dueno@vakera.com";
-      return iniciarSesion(email, "password123");
-    }
-    return iniciarSesion(usuarioEncontrado.email, usuarioEncontrado.passwordDemo);
-  }
-
   async function registrarse(datos) {
     const res = await apiRegistro(datos);
     // Si viene token inmediato
@@ -114,9 +88,7 @@ export function AuthProvider({ children }) {
         rol: usuario?.rol || null,
         estaAutenticado: Boolean(usuario),
         cargando,
-        usuariosDemo,
         iniciarSesion,
-        loginRapido,
         registrarse,
         verificarEmailConToken,
         cerrarSesion,
@@ -134,3 +106,4 @@ export function useAuth() {
   }
   return context;
 }
+

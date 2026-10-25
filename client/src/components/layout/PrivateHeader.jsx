@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "../../context/AuthContext";
 
 export default function PrivateHeader({ alAbrirMenu, alIrALanding, colapsado = false, alToggleColapso }) {
-  const { rol, loginRapido } = useAuth();
   const [hora, setHora] = useState("");
   const [fecha, setFecha] = useState("");
 
@@ -65,22 +63,6 @@ export default function PrivateHeader({ alAbrirMenu, alIrALanding, colapsado = f
 
       {/* Right Actions */}
       <div className="flex items-center gap-3 lg:gap-5">
-        {/* Selector de rol de simulación */}
-        <div className="hidden sm:flex items-center gap-2 bg-[#e7dfcb] px-3 py-1.5 rounded-xl border border-[#d2c8b0] shadow-sm">
-          <span className="text-[10px] font-bold text-[#182920] uppercase tracking-wider">Rol:</span>
-          <select
-            value={rol || "dueno"}
-            onChange={(e) => loginRapido(e.target.value)}
-            className="bg-transparent text-xs font-bold text-[#182920] outline-none cursor-pointer"
-          >
-            <option value="dueno" className="bg-[#f1ecdd] text-[#182920]">Dueño</option>
-            <option value="capataz" className="bg-[#f1ecdd] text-[#182920]">Capataz</option>
-            <option value="peon" className="bg-[#f1ecdd] text-[#182920]">Peón</option>
-            <option value="oficina" className="bg-[#f1ecdd] text-[#182920]">Oficina</option>
-            <option value="veterinario" className="bg-[#f1ecdd] text-[#182920]">Veterinario</option>
-          </select>
-        </div>
-
         {/* Ver Landing Page */}
         <button
           type="button"

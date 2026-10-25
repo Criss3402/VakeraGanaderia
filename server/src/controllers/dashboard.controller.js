@@ -121,6 +121,17 @@ class DashboardController {
     }
   }
 
+  static async eliminarPotrero(req, res) {
+    try {
+      const { id } = req.params;
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const eliminado = await GanadoModel.eliminarPotrero(id, estId);
+      return exito(res, eliminado, "Potrero eliminado exitosamente.");
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
   // 3. Sanidad y Calendario
   static async obtenerAlertas(req, res) {
     try {

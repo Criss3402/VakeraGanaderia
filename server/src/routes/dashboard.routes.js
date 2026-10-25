@@ -24,6 +24,11 @@ router.post(
   rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ),
   DashboardController.registrarPotrero
 );
+router.delete(
+  "/potreros/:id",
+  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ),
+  DashboardController.eliminarPotrero
+);
 router.post(
   "/ganado",
   rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ),

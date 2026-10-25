@@ -12,7 +12,6 @@ router.get("/verificar-email", AuthController.verificarEmail);
 router.post("/reenviar-verificacion", AuthController.reenviarVerificacion);
 router.post("/solicitar-recuperacion", AuthController.solicitarRecuperacion);
 router.post("/restablecer-password", AuthController.restablecerPassword);
-router.get("/usuarios-demo", AuthController.obtenerUsuariosDemo);
 
 // Autenticación protegida (sesión actual)
 router.get("/me", authMiddleware, AuthController.me);

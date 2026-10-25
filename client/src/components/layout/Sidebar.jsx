@@ -10,7 +10,7 @@ export default function Sidebar({
   colapsado = false,
   alToggleColapso,
 }) {
-  const { usuario, rol, cerrarSesion, loginRapido } = useAuth();
+  const { usuario, rol, cerrarSesion } = useAuth();
   const [mostrarOpcionesPerfil, setMostrarOpcionesPerfil] = useState(false);
 
   const esDueno = rol === "dueno";
@@ -18,6 +18,7 @@ export default function Sidebar({
   const enlaces = [
     { id: "metricas", etiqueta: "Panel General", icono: "fa-house" },
     { id: "ganado", etiqueta: "Ganado", icono: "fa-cow" },
+    { id: "parcelas", etiqueta: "Parcelas", icono: "fa-draw-polygon" },
     { id: "partes", etiqueta: "Partes de Campo", icono: "fa-clipboard-list" },
     { id: "sanidad", etiqueta: "Sanidad y Vacunas", icono: "fa-syringe" },
     { id: "insumos", etiqueta: "Insumos y Stock", icono: "fa-boxes-stacked" },
@@ -176,48 +177,21 @@ export default function Sidebar({
 
             {/* Menú de opciones de perfil */}
             {mostrarOpcionesPerfil && (
-              <div className="mt-2 bg-[#16271e] border border-[#8fb56b]/30 rounded-xl p-2.5 text-xs space-y-2 shadow-2xl animate-fade-in">
-                {(usuario?.email?.endsWith("@vakera.com") || usuario?.establecimientoId === "est-el-rancho") && (
-                  <>
-                    <div className="text-[#8fb56b] px-1 font-bold text-[11px] uppercase tracking-wider flex items-center gap-1.5">
-                      <i className="fa-solid fa-user-gear"></i> Simular Rol:
-                    </div>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {["dueno", "capataz", "peon", "oficina", "veterinario"].map((r) => (
-                        <button
-                          key={r}
-                          type="button"
-                          onClick={() => {
-                            loginRapido(r);
-                            setMostrarOpcionesPerfil(false);
-                          }}
-                          className={`px-2 py-1.5 rounded-lg text-left uppercase text-[10px] font-bold transition-all ${rol === r
-                              ? "bg-[#8fb56b] text-[#182920]"
-                              : "bg-[#1f3729] text-[#eef2e9] hover:bg-[#284835]"
-                            }`}
-                        >
-                          {r}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-                <div className="border-t border-[#8fb56b]/15 pt-2 flex flex-col gap-1">
-                  <button
-                    type="button"
-                    onClick={alIrALanding}
-                    className="w-full text-left px-2 py-1.5 hover:bg-[#1e3828] text-[#eef2e9] rounded-lg flex items-center gap-2 transition-colors"
-                  >
-                    <i className="fa-solid fa-globe text-[#8fb56b]"></i> Ver Web Inicio
-                  </button>
-                  <button
-                    type="button"
-                    onClick={cerrarSesion}
-                    className="w-full text-left px-2 py-1.5 hover:bg-red-950/40 text-red-300 rounded-lg flex items-center gap-2 transition-colors"
-                  >
-                    <i className="fa-solid fa-right-from-bracket text-red-400"></i> Cerrar Sesión
-                  </button>
-                </div>
+              <div className="mt-2 bg-[#16271e] border border-[#8fb56b]/30 rounded-xl p-2.5 text-xs space-y-1 shadow-2xl animate-fade-in">
+                <button
+                  type="button"
+                  onClick={alIrALanding}
+                  className="w-full text-left px-2 py-1.5 hover:bg-[#1e3828] text-[#eef2e9] rounded-lg flex items-center gap-2 transition-colors"
+                >
+                  <i className="fa-solid fa-globe text-[#8fb56b]"></i> Ver Web Inicio
+                </button>
+                <button
+                  type="button"
+                  onClick={cerrarSesion}
+                  className="w-full text-left px-2 py-1.5 hover:bg-red-950/40 text-red-300 rounded-lg flex items-center gap-2 transition-colors"
+                >
+                  <i className="fa-solid fa-right-from-bracket text-red-400"></i> Cerrar Sesión
+                </button>
               </div>
             )}
           </div>

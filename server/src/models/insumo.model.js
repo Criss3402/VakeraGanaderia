@@ -53,6 +53,36 @@ let solicitudesInsumos = [
   },
 ];
 
+function normalizarInsumo(item) {
+  let campo = item.campo;
+  let ubicacion = item.ubicacion || "Depósito Central";
+
+  if (!campo) {
+    if (ubicacion.includes(" - ")) {
+      const partes = ubicacion.split(" - ");
+      campo = partes[0].trim();
+      ubicacion = partes.slice(1).join(" - ").trim();
+    } else if (item.id === "ins-3" || item.id === "ins-4" || ubicacion.toLowerCase().includes("moraleja")) {
+      campo = "Campo 2 - La Moraleja";
+    } else {
+      campo = "Campo 1 - El Rancho";
+    }
+  }
+
+  return {
+    ...item,
+    campo,
+    ubicacion,
+    sectorCustodia: (ubicacion || "").includes("Peón")
+      ? "peon"
+      : (ubicacion || "").includes("Capataz")
+      ? "capataz"
+      : (ubicacion || "").includes("Veterin")
+      ? "veterinario"
+      : "oficina",
+  };
+}
+
 class InsumoModel {
   static async listarTodos(establecimientoId) {
     try {
@@ -61,32 +91,14 @@ class InsumoModel {
         where: whereClause,
         orderBy: { nombre: "asc" },
       });
-      return lista.map((item) => ({
-        ...item,
-        sectorCustodia: (item.ubicacion || "").includes("Peón")
-          ? "peon"
-          : (item.ubicacion || "").includes("Capataz")
-          ? "capataz"
-          : (item.ubicacion || "").includes("Veterin")
-          ? "veterinario"
-          : "oficina",
-      }));
+      return lista.map(normalizarInsumo);
     } catch (err) {
       console.warn("[InsumoModel] Fallo al consultar Prisma, usando fallback en memoria:", err.message);
       const fuente = Array.isArray(db.insumos) ? db.insumos : [];
       const filtrados = establecimientoId
         ? fuente.filter((i) => i.establecimientoId === establecimientoId)
         : fuente;
-      return filtrados.map((item) => ({
-        ...item,
-        sectorCustodia: (item.ubicacion || "").includes("Peón")
-          ? "peon"
-          : (item.ubicacion || "").includes("Capataz")
-          ? "capataz"
-          : (item.ubicacion || "").includes("Veterin")
-          ? "veterinario"
-          : "oficina",
-      }));
+      return filtrados.map(normalizarInsumo);
     }
   }
 
@@ -121,6 +133,11 @@ class InsumoModel {
     const stockMinimo = parseFloat(insumo.stockMinimo) || 5;
     const esCritico = stockActual <= stockMinimo;
     const estado = esCritico ? "Crítico" : "OK";
+    const campo = insumo.campo || "Campo 1 - El Rancho";
+    const detalleUbicacion = insumo.ubicacion || "Depósito Central";
+    const ubicacionCompuesta = insumo.campo
+      ? (insumo.ubicacion ? `${campo} - ${detalleUbicacion}` : campo)
+      : detalleUbicacion;
 
     try {
       const nuevo = await prisma.insumo.create({
@@ -130,7 +147,7 @@ class InsumoModel {
           stockActual,
           stockMinimo,
           unidad: insumo.unidad || "Unidades",
-          ubicacion: insumo.ubicacion || "Depósito Central",
+          ubicacion: ubicacionCompuesta,
           estado,
           requiereReposicion: esCritico,
           icono: insumo.icono || "fa-box-archive",
@@ -138,12 +155,14 @@ class InsumoModel {
           establecimiento: establecimiento || null,
         },
       });
-      return nuevo;
+      return normalizarInsumo(nuevo);
     } catch (err) {
       console.warn("[InsumoModel] Fallo al guardar en Prisma, usando fallback:", err.message);
       const nuevo = {
         id: `ins-${Date.now()}`,
         ...insumo,
+        campo,
+        ubicacion: detalleUbicacion,
         stockActual,
         stockMinimo,
         estado,
@@ -153,7 +172,7 @@ class InsumoModel {
       };
       if (!db.insumos) db.insumos = [];
       db.insumos.push(nuevo);
-      return nuevo;
+      return normalizarInsumo(nuevo);
     }
   }
 

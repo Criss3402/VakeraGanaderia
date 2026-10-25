@@ -58,6 +58,12 @@ export async function registrarPotrero(datos) {
   });
 }
 
+export async function eliminarPotrero(id) {
+  return request(`/dashboard/potreros/${id}`, {
+    method: "DELETE",
+  });
+}
+
 // Sanidad y Vacunaciones
 export async function obtenerAlertasSanitarias() {
   return request("/dashboard/alertas");

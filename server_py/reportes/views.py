@@ -65,7 +65,7 @@ def _obtener_datos_insumos():
 
 class ResumenEjecutivoView(APIView):
     """
-    GET /api/py/reportes/resumen-ejecutivo
+
     Retorna métricas cuantitativas consolidadas para Dueño y Oficina.
     """
     permission_classes = [CanAccessReports]
@@ -135,7 +135,6 @@ class ExportarPdfHaciendaView(APIView):
 
 class ExportarExcelStockView(APIView):
     """
-    GET /api/py/reportes/exportar-excel
     Genera y descarga una planilla Excel (.xlsx) con el inventario completo.
     """
     permission_classes = [CanAccessReports]

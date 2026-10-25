@@ -71,10 +71,6 @@ export async function obtenerUsuarioActual() {
   return request("/auth/me");
 }
 
-export async function obtenerUsuariosDemo() {
-  return request("/auth/usuarios-demo");
-}
-
 export function logout() {
   setToken(null);
 }

@@ -11,6 +11,7 @@ import PartesView from "./views/3_dashboard/modulos/PartesView.jsx";
 import SanidadView from "./views/3_dashboard/modulos/SanidadView.jsx";
 import InsumosView from "./views/3_dashboard/modulos/InsumosView.jsx";
 import ReportesView from "./views/3_dashboard/modulos/ReportesView.jsx";
+import ParcelasView from "./views/3_dashboard/modulos/ParcelasView.jsx";
 import GestionUsuariosView from "./views/4_permisos/GestionUsuariosView.jsx";
 import ProtectedRoute from "./views/4_permisos/ProtectedRoute.jsx";
 import PrivateLayout from "./components/layout/PrivateLayout.jsx";
@@ -48,6 +49,7 @@ function AppContenido() {
   const titulosVistas = {
     metricas: "Panel de Control Ganadero",
     ganado: "Gestión de Rodeo y Potreros",
+    parcelas: "Mapeo Geoespacial de Parcelas y Potreros",
     partes: "Partes Diarios de Novedades de Campo",
     sanidad: "Calendario y Tratamientos Sanitarios",
     insumos: "Control de Insumos y Stock Crítico",
@@ -140,6 +142,7 @@ function AppContenido() {
         )}
 
         {subVistaApp === "ganado" && <GanadoView />}
+        {subVistaApp === "parcelas" && <ParcelasView />}
         {subVistaApp === "partes" && <PartesView />}
         {subVistaApp === "sanidad" && <SanidadView />}
         {subVistaApp === "insumos" && <InsumosView />}

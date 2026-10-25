@@ -98,7 +98,7 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`API de Vakera escuchando en http://localhost:${PORT}`);
   console.log(`- Módulo Presentación: http://localhost:${PORT}/api/servicios`);
-  console.log(`- Módulo Auth:          http://localhost:${PORT}/api/auth/usuarios-demo`);
+  console.log(`- Módulo Auth:          http://localhost:${PORT}/api/auth/me`);
   console.log(`- Módulo Dashboard:     http://localhost:${PORT}/api/dashboard/metricas`);
   console.log(`- Módulo Permisos:      http://localhost:${PORT}/api/permisos/roles`);
 });

@@ -316,28 +316,6 @@ class AuthController {
     }
     return exito(res, { usuario: req.usuario });
   }
-
-  /**
-   * Disponible en modo desarrollo/demo.
-   */
-  static async obtenerUsuariosDemo(req, res) {
-    if (process.env.NODE_ENV === "production") {
-      return error(res, "Endpoint no disponible en producción.", 403);
-    }
-
-    const lista = await UsuarioModel.listarTodos("est-el-rancho");
-    const usuariosDemo = lista.map((u) => ({
-      id: u.id,
-      nombre: u.nombre,
-      email: u.email,
-      rol: u.rol,
-      cargo: u.cargo,
-      passwordDemo: "password123",
-      emailVerificado: u.emailVerificado,
-    }));
-
-    return exito(res, usuariosDemo);
-  }
 }
 
 module.exports = AuthController;
