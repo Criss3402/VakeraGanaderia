@@ -11,8 +11,9 @@ export async function obtenerClimaActual(params = {}) {
 }
 
 // Ganado y Potreros
-export async function obtenerGanado() {
-  return request("/dashboard/ganado");
+export async function obtenerGanado(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return request(`/dashboard/ganado${query ? `?${query}` : ""}`);
 }
 
 export async function obtenerPotreros() {

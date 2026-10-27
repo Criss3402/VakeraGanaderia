@@ -72,6 +72,7 @@ const MATRIZ_PERMISOS = {
 
 class PermisosController {
   static obtenerRoles(req, res) {
+    res.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=600");
     return exito(res, {
       roles: ROLES_INFO,
       matrizPermisos: MATRIZ_PERMISOS,

@@ -42,7 +42,8 @@ class DashboardController {
   static async obtenerGanado(req, res) {
     try {
       const { estId } = obtenerEstablecimientoContexto(req);
-      const lista = await GanadoModel.listarTodos(estId);
+      const { take, skip } = req.query || {};
+      const lista = await GanadoModel.listarTodos(estId, { take, skip });
       return exito(res, lista);
     } catch (err) {
       return error(res, err.message, 500);

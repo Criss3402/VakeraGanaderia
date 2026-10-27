@@ -55,8 +55,17 @@ Se introdujo una capa de caché ligera en memoria con invalidación automática:
 - **Índices en Base de Datos:** Se crearon directivas `@@index` en las tablas `Potrero`, `Ganado`, `SanidadEvento`, `Insumo` y `ParteDiario` (claves foráneas y campos de filtro recurrente como `establecimientoId`, `potreroId`, `estadoSanitario`, `fechaProgramada`).
 - **Agregaciones Nativas en PostgreSQL:** Se reemplazó la carga de todos los animales a la memoria de Node.js en `GanadoModel.obtenerMetricas()` por consultas concurrentes nativas de PostgreSQL: `count()`, `aggregate({ _avg })` y `groupBy()`, preservando la resiliencia en memoria del patrón dual.
 
-### 2.7 Optimización de LCP (Largest Contentful Paint)
-En `client/src/views/1_inicio_presentacion/Hero.jsx`, se añadieron los atributos `fetchPriority="high"` y `decoding="async"` a la imagen principal `hero-bg.jpg`, indicando al motor del navegador que priorice su descarga sin bloquear el hilo principal.
+### 2.7 Optimización de LCP con Formato WebP (`Hero.jsx` y `hero-bg.webp`)
+- **Conversión a WebP:** Se procesó `client/public/hero-bg.jpg` (440 kB) generando `hero-bg.webp` (156 kB), logrando una **reducción del 65%** en peso del activo LCP.
+- **Etiqueta `<picture>`:** Se configuró un elemento `<picture>` con `<source srcSet="/hero-bg.webp" type="image/webp" />` y atributos `fetchPriority="high"` y `decoding="async"`, garantizando retrocompatibilidad y máxima velocidad de renderizado.
+
+### 2.8 Cabeceras HTTP de Caché en Rutas Estáticas
+- En `server/src/controllers/presentacion.controller.js` (`/api/servicios`) y `server/src/controllers/permisos.controller.js` (`/api/permisos/roles`), se inyectó la cabecera `Cache-Control: public, max-age=3600, stale-while-revalidate=600`, permitiendo que el navegador resuelva estas consultas desde su propia caché local sin tráfico de red durante 1 hora.
+
+### 2.10 Sustitución de Tailwind Play CDN por Compilación PostCSS en Tiempo de Build
+- **Eliminación Total de `cdn.tailwindcss.com`:** Se removió el compilador JIT en tiempo de ejecución del archivo `index.html`. El navegador ya no necesita descargar ~350 kB de compilador ni procesar el DOM en cada render.
+- **Integración con PostCSS y Vite (`tailwind.config.js` y `postcss.config.js`):** Se integró `@tailwindcss/postcss` de modo que todos los estilos utilitarios y los tokens de color (`vakera-profundo`, `vakera-brote`, etc.) son generados y optimizados estáticamente durante el proceso de compilación (`vite build`).
+- **HTML Ultraligero:** El archivo base `index.html` pasó de 3.11 kB a solo **1.63 kB** (gzip: **0.73 kB**).
 
 ---
 
@@ -64,33 +73,22 @@ En `client/src/views/1_inicio_presentacion/Hero.jsx`, se añadieron los atributo
 
 | Métrica / Archivo | Antes (Línea Base) | Después de Optimización | Mejora Relativa |
 | :--- | :--- | :--- | :--- |
-| **Entrada Principal JS (`index.js`)** | 1,490.73 kB | **24.16 kB** (gzip: 8.01 kB) | **-98.4%** |
+| **Entrada Principal JS (`index.js`)** | 1,490.73 kB | **24.16 kB** (gzip: 8.02 kB) | **-98.4%** |
 | **Núcleo React en Caché (`vendor-react.js`)** | Embebido en index | **140.87 kB** (gzip: 45.26 kB) | Modularizado |
 | **Mapeo Geoespacial (`vendor-maps.js`)** | Embebido en index | **1,079.38 kB** (Bajo demanda) | Aislado a Parcelas |
-| **Landing Page inicial (`LandingView.js`)** | Embebido en index | **19.30 kB** (gzip: 6.37 kB) | Carga instantánea |
-| **CSS Principal (`index.css`)** | 102.68 kB | **31.14 kB** (gzip: 6.97 kB) | Separado de mapas |
-| **CSS de Mapas (`ParcelasView.css`)** | Embebido en index | **71.55 kB** (Bajo demanda) | Aislado a Parcelas |
+| **Landing Page inicial (`LandingView.js`)** | Embebido en index | **19.39 kB** (gzip: 6.41 kB) | Carga instantánea |
+| **HTML Principal (`index.html`)** | 3.11 kB | **1.63 kB** (gzip: 0.73 kB) | **-47.5%** |
+| **Compilador Tailwind en Runtime** | Activo (consumo alto CPU) | **Eliminado (Compilación estática)** | 0ms costo CPU |
+| **Imagen Principal Hero** | 440.77 kB (JPEG) | **156.05 kB (WebP `<picture>`)** | **-65.0%** |
 | **Scripts Bloqueantes en `<head>`** | Chart.js (~250 kB) + CSS síncrono | **Eliminado + CSS diferido** | FCP ultra-rápido |
 | **Respuestas API (Node.js)** | Sin comprimir | **Gzip / Deflate activado** | -75% peso de red |
 | **Consultas de Métricas en Servidor** | Carga completa en memoria | **PostgreSQL COUNT / AVG nativo** | Escalamiento 100x |
+| **Catálogos de Servicios y Roles** | Petición en cada visita | **Cache-Control: 1 hora** | 0 peticiones de red |
 | **Navegación Interna en Dashboard** | 5 peticiones HTTP por cambio | **Caché en cliente (0ms)** | Instantánea |
 
 ---
 
 ## 4. Hoja de Ruta para Optimizaciones Futuras
-
-### Fase 2.1: Consolidación Residual de Estilos
-1. **Reemplazo del CDN de Tailwind:**
-   - Actualmente `client/index.html` incluye `cdn.tailwindcss.com`.
-   - Se recomienda compilar las utilidades de Tailwind en tiempo de build o migrar los estilos residuales a `client/src/index.css`, eliminando la inyección de scripts externos.
-2. **Conversión de Imagen Hero a WebP:**
-   - Convertir `client/public/hero-bg.jpg` (440 kB) a formato WebP/AVIF (estimado: ~45 kB).
-
-### Fase 3.1: Paginación en Listados de Gran Volumen
-1. **Paginación en Ganado y Partes:**
-   - Implementar paginación (`take: 50`, `skip: N`) en la vista de rodeo cuando el número de cabezas supere los miles de animales.
-2. **Caché HTTP en Rutas Estáticas:**
-   - Añadir cabeceras `Cache-Control: public, max-age=300` para catálogos estáticos (potreros, servicios).
 
 ### Fase 4: Modo Rural y PWA (Progressive Web App)
 Dado que el entorno de uso es agropecuario (lotes y mangas con conectividad 3G/4G inestable):
@@ -99,6 +97,8 @@ Dado que el entorno de uso es agropecuario (lotes y mangas con conectividad 3G/4
    - Permitir la visualización del último rodeo cargado aún sin señal.
 2. **Cola de Partes Diarios Offline:**
    - Permitir al peón redactar el parte diario en el campo y sincronizarlo automáticamente cuando recupere señal Wi-Fi/4G.
+
+
 
 ---
 

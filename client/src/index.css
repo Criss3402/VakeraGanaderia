@@ -1,3 +1,6 @@
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
 :root {
   --verde-profundo: #182920;
   --verde-oscuro: #1e3226;

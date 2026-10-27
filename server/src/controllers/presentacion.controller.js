@@ -7,6 +7,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 class PresentacionController {
   static obtenerServicios(req, res) {
+    res.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=600");
     return exito(res, servicios);
   }
 

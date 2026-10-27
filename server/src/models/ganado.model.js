@@ -2,10 +2,10 @@ const prisma = require("../config/prisma");
 const db = require("../config/db");
 
 class GanadoModel {
-  static async listarTodos(establecimientoId) {
+  static async listarTodos(establecimientoId, { take, skip } = {}) {
     try {
       const whereClause = establecimientoId ? { establecimientoId } : {};
-      const lista = await prisma.ganado.findMany({
+      const findOptions = {
         where: whereClause,
         include: {
           potrero: true,
@@ -15,7 +15,16 @@ class GanadoModel {
           },
         },
         orderBy: { caravana: "asc" },
-      });
+      };
+
+      if (take && Number(take) > 0) {
+        findOptions.take = Number(take);
+        if (skip && Number(skip) > 0) {
+          findOptions.skip = Number(skip);
+        }
+      }
+
+      const lista = await prisma.ganado.findMany(findOptions);
       return lista.map((g) => ({
         ...g,
         potrero: g.potrero ? g.potrero.nombre : "Sin potrero asignado",
@@ -26,9 +35,15 @@ class GanadoModel {
     } catch (err) {
       console.warn("[GanadoModel] Fallo al consultar Prisma, usando fallback en memoria:", err.message);
       const fuente = Array.isArray(db.ganado) ? db.ganado : [];
-      const filtrados = establecimientoId
+      let filtrados = establecimientoId
         ? fuente.filter((g) => g.establecimientoId === establecimientoId)
         : fuente;
+
+      if (take && Number(take) > 0) {
+        const offset = Number(skip) || 0;
+        filtrados = filtrados.slice(offset, offset + Number(take));
+      }
+
       return filtrados.map((g) => ({
         ...g,
         potrero: g.potreroNombre || g.potrero || "Sin potrero asignado",
