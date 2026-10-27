@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const compression = require("compression");
 
 const path = require("path");
 const fs = require("fs");
@@ -51,6 +52,8 @@ app.use(
     credentials: true,
   })
 );
+
+app.use(compression());
 
 app.use(express.json({ limit: "1mb" }));
 

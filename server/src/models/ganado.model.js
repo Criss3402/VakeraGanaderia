@@ -146,7 +146,52 @@ class GanadoModel {
 
   static async obtenerMetricas(establecimientoId) {
     try {
-      const lista = await this.listarTodos(establecimientoId);
+      const whereClause = establecimientoId ? { establecimientoId } : {};
+
+      // Consultas agregadas directas en PostgreSQL en paralelo
+      const [total, agregados, gruposCat, gruposSan] = await Promise.all([
+        prisma.ganado.count({ where: whereClause }),
+        prisma.ganado.aggregate({
+          where: whereClause,
+          _avg: { pesoKg: true },
+        }),
+        prisma.ganado.groupBy({
+          by: ["categoria"],
+          where: whereClause,
+          _count: { _all: true },
+        }),
+        prisma.ganado.groupBy({
+          by: ["estadoSanitario"],
+          where: whereClause,
+          _count: { _all: true },
+        }),
+      ]);
+
+      const porCategoria = gruposCat.reduce((acc, curr) => {
+        acc[curr.categoria] = curr._count._all;
+        return acc;
+      }, {});
+
+      const porEstadoSanitario = gruposSan.reduce((acc, curr) => {
+        acc[curr.estadoSanitario] = curr._count._all;
+        return acc;
+      }, {});
+
+      const pesoPromedio = agregados._avg?.pesoKg ? Math.round(agregados._avg.pesoKg) : 0;
+
+      return {
+        totalCabezas: total,
+        porCategoria,
+        porEstadoSanitario,
+        pesoPromedioKg: pesoPromedio,
+        tasaMortalidadMensual: total > 0 ? "0.8%" : "0.0%",
+      };
+    } catch (e) {
+      console.warn("[GanadoModel.obtenerMetricas] Fallback a memoria:", e.message);
+      const fuente = Array.isArray(db.ganado) ? db.ganado : [];
+      const lista = establecimientoId
+        ? fuente.filter((g) => g.establecimientoId === establecimientoId)
+        : fuente;
       const total = lista.length;
 
       const porCategoria = lista.reduce((acc, curr) => {
@@ -169,15 +214,6 @@ class GanadoModel {
         porEstadoSanitario,
         pesoPromedioKg: pesoPromedio,
         tasaMortalidadMensual: total > 0 ? "0.8%" : "0.0%",
-      };
-    } catch (e) {
-      console.warn("[GanadoModel.obtenerMetricas] Fallback:", e.message);
-      return {
-        totalCabezas: 0,
-        porCategoria: {},
-        porEstadoSanitario: {},
-        pesoPromedioKg: 0,
-        tasaMortalidadMensual: "0.0%",
       };
     }
   }

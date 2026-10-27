@@ -77,6 +77,7 @@ model Potrero {
   animales      Ganado[]
   partes        ParteDiario[]
 
+  @@index([establecimientoId])
   @@map("potreros")
 }
 
@@ -101,6 +102,9 @@ model Ganado {
   // Historial sanitario individual opcional
   eventosSanitarios SanidadEvento[]
 
+  @@index([establecimientoId])
+  @@index([potreroId])
+  @@index([estadoSanitario])
   @@map("ganado")
 }
 
@@ -127,6 +131,9 @@ model SanidadEvento {
   responsableId   String?
   responsable     Usuario? @relation("ResponsableEventos", fields: [responsableId], references: [id], onDelete: SetNull)
 
+  @@index([establecimientoId])
+  @@index([fechaProgramada])
+  @@index([ganadoId])
   @@map("sanidad_eventos")
 }
 
@@ -146,6 +153,8 @@ model Insumo {
   establecimientoId  String?  @default("est-el-rancho")
   establecimiento    String?  @default("El Rancho, Goya, Corrientes")
 
+  @@index([establecimientoId])
+  @@index([estado])
   @@map("insumos")
 }
 
@@ -174,6 +183,9 @@ model ParteDiario {
   potreroId         String?
   potrero           Potrero?    @relation(fields: [potreroId], references: [id], onDelete: SetNull)
 
+  @@index([establecimientoId, fecha])
+  @@index([peonId])
+  @@index([estado])
   @@map("partes_diarios")
 }
 

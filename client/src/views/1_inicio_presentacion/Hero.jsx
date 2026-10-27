@@ -5,6 +5,8 @@ export default function Hero({ alIniciarSesion }) {
         src="/hero-bg.jpg"
         alt="Entorno ganadero Vakera"
         className="hero__fondo-img"
+        fetchPriority="high"
+        decoding="async"
       />
       <div className="hero__velo" aria-hidden="true" />
 
