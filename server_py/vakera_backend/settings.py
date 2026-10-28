@@ -4,6 +4,7 @@ Diseñado para coexistir con el backend principal de Node.js y Express.
 """
 from pathlib import Path
 import os
+import sys
 import urllib.parse
 from dotenv import load_dotenv
 
@@ -66,30 +67,38 @@ database_url = os.getenv(
     "postgresql://postgres:postgres@localhost:5433/vakera_db?schema=public",
 )
 
-try:
-    parsed_url = urllib.parse.urlparse(database_url)
-    db_engine = "django.db.backends.postgresql" if "postgres" in parsed_url.scheme else "django.db.backends.sqlite3"
-    db_name = parsed_url.path.lstrip("/").split("?")[0] if parsed_url.path else "vakera_db"
-    
-    DATABASES = {
-        "default": {
-            "ENGINE": db_engine,
-            "NAME": db_name,
-            "USER": parsed_url.username or "postgres",
-            "PASSWORD": parsed_url.password or "postgres",
-            "HOST": parsed_url.hostname or "localhost",
-            "PORT": str(parsed_url.port or 5433),
-            "CONN_MAX_AGE": 60,
-        }
-    }
-except Exception as e:
-    # Fallback seguro para tests aislados
+if "test" in sys.argv:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "dev_fallback.sqlite3",
+            "NAME": ":memory:",
         }
     }
+else:
+    try:
+        parsed_url = urllib.parse.urlparse(database_url)
+        db_engine = "django.db.backends.postgresql" if "postgres" in parsed_url.scheme else "django.db.backends.sqlite3"
+        db_name = parsed_url.path.lstrip("/").split("?")[0] if parsed_url.path else "vakera_db"
+
+        DATABASES = {
+            "default": {
+                "ENGINE": db_engine,
+                "NAME": db_name,
+                "USER": parsed_url.username or "postgres",
+                "PASSWORD": parsed_url.password or "postgres",
+                "HOST": parsed_url.hostname or "localhost",
+                "PORT": str(parsed_url.port or 5433),
+                "CONN_MAX_AGE": 60,
+            }
+        }
+    except Exception:
+        # Fallback seguro para tests aislados
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.sqlite3",
+                "NAME": BASE_DIR / "dev_fallback.sqlite3",
+            }
+        }
 
 # -----------------------------------------------------------------------------
 # Django REST Framework & Seguridad

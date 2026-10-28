@@ -1,6 +1,25 @@
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 
+// Mapa de pre-carga bajo demanda al pasar el cursor (Hover Prefetching)
+const PREFETCH_MODULOS = {
+  metricas: () => import("../../views/3_dashboard/DashboardView.jsx"),
+  ganado: () => import("../../views/3_dashboard/modulos/GanadoView.jsx"),
+  parcelas: () => import("../../views/3_dashboard/modulos/ParcelasView.jsx"),
+  partes: () => import("../../views/3_dashboard/modulos/PartesView.jsx"),
+  sanidad: () => import("../../views/3_dashboard/modulos/SanidadView.jsx"),
+  insumos: () => import("../../views/3_dashboard/modulos/InsumosView.jsx"),
+  reportes: () => import("../../views/3_dashboard/modulos/ReportesView.jsx"),
+  permisos: () => import("../../views/4_permisos/GestionUsuariosView.jsx"),
+};
+
+function precargarModulo(id) {
+  const loader = PREFETCH_MODULOS[id];
+  if (loader) {
+    loader().catch(() => {});
+  }
+}
+
 export default function Sidebar({
   vistaActiva,
   alCambiarVista,
@@ -120,6 +139,8 @@ export default function Sidebar({
                 <button
                   key={enlace.id}
                   type="button"
+                  onMouseEnter={() => precargarModulo(enlace.id)}
+                  onFocus={() => precargarModulo(enlace.id)}
                   onClick={() => {
                     alCambiarVista(enlace.id);
                     if (alCerrarMenu) alCerrarMenu();

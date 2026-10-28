@@ -2,9 +2,9 @@ import { useState, useEffect, lazy, Suspense } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import ProtectedRoute from "./views/4_permisos/ProtectedRoute.jsx";
 import PrivateLayout from "./components/layout/PrivateLayout.jsx";
+import LandingView from "./views/1_inicio_presentacion/LandingView.jsx";
 
-// Vistas Públicas diferidas (Code Splitting)
-const LandingView = lazy(() => import("./views/1_inicio_presentacion/LandingView.jsx"));
+// Vistas Secundarias Públicas diferidas (Code Splitting)
 const LoginView = lazy(() => import("./views/2_login_registro/LoginView.jsx"));
 const RegistroView = lazy(() => import("./views/2_login_registro/RegistroView.jsx"));
 const RecuperarPasswordView = lazy(() => import("./views/2_login_registro/RecuperarPasswordView.jsx"));
@@ -31,7 +31,7 @@ function VistaCargando() {
 }
 
 function AppContenido() {
-  const { estaAutenticado, rol } = useAuth();
+  const { estaAutenticado } = useAuth();
   // Vistas principales: 'landing' | 'login' | 'registro' | 'recuperar' | 'verificar' | 'app'
   const [ruta, setRuta] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -71,21 +71,19 @@ function AppContenido() {
     permisos: "Administración de Roles y Permisos (RBAC)",
   };
 
-  // Renderizar Vistas Públicas
+  // Renderizar Portada Principal sin cascada lazy (FCP / LCP inmediato)
   if (ruta === "landing") {
     return (
-      <Suspense fallback={<VistaCargando />}>
-        <LandingView
-          alIniciarSesion={() => setRuta("login")}
-          alRegistrarse={() => setRuta("registro")}
-          alIrARecuperar={() => setRuta("recuperar")}
-          alIrAVerificar={(tok, em) => {
-            setParamsUrl({ token: tok || "", email: em || "" });
-            setRuta("verificar");
-          }}
-          alIrAlDashboard={() => setRuta("app")}
-        />
-      </Suspense>
+      <LandingView
+        alIniciarSesion={() => setRuta("login")}
+        alRegistrarse={() => setRuta("registro")}
+        alIrARecuperar={() => setRuta("recuperar")}
+        alIrAVerificar={(tok, em) => {
+          setParamsUrl({ token: tok || "", email: em || "" });
+          setRuta("verificar");
+        }}
+        alIrAlDashboard={() => setRuta("app")}
+      />
     );
   }
 

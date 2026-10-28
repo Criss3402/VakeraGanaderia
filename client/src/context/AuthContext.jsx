@@ -9,29 +9,55 @@ import {
 import { getToken } from "../api/client.js";
 
 const AuthContext = createContext(null);
+const USER_CACHE_KEY = "vakera_usuario_cache";
+
+function leerUsuarioCache() {
+  try {
+    if (!getToken()) return null;
+    const raw = localStorage.getItem(USER_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function guardarUsuarioCache(usr) {
+  try {
+    if (usr) {
+      localStorage.setItem(USER_CACHE_KEY, JSON.stringify(usr));
+    } else {
+      localStorage.removeItem(USER_CACHE_KEY);
+    }
+  } catch {
+    // Ignorar cuota de almacenamiento excedida
+  }
+}
 
 export function AuthProvider({ children }) {
-  const [usuario, setUsuario] = useState(null);
-  const [token, setTokenState] = useState(getToken());
-  const [cargando, setCargando] = useState(true);
+  const [usuario, setUsuario] = useState(() => leerUsuarioCache());
+  const [token, setTokenState] = useState(() => getToken());
+  // Si ya hay usuario cacheado con token, evitamos bloquear la UI (Stale-While-Revalidate)
+  const [cargando, setCargando] = useState(() => Boolean(getToken() && !leerUsuarioCache()));
 
   useEffect(() => {
-    // Verificar si hay sesión activa
     const tokenGuardado = getToken();
     if (tokenGuardado) {
       obtenerUsuarioActual()
         .then((res) => {
           if (res?.data?.usuario) {
             setUsuario(res.data.usuario);
+            guardarUsuarioCache(res.data.usuario);
             setTokenState(tokenGuardado);
           } else {
             apiLogout();
+            guardarUsuarioCache(null);
             setUsuario(null);
             setTokenState(null);
           }
         })
         .catch(() => {
           apiLogout();
+          guardarUsuarioCache(null);
           setUsuario(null);
           setTokenState(null);
         })
@@ -39,6 +65,7 @@ export function AuthProvider({ children }) {
           setCargando(false);
         });
     } else {
+      guardarUsuarioCache(null);
       setCargando(false);
     }
   }, []);
@@ -47,6 +74,7 @@ export function AuthProvider({ children }) {
     const res = await apiLogin(email, password);
     if (res?.data?.usuario) {
       setUsuario(res.data.usuario);
+      guardarUsuarioCache(res.data.usuario);
       setTokenState(res.data.token);
       return res.data.usuario;
     }
@@ -55,9 +83,9 @@ export function AuthProvider({ children }) {
 
   async function registrarse(datos) {
     const res = await apiRegistro(datos);
-    // Si viene token inmediato
     if (res?.data?.token && res?.data?.usuario) {
       setUsuario(res.data.usuario);
+      guardarUsuarioCache(res.data.usuario);
       setTokenState(res.data.token);
       return res.data.usuario;
     }
@@ -68,6 +96,7 @@ export function AuthProvider({ children }) {
     const res = await apiVerificarEmail(tokenVerif);
     if (res?.data?.usuario && res?.data?.token) {
       setUsuario(res.data.usuario);
+      guardarUsuarioCache(res.data.usuario);
       setTokenState(res.data.token);
       return res.data.usuario;
     }
@@ -76,6 +105,7 @@ export function AuthProvider({ children }) {
 
   function cerrarSesion() {
     apiLogout();
+    guardarUsuarioCache(null);
     setUsuario(null);
     setTokenState(null);
   }
@@ -106,4 +136,3 @@ export function useAuth() {
   }
   return context;
 }
-

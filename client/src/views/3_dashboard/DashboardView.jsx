@@ -1,9 +1,20 @@
+import { lazy, Suspense } from "react";
 import { useAuth } from "../../context/AuthContext";
-import PanelDueno from "./actores/PanelDueno.jsx";
-import PanelCapataz from "./actores/PanelCapataz.jsx";
-import PanelPeon from "./actores/PanelPeon.jsx";
-import PanelOficina from "./actores/PanelOficina.jsx";
-import PanelVeterinario from "./actores/PanelVeterinario.jsx";
+
+const PanelDueno = lazy(() => import("./actores/PanelDueno.jsx"));
+const PanelCapataz = lazy(() => import("./actores/PanelCapataz.jsx"));
+const PanelPeon = lazy(() => import("./actores/PanelPeon.jsx"));
+const PanelOficina = lazy(() => import("./actores/PanelOficina.jsx"));
+const PanelVeterinario = lazy(() => import("./actores/PanelVeterinario.jsx"));
+
+function PanelFallback() {
+  return (
+    <div className="bg-white/60 p-8 rounded-2xl border border-[#ded7c4] flex items-center justify-center gap-3 text-sm font-semibold text-[#526354]">
+      <span className="w-4 h-4 rounded-full border-2 border-[#8fb56b] border-t-transparent animate-spin" />
+      Preparando panel operativo...
+    </div>
+  );
+}
 
 export default function DashboardView({ alCambiarVista }) {
   const { rol, usuario } = useAuth();
@@ -34,14 +45,16 @@ export default function DashboardView({ alCambiarVista }) {
         </div>
       </div>
 
-      {/* Renderizado Dinámico de la Interfaz según el Rol del Usuario */}
-      {rolNormalizado === "peon" && <PanelPeon alCambiarVista={alCambiarVista} />}
-      {rolNormalizado === "capataz" && <PanelCapataz alCambiarVista={alCambiarVista} />}
-      {rolNormalizado === "oficina" && <PanelOficina alCambiarVista={alCambiarVista} />}
-      {rolNormalizado === "veterinario" && <PanelVeterinario alCambiarVista={alCambiarVista} />}
-      {(rolNormalizado === "dueno" || !["peon", "capataz", "oficina", "veterinario"].includes(rolNormalizado)) && (
-        <PanelDueno alCambiarVista={alCambiarVista} />
-      )}
+      {/* Renderizado Dinámico de la Interfaz según el Rol del Usuario (Aislado por Rol) */}
+      <Suspense fallback={<PanelFallback />}>
+        {rolNormalizado === "peon" && <PanelPeon alCambiarVista={alCambiarVista} />}
+        {rolNormalizado === "capataz" && <PanelCapataz alCambiarVista={alCambiarVista} />}
+        {rolNormalizado === "oficina" && <PanelOficina alCambiarVista={alCambiarVista} />}
+        {rolNormalizado === "veterinario" && <PanelVeterinario alCambiarVista={alCambiarVista} />}
+        {(rolNormalizado === "dueno" || !["peon", "capataz", "oficina", "veterinario"].includes(rolNormalizado)) && (
+          <PanelDueno alCambiarVista={alCambiarVista} />
+        )}
+      </Suspense>
     </div>
   );
 }
