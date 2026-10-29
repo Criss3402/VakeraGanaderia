@@ -114,7 +114,6 @@ class AuthController {
         {
           requiereVerificacion: true,
           email: nuevoUsuario.email,
-          tokenPrueba: tokenVerificacion,
           usuario: nuevoUsuario,
         },
         "Usuario registrado exitosamente. Te enviamos un correo electrónico con tu código de activación.",
