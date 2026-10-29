@@ -69,39 +69,25 @@ export default function Sidebar({
         {/* Logo & Header */}
         <div className={`h-20 border-b border-[#8fb56b]/15 flex items-center ${colapsado ? "justify-center px-2" : "justify-between px-5"} relative transition-all duration-300`}>
           {!colapsado ? (
-            <div className="flex items-center gap-3 overflow-hidden">
-              <div className="w-10 h-10 rounded-xl bg-[#1e3828] border border-[#8fb56b]/30 flex items-center justify-center text-xl text-[#8fb56b] shadow-glow flex-shrink-0">
-                <i className="fa-solid fa-cow"></i>
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-xl font-bold tracking-wider text-white font-['Fraunces',serif] leading-tight truncate">
-                  Vakera
-                </span>
-                <span className="text-[10px] tracking-widest text-[#8fb56b] uppercase font-semibold">
-                  Gestión Ganadera
-                </span>
-              </div>
+            <div className="flex items-center overflow-hidden">
+              <img
+                src="/logo-vakera.png"
+                alt="Vakera"
+                className="h-9 w-auto object-contain select-none"
+              />
             </div>
           ) : (
-            <div className="w-10 h-10 rounded-xl bg-[#1e3828] border border-[#8fb56b]/30 flex items-center justify-center text-xl text-[#8fb56b] shadow-glow flex-shrink-0" title="Vakera Gestión Ganadera">
-              <i className="fa-solid fa-cow"></i>
+            <div
+              className="w-10 h-10 overflow-hidden flex items-center justify-start flex-shrink-0"
+              title="Vakera"
+            >
+              <img
+                src="/logo-vakera.png"
+                alt="Vakera"
+                className="h-9 w-auto max-w-none object-left object-contain select-none"
+              />
             </div>
           )}
-
-          {/* Botón de Colapso Desktop */}
-          <button
-            type="button"
-            onClick={alToggleColapso}
-            className={`
-              hidden md:flex items-center justify-center w-7 h-7 rounded-lg bg-[#1a3023] hover:bg-[#8fb56b]
-              hover:text-[#182920] text-[#8fb56b] border border-[#8fb56b]/30 transition-all duration-200
-              ${colapsado ? "absolute -right-3 top-6 shadow-md z-40 bg-[#1e3828]" : ""}
-            `}
-            title={colapsado ? "Expandir barra lateral" : "Colapsar barra lateral"}
-            aria-label={colapsado ? "Expandir barra lateral" : "Colapsar barra lateral"}
-          >
-            <i className={`fa-solid ${colapsado ? "fa-chevron-right" : "fa-chevron-left"} text-xs`}></i>
-          </button>
 
           {/* Mobile close button */}
           <button
