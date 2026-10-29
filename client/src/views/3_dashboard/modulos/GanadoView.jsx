@@ -5,6 +5,7 @@ import {
   registrarGanado,
   actualizarGanado,
   eliminarGanado,
+  bajaMasivaGanado,
   trasladoMasivoGanado,
   registrarPotrero,
   obtenerFichaAnimal,
@@ -26,7 +27,7 @@ export default function GanadoView() {
   const [filtroCategoria, setFiltroCategoria] = useState("todas");
   const [filtroSanidad, setFiltroSanidad] = useState("todos");
 
-  // Selección múltiple para lotes
+  // Selección múltiple para lotes y eliminación
   const [seleccionados, setSeleccionados] = useState([]);
 
   // Modales
@@ -34,6 +35,7 @@ export default function GanadoView() {
   const [modalEditar, setModalEditar] = useState(false);
   const [modalFicha, setModalFicha] = useState(false);
   const [modalBaja, setModalBaja] = useState(false);
+  const [modalBajaMasiva, setModalBajaMasiva] = useState(false);
   const [modalTrasladoLote, setModalTrasladoLote] = useState(false);
   const [modalCrearPotrero, setModalCrearPotrero] = useState(false);
 
@@ -160,18 +162,39 @@ export default function GanadoView() {
     }
   }
 
-  // --- 4. DAR DE BAJA ---
+  // --- 4. DAR DE BAJA INDIVIDUAL ---
   async function manejarBaja() {
     if (!animalActivo) return;
     setProcesando(true);
     try {
       await eliminarGanado(animalActivo.id, motivoBaja);
       mostrarNotificacion(`Baja del animal ${animalActivo.caravana} procesada (${motivoBaja}).`);
+      setSeleccionados((prev) => prev.filter((id) => id !== animalActivo.id));
       setModalBaja(false);
       setAnimalActivo(null);
       await cargarDatos();
     } catch (err) {
       alert("Error al registrar baja: " + err.message);
+    } finally {
+      setProcesando(false);
+    }
+  }
+
+  // --- 4B. DAR DE BAJA / ELIMINAR SELECCIONADOS (MASIVO) ---
+  async function manejarBajaMasiva() {
+    if (seleccionados.length === 0) return;
+    setProcesando(true);
+    try {
+      await bajaMasivaGanado({
+        animalIds: seleccionados,
+        motivo: motivoBaja,
+      });
+      mostrarNotificacion(`Se eliminaron / dieron de baja ${seleccionados.length} animales seleccionados (${motivoBaja}).`);
+      setModalBajaMasiva(false);
+      setSeleccionados([]);
+      await cargarDatos();
+    } catch (err) {
+      alert("Error al eliminar animales seleccionados: " + err.message);
     } finally {
       setProcesando(false);
     }
@@ -229,7 +252,7 @@ export default function GanadoView() {
   }
 
   function seleccionarTodos() {
-    if (seleccionados.length === ganadoFiltrado.length) {
+    if (seleccionados.length === ganadoFiltrado.length && ganadoFiltrado.length > 0) {
       setSeleccionados([]);
     } else {
       setSeleccionados(ganadoFiltrado.map((g) => g.id));
@@ -375,9 +398,9 @@ export default function GanadoView() {
         </div>
 
         <div className="bg-white rounded-2xl p-4 border border-[#ded7c4] shadow-sm">
-          <p className="text-[10px] font-bold text-[#6b7c6d] uppercase">Animales Seleccionados</p>
+          <p className="text-[10px] font-bold text-[#6b7c6d] uppercase">Animales Marcados</p>
           <p className="text-2xl font-extrabold text-[#33512f] mt-0.5">{seleccionados.length} Cabezas</p>
-          <span className="text-[11px] text-[#33512f]">Listos para acción en lote</span>
+          <span className="text-[11px] text-[#33512f]">Listos para trasladar o dar de baja</span>
         </div>
       </div>
 
@@ -388,9 +411,9 @@ export default function GanadoView() {
         <div className="space-y-4">
           {/* Barra de Filtros y Búsqueda */}
           <div className="bg-white rounded-2xl p-4 border border-[#ded7c4] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-            <div className="flex items-center gap-3 flex-1 w-full md:w-auto">
+            <div className="flex items-center gap-3 flex-1 w-full md:w-auto flex-wrap">
               {/* Buscador */}
-              <div className="relative flex-1 max-w-xs">
+              <div className="relative flex-1 min-w-[200px] max-w-xs">
                 <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[#6b7c6d] text-xs"></i>
                 <input
                   type="text"
@@ -441,13 +464,24 @@ export default function GanadoView() {
             </div>
 
             {seleccionados.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setModalTrasladoLote(true)}
-                className="bg-[#182920] hover:bg-[#284835] text-[#f1ecdd] font-bold text-xs uppercase px-4 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5"
-              >
-                <i className="fa-solid fa-right-left text-[#8fb56b]"></i> Trasladar Lote ({seleccionados.length})
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setModalTrasladoLote(true)}
+                  className="bg-[#182920] hover:bg-[#284835] text-[#f1ecdd] font-bold text-xs uppercase px-4 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5"
+                >
+                  <i className="fa-solid fa-right-left text-[#8fb56b]"></i> Trasladar Lote ({seleccionados.length})
+                </button>
+                {puedeGestionar && (
+                  <button
+                    type="button"
+                    onClick={() => setModalBajaMasiva(true)}
+                    className="bg-red-700 hover:bg-red-800 text-white font-bold text-xs uppercase px-4 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5"
+                  >
+                    <i className="fa-solid fa-trash-can"></i> Eliminar Marcados ({seleccionados.length})
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -463,6 +497,7 @@ export default function GanadoView() {
                         checked={seleccionados.length === ganadoFiltrado.length && ganadoFiltrado.length > 0}
                         onChange={seleccionarTodos}
                         className="rounded cursor-pointer"
+                        title="Seleccionar todos"
                       />
                     </th>
                     <th className="py-2.5 px-3">Caravana</th>
@@ -569,7 +604,7 @@ export default function GanadoView() {
                             No hay animales registrados en este rodeo.
                           </p>
                           <p className="text-xs text-[#526354]">
-                            Hacé clic en "+ Nuevo Animal" para dar de alta la primera cabeza de ganado.
+                            Hacé clic en "+ Alta de Animal" para dar de alta la primera cabeza de ganado.
                           </p>
                         </div>
                       </td>
@@ -594,23 +629,48 @@ export default function GanadoView() {
                   Manejo Masivo de Rodeo por Lotes
                 </h3>
                 <p className="text-xs text-[#6b7c6d]">
-                  Traslada grupos enteros de animales de un potrero a otro en un solo movimiento registrado en PostgreSQL.
+                  Marca grupos enteros de animales para trasladarlos de potrero o darlos de baja en bloque.
                 </p>
               </div>
 
-              {seleccionados.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setModalTrasladoLote(true)}
-                  className="bg-[#182920] hover:bg-[#284835] text-[#f1ecdd] font-bold text-xs uppercase px-5 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-2"
-                >
-                  <i className="fa-solid fa-right-left text-[#8fb56b]"></i> Trasladar {seleccionados.length} Animales Seleccionados
-                </button>
-              )}
+              <div className="flex items-center gap-2 flex-wrap">
+                {ganado.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={seleccionarTodos}
+                    className="bg-[#f8f5eb] hover:bg-[#e7dfcb] text-[#182920] border border-[#ded7c4] font-bold text-xs px-3.5 py-2 rounded-xl transition-all"
+                  >
+                    {seleccionados.length === ganadoFiltrado.length && ganadoFiltrado.length > 0
+                      ? "Desmarcar todos"
+                      : "Marcar todos"}
+                  </button>
+                )}
+
+                {seleccionados.length > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setModalTrasladoLote(true)}
+                      className="bg-[#182920] hover:bg-[#284835] text-[#f1ecdd] font-bold text-xs uppercase px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-2"
+                    >
+                      <i className="fa-solid fa-right-left text-[#8fb56b]"></i> Trasladar ({seleccionados.length})
+                    </button>
+                    {puedeGestionar && (
+                      <button
+                        type="button"
+                        onClick={() => setModalBajaMasiva(true)}
+                        className="bg-red-700 hover:bg-red-800 text-white font-bold text-xs uppercase px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-2"
+                      >
+                        <i className="fa-solid fa-trash-can"></i> Eliminar Marcados ({seleccionados.length})
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
 
             <p className="text-xs text-[#182920] font-semibold mb-3">
-              Selecciona los animales del rodeo para conformar el lote:
+              Selecciona los animales del rodeo para conformar el lote o eliminarlos:
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -630,7 +690,7 @@ export default function GanadoView() {
                       <input
                         type="checkbox"
                         checked={isChecked}
-                        onChange={() => {}} // controlado por el div
+                        onChange={() => {}}
                         className="rounded"
                       />
                       <div>
@@ -941,8 +1001,8 @@ export default function GanadoView() {
                   value={nuevoAnimal.potreroId}
                   onChange={(e) => setNuevoAnimal({ ...nuevoAnimal, potreroId: e.target.value })}
                   className="w-full bg-[#f8f5eb] border border-[#ded7c4] rounded-xl px-3 py-2 text-[#182920] outline-none"
-                  required
                 >
+                  <option value="">Sin potrero asignado</option>
                   {potreros.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.nombre} ({p.totalAnimales ?? 0} cabezas)
@@ -1003,6 +1063,7 @@ export default function GanadoView() {
                   onChange={(e) => setAnimalActivo({ ...animalActivo, potreroId: e.target.value })}
                   className="w-full bg-[#f8f5eb] border border-[#ded7c4] rounded-xl px-3 py-2 text-[#182920] outline-none"
                 >
+                  <option value="">Sin potrero asignado</option>
                   {potreros.map((p) => (
                     <option key={p.id} value={p.id}>{p.nombre}</option>
                   ))}
@@ -1044,7 +1105,7 @@ export default function GanadoView() {
       )}
 
       {/* ========================================================= */}
-      {/* MODAL: BAJA DE ANIMAL (VENTA, FAENA O MUERTE)             */}
+      {/* MODAL: BAJA DE ANIMAL INDIVIDUAL                          */}
       {/* ========================================================= */}
       {modalBaja && animalActivo && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
@@ -1086,6 +1147,56 @@ export default function GanadoView() {
                 className="px-5 py-2 rounded-xl bg-red-700 hover:bg-red-800 text-white font-bold"
               >
                 {procesando ? "Procesando..." : "Confirmar Baja"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL: BAJA MASIVA DE ANIMALES SELECCIONADOS              */}
+      {/* ========================================================= */}
+      {modalBajaMasiva && seleccionados.length > 0 && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 border border-red-200 shadow-2xl max-w-sm w-full animate-fade-in text-xs space-y-3">
+            <h3 className="text-base font-bold text-red-800 font-['Fraunces',serif] flex items-center gap-2">
+              <i className="fa-solid fa-triangle-exclamation"></i>
+              Eliminar {seleccionados.length} Animales Marcados
+            </h3>
+            <p className="text-[#555]">
+              Estás por dar de baja / eliminar del rodeo activo las <strong>{seleccionados.length} cabezas de ganado</strong> seleccionadas.
+            </p>
+
+            <div>
+              <label className="block font-bold text-[#182920] mb-1">Motivo de Baja / Salida</label>
+              <select
+                value={motivoBaja}
+                onChange={(e) => setMotivoBaja(e.target.value)}
+                className="w-full bg-[#f8f5eb] border border-[#ded7c4] rounded-xl px-3 py-2 text-[#182920] outline-none"
+              >
+                <option value="Venta a Frigorífico">Venta a Frigorífico</option>
+                <option value="Venta como Reproductor">Venta como Reproductor</option>
+                <option value="Faena para Consumo">Faena para Consumo</option>
+                <option value="Mortandad con Causa">Mortandad con Causa</option>
+                <option value="Depuración de Registro">Depuración de Registro</option>
+              </select>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setModalBajaMasiva(false)}
+                className="px-4 py-2 rounded-xl border border-[#ded7c4] text-[#182920] font-bold"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={procesando}
+                onClick={manejarBajaMasiva}
+                className="px-5 py-2 rounded-xl bg-red-700 hover:bg-red-800 text-white font-bold"
+              >
+                {procesando ? "Eliminando..." : `Eliminar (${seleccionados.length})`}
               </button>
             </div>
           </div>

@@ -45,6 +45,11 @@ router.delete(
   DashboardController.darDeBajaAnimal
 );
 router.post(
+  "/ganado/baja-masiva",
+  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ),
+  DashboardController.darDeBajaMasivoGanado
+);
+router.post(
   "/ganado/traslado-masivo",
   rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ),
   DashboardController.trasladoMasivoGanado
@@ -69,8 +74,23 @@ router.get("/insumos", DashboardController.obtenerInsumosCriticos);
 router.get("/insumos-criticos", DashboardController.obtenerInsumosCriticos);
 router.post(
   "/insumos",
-  rbacMiddleware(ROLES.DUENO, ROLES.OFICINA),
+  rbacMiddleware(ROLES.DUENO, ROLES.OFICINA, ROLES.CAPATAZ),
   DashboardController.registrarInsumo
+);
+router.post(
+  "/insumos/eliminar-masivo",
+  rbacMiddleware(ROLES.DUENO, ROLES.OFICINA, ROLES.CAPATAZ),
+  DashboardController.eliminarInsumosMasivo
+);
+router.patch(
+  "/insumos/locaciones",
+  rbacMiddleware(ROLES.DUENO, ROLES.OFICINA, ROLES.CAPATAZ),
+  DashboardController.gestionarLocacionInsumos
+);
+router.delete(
+  "/insumos/:id",
+  rbacMiddleware(ROLES.DUENO, ROLES.OFICINA, ROLES.CAPATAZ),
+  DashboardController.eliminarInsumo
 );
 router.patch(
   "/insumos/:id/stock",

@@ -3,6 +3,9 @@ import {
   obtenerInsumos,
   registrarInsumo,
   actualizarStockInsumo,
+  eliminarInsumo,
+  eliminarInsumosMasivo,
+  gestionarLocacionInsumos,
   obtenerSolicitudesInsumos,
   crearSolicitudInsumo,
   actualizarEstadoSolicitudInsumo,
@@ -19,23 +22,78 @@ export default function InsumosView() {
   // Vistas internas: 'inventario' | 'solicitudes'
   const [pestaña, setPestaña] = useState("inventario");
 
-  // Campos / Locaciones por campo
-  const CAMPOS_BASE = ["Campo 1 - El Rancho", "Campo 2 - La Moraleja"];
-  const [camposPersonalizados, setCamposPersonalizados] = useState(() => {
+  // Modo de visualización en Stock: 'tarjetas' | 'lista'
+  const [vistaStock, setVistaStock] = useState("tarjetas");
+
+  // Clave aislada por cuenta para locaciones
+  const cuentaScope =
+    usuario?.establecimientoId ||
+    usuario?.id ||
+    usuario?.email ||
+    "default";
+  const storageKeyLocaciones = `vakera_locaciones_${cuentaScope}`;
+  const storageKeyEliminadas = `vakera_locaciones_excluidas_${cuentaScope}`;
+
+  const locacionesPorDefecto =
+    cuentaScope === "est-el-rancho" || usuario?.email === "dueno@vakera.com"
+      ? ["Campo 1 - El Rancho", "Campo 2 - La Moraleja"]
+      : [usuario?.establecimiento || "Campo Principal"];
+
+  const [camposGuardados, setCamposGuardados] = useState(() => {
     try {
-      const guardados = localStorage.getItem("vakera_campos_insumos");
+      const guardados = localStorage.getItem(storageKeyLocaciones);
+      if (guardados) {
+        const parsed = JSON.parse(guardados);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (err) {
+      console.warn("No se pudieron leer locaciones locales:", err);
+    }
+    return locacionesPorDefecto;
+  });
+
+  const [camposExcluidos, setCamposExcluidos] = useState(() => {
+    try {
+      const guardados = localStorage.getItem(storageKeyEliminadas);
       return guardados ? JSON.parse(guardados) : [];
     } catch {
       return [];
     }
   });
 
-  // Campos consolidados: extraídos dinámicamente de insumos + base + personalizados
+  useEffect(() => {
+    try {
+      const guardados = localStorage.getItem(storageKeyLocaciones);
+      if (guardados) {
+        setCamposGuardados(JSON.parse(guardados));
+      } else {
+        setCamposGuardados(locacionesPorDefecto);
+      }
+      const excluidos = localStorage.getItem(storageKeyEliminadas);
+      setCamposExcluidos(excluidos ? JSON.parse(excluidos) : []);
+    } catch (err) {
+      console.warn("Error sincronizando locaciones por cuenta:", err);
+    }
+  }, [storageKeyLocaciones, storageKeyEliminadas]);
+
+  function persistirLocaciones(nuevosCampos, nuevosExcluidos = camposExcluidos) {
+    setCamposGuardados(nuevosCampos);
+    setCamposExcluidos(nuevosExcluidos);
+    try {
+      localStorage.setItem(storageKeyLocaciones, JSON.stringify(nuevosCampos));
+      localStorage.setItem(storageKeyEliminadas, JSON.stringify(nuevosExcluidos));
+    } catch (err) {
+      console.warn("No se pudo guardar locaciones en localStorage:", err);
+    }
+  }
+
+  // Campos consolidados: guardados + extraídos de insumos activos (excepto los eliminados explícitamente)
   const camposDisponibles = Array.from(
     new Set([
-      ...CAMPOS_BASE,
-      ...camposPersonalizados,
-      ...insumos.map((i) => i.campo).filter(Boolean),
+      ...camposGuardados,
+      ...insumos
+        .map((i) => i.campo)
+        .filter((c) => Boolean(c) && !camposExcluidos.includes(c)),
     ])
   );
 
@@ -46,13 +104,23 @@ export default function InsumosView() {
   const [filtroSolicitudes, setFiltroSolicitudes] = useState("TODAS");
   const [busqueda, setBusqueda] = useState("");
 
-  // Modales
+  // Selección múltiple para eliminar insumos en Stock y Conteo
+  const [seleccionadosInsumos, setSeleccionadosInsumos] = useState([]);
+
+  // Modales de Stock e Insumos
   const [modalNuevoProducto, setModalNuevoProducto] = useState(false);
   const [modalReponer, setModalReponer] = useState(false);
   const [modalConteo, setModalConteo] = useState(false);
   const [modalSolicitar, setModalSolicitar] = useState(false);
-  const [modalNuevoCampo, setModalNuevoCampo] = useState(false);
+  const [modalEliminarInsumos, setModalEliminarInsumos] = useState(false);
+  const [insumoAEliminar, setInsumoAEliminar] = useState(null); // null = usa seleccionadosInsumos
+
+  // Modales de Locaciones (Agregar, Editar y Eliminar como pantalla emergente)
+  const [modalGestionLocaciones, setModalGestionLocaciones] = useState(false);
   const [nombreNuevoCampo, setNombreNuevoCampo] = useState("");
+  const [locacionEditando, setLocacionEditando] = useState(null);
+  const [nuevoNombreLocacion, setNuevoNombreLocacion] = useState("");
+  const [locacionConfirmarEliminar, setLocacionConfirmarEliminar] = useState(null);
 
   // Elemento activo
   const [insumoActivo, setInsumoActivo] = useState(null);
@@ -66,27 +134,10 @@ export default function InsumosView() {
     stockActual: 10,
     stockMinimo: 3,
     unidad: "Unidades",
-    campo: "Campo 1 - El Rancho",
+    campo: camposDisponibles[0] || "Campo Principal",
     ubicacion: "Galpón 1",
     icono: "fa-gavel",
   });
-
-  function agregarNuevoCampo(nombre) {
-    const limpio = nombre.trim();
-    if (!limpio) return;
-    if (!camposDisponibles.includes(limpio)) {
-      const actualizados = [...camposPersonalizados, limpio];
-      setCamposPersonalizados(actualizados);
-      try {
-        localStorage.setItem("vakera_campos_insumos", JSON.stringify(actualizados));
-      } catch (_) {}
-    }
-    setFiltroLocacion(limpio);
-    setNuevoProducto((prev) => ({ ...prev, campo: limpio }));
-    setNombreNuevoCampo("");
-    setModalNuevoCampo(false);
-    mostrarNotificacion(`Campo "${limpio}" agregado como nueva locación.`);
-  }
 
   // Formulario de solicitud de insumos
   const [nuevaSolicitud, setNuevaSolicitud] = useState({
@@ -129,6 +180,83 @@ export default function InsumosView() {
     setTimeout(() => setMensaje(""), 4500);
   }
 
+  // --- GESTIÓN DE LOCACIONES (AGREGAR, EDITAR, ELIMINAR EN MODAL EMERGENTE) ---
+  function agregarNuevoCampo(nombre) {
+    const limpio = (nombre || "").trim();
+    if (!limpio) return;
+    const nuevosExcluidos = camposExcluidos.filter((c) => c !== limpio);
+    const actualizados = camposGuardados.includes(limpio)
+      ? camposGuardados
+      : [...camposGuardados, limpio];
+    persistirLocaciones(actualizados, nuevosExcluidos);
+    setFiltroLocacion(limpio);
+    setNuevoProducto((prev) => ({ ...prev, campo: limpio }));
+    setNombreNuevoCampo("");
+    mostrarNotificacion(`Locación "${limpio}" agregada correctamente.`);
+  }
+
+  async function guardarEdicionLocacion(nombreAnterior) {
+    const limpio = (nuevoNombreLocacion || "").trim();
+    if (!limpio || limpio === nombreAnterior) {
+      setLocacionEditando(null);
+      return;
+    }
+    setProcesando(true);
+    try {
+      await gestionarLocacionInsumos({
+        nombreAnterior,
+        nuevoNombre: limpio,
+        accion: "editar",
+      });
+      const actualizados = camposDisponibles.map((c) =>
+        c === nombreAnterior ? limpio : c
+      );
+      const nuevosExcluidos = Array.from(new Set([...camposExcluidos, nombreAnterior])).filter(
+        (c) => c !== limpio
+      );
+      persistirLocaciones(actualizados, nuevosExcluidos);
+      if (filtroLocacion === nombreAnterior) setFiltroLocacion(limpio);
+      if (nuevoProducto.campo === nombreAnterior) {
+        setNuevoProducto((prev) => ({ ...prev, campo: limpio }));
+      }
+      setLocacionEditando(null);
+      setNuevoNombreLocacion("");
+      await cargarDatos();
+      mostrarNotificacion(`Locación "${nombreAnterior}" renombrada a "${limpio}".`);
+    } catch (err) {
+      alert("Error al editar la locación: " + err.message);
+    } finally {
+      setProcesando(false);
+    }
+  }
+
+  async function confirmarEliminarLocacion(nombreLocacion) {
+    if (!nombreLocacion) return;
+    setProcesando(true);
+    try {
+      const restantes = camposDisponibles.filter((c) => c !== nombreLocacion);
+      const destinoReasignacion = restantes[0] || "Depósito General";
+      await gestionarLocacionInsumos({
+        nombreAnterior: nombreLocacion,
+        nuevoNombre: destinoReasignacion,
+        accion: "eliminar",
+      });
+      const nuevosExcluidos = Array.from(new Set([...camposExcluidos, nombreLocacion]));
+      persistirLocaciones(restantes, nuevosExcluidos);
+      if (filtroLocacion === nombreLocacion) setFiltroLocacion("TODOS");
+      if (nuevoProducto.campo === nombreLocacion) {
+        setNuevoProducto((prev) => ({ ...prev, campo: destinoReasignacion }));
+      }
+      setLocacionConfirmarEliminar(null);
+      await cargarDatos();
+      mostrarNotificacion(`Locación "${nombreLocacion}" eliminada correctamente.`);
+    } catch (err) {
+      alert("Error al eliminar la locación: " + err.message);
+    } finally {
+      setProcesando(false);
+    }
+  }
+
   // --- 1. AÑADIR NUEVO PRODUCTO AL STOCK ---
   async function manejarCrearProducto(e) {
     e.preventDefault();
@@ -144,7 +272,7 @@ export default function InsumosView() {
         stockActual: 10,
         stockMinimo: 3,
         unidad: "Unidades",
-        campo: camposDisponibles[0] || "Campo 1 - El Rancho",
+        campo: camposDisponibles[0] || "Campo Principal",
         ubicacion: "Galpón 1",
         icono: "fa-gavel",
       });
@@ -187,6 +315,29 @@ export default function InsumosView() {
       await cargarDatos();
     } catch (err) {
       alert("Error al registrar conteo: " + err.message);
+    } finally {
+      setProcesando(false);
+    }
+  }
+
+  // --- 3B. ELIMINAR INSUMOS (INDIVIDUAL O MARCADOS EN LOTE) ---
+  async function manejarConfirmarEliminarInsumos() {
+    setProcesando(true);
+    try {
+      if (insumoAEliminar) {
+        await eliminarInsumo(insumoAEliminar.id);
+        setSeleccionadosInsumos((prev) => prev.filter((id) => id !== insumoAEliminar.id));
+        mostrarNotificacion(`Insumo "${insumoAEliminar.nombre}" eliminado del inventario.`);
+      } else if (seleccionadosInsumos.length > 0) {
+        await eliminarInsumosMasivo(seleccionadosInsumos);
+        mostrarNotificacion(`Se eliminaron ${seleccionadosInsumos.length} insumos seleccionados del stock.`);
+        setSeleccionadosInsumos([]);
+      }
+      setModalEliminarInsumos(false);
+      setInsumoAEliminar(null);
+      await cargarDatos();
+    } catch (err) {
+      alert("Error al eliminar insumos: " + err.message);
     } finally {
       setProcesando(false);
     }
@@ -237,7 +388,7 @@ export default function InsumosView() {
 
   // Filtrado de Inventario por Locación / Campo
   const insumosFiltrados = insumos.filter((item) => {
-    const itemCampo = item.campo || "Campo 1 - El Rancho";
+    const itemCampo = item.campo || "Campo Principal";
     const itemUbicacion = item.ubicacion || "";
 
     const matchBusqueda =
@@ -258,6 +409,24 @@ export default function InsumosView() {
 
     return matchBusqueda && matchLocacion && matchCat && matchEst;
   });
+
+  // Selección de insumos en Stock y Conteo
+  function toggleSeleccionInsumo(id) {
+    setSeleccionadosInsumos((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  }
+
+  function seleccionarTodosInsumos() {
+    if (
+      seleccionadosInsumos.length === insumosFiltrados.length &&
+      insumosFiltrados.length > 0
+    ) {
+      setSeleccionadosInsumos([]);
+    } else {
+      setSeleccionadosInsumos(insumosFiltrados.map((i) => i.id));
+    }
+  }
 
   // Filtrado de Solicitudes
   const solicitudesFiltradas = solicitudes.filter((sol) => {
@@ -289,7 +458,7 @@ export default function InsumosView() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Botón Solicitar Insumo (Para Peón, Capataz y Veterinario) */}
+          {/* Botón Solicitar Insumo */}
           <button
             type="button"
             onClick={() => setModalSolicitar(true)}
@@ -323,10 +492,11 @@ export default function InsumosView() {
         <button
           type="button"
           onClick={() => setPestaña("inventario")}
-          className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all ${pestaña === "inventario"
+          className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all ${
+            pestaña === "inventario"
               ? "bg-[#182920] text-[#f1ecdd] shadow-sm"
               : "bg-white text-[#4a5c4e] border border-[#ded7c4] hover:bg-[#e7dfcb]"
-            }`}
+          }`}
         >
           <i className="fa-solid fa-boxes-stacked"></i>
           <span>Inventario & Conteo de Pertenencias ({insumos.length})</span>
@@ -335,10 +505,11 @@ export default function InsumosView() {
         <button
           type="button"
           onClick={() => setPestaña("solicitudes")}
-          className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all ${pestaña === "solicitudes"
+          className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all ${
+            pestaña === "solicitudes"
               ? "bg-[#182920] text-[#f1ecdd] shadow-sm"
               : "bg-white text-[#4a5c4e] border border-[#ded7c4] hover:bg-[#e7dfcb]"
-            }`}
+          }`}
         >
           <i className="fa-solid fa-clipboard-list"></i>
           <span>Solicitudes de Reposición ({solicitudes.length})</span>
@@ -352,12 +523,22 @@ export default function InsumosView() {
 
       {/* KPI Cards Rápidos */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl p-4 border border-[#ded7c4] shadow-sm">
-          <p className="text-[10px] font-bold text-[#6b7c6d] uppercase">Locaciones / Campos</p>
-          <p className="text-2xl font-extrabold text-[#33512f] mt-0.5">{camposDisponibles.length} Campos</p>
-          <span className="text-[11px] text-[#6b7c6d]">
-            {filtroLocacion === "TODOS" ? "Visualizando todas las locaciones" : `Filtrando: ${filtroLocacion}`}
-          </span>
+        <div className="bg-white rounded-2xl p-4 border border-[#ded7c4] shadow-sm flex justify-between items-start">
+          <div>
+            <p className="text-[10px] font-bold text-[#6b7c6d] uppercase">Locaciones / Campos</p>
+            <p className="text-2xl font-extrabold text-[#33512f] mt-0.5">{camposDisponibles.length} Campos</p>
+            <span className="text-[11px] text-[#6b7c6d]">
+              {filtroLocacion === "TODOS" ? "Visualizando todas las locaciones" : `Filtrando: ${filtroLocacion}`}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setModalGestionLocaciones(true)}
+            className="text-[11px] font-bold text-[#33512f] bg-[#f8f5eb] hover:bg-[#e7dfcb] px-2.5 py-1.5 rounded-xl border border-[#ded7c4] flex items-center gap-1"
+            title="Editar o eliminar locaciones"
+          >
+            <i className="fa-solid fa-pen-to-square"></i> Gestionar
+          </button>
         </div>
 
         <div className="bg-white rounded-2xl p-4 border border-[#ded7c4] shadow-sm">
@@ -375,9 +556,9 @@ export default function InsumosView() {
         </div>
 
         <div className="bg-white rounded-2xl p-4 border border-[#ded7c4] shadow-sm">
-          <p className="text-[10px] font-bold text-amber-800 uppercase">Solicitudes Pendientes</p>
-          <p className="text-2xl font-extrabold text-amber-900 mt-0.5">{solicitudesPendientesCount}</p>
-          <span className="text-[11px] text-amber-700">Por entregar / aprobar</span>
+          <p className="text-[10px] font-bold text-[#33512f] uppercase">Artículos Marcados</p>
+          <p className="text-2xl font-extrabold text-[#182920] mt-0.5">{seleccionadosInsumos.length} Seleccionados</p>
+          <span className="text-[11px] text-[#6b7c6d]">Para eliminación rápida</span>
         </div>
       </div>
 
@@ -386,9 +567,28 @@ export default function InsumosView() {
       {/* ========================================================= */}
       {pestaña === "inventario" && (
         <div className="space-y-4">
-          {/* Barra de Filtros con FILTRO DE PERTENENCIAS / SECTOR */}
-          <div className="bg-white rounded-2xl p-4 border border-[#ded7c4] shadow-sm flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3">
+          {/* Barra de Filtros, Locación (con Editar/Eliminar), Vista Lista/Tarjetas y Marcado */}
+          <div className="bg-white rounded-2xl p-4 border border-[#ded7c4] shadow-sm flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3">
             <div className="flex items-center gap-2.5 flex-wrap flex-1">
+              {/* Checkbox Seleccionar Todos */}
+              {insumosFiltrados.length > 0 && (
+                <label
+                  className="flex items-center gap-1.5 text-xs font-bold text-[#182920] bg-[#f8f5eb] px-3 py-2 rounded-xl border border-[#ded7c4] cursor-pointer select-none hover:bg-[#e7dfcb] transition-colors"
+                  title="Marcar o desmarcar todos los insumos visibles"
+                >
+                  <input
+                    type="checkbox"
+                    checked={
+                      seleccionadosInsumos.length === insumosFiltrados.length &&
+                      insumosFiltrados.length > 0
+                    }
+                    onChange={seleccionarTodosInsumos}
+                    className="rounded cursor-pointer"
+                  />
+                  <span>Marcar todos</span>
+                </label>
+              )}
+
               {/* Buscador */}
               <div className="relative">
                 <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[#6b7c6d] text-xs"></i>
@@ -401,7 +601,7 @@ export default function InsumosView() {
                 />
               </div>
 
-              {/* FILTRO DE LOCACIÓN POR CAMPO */}
+              {/* FILTRO Y GESTIÓN DE LOCACIÓN POR CAMPO */}
               <div className="flex items-center gap-1.5 bg-[#f8f5eb] p-1 rounded-xl border border-[#ded7c4]">
                 <span className="text-[10px] font-extrabold text-[#182920] uppercase px-2 flex items-center gap-1">
                   <i className="fa-solid fa-location-dot text-[#33512f]"></i> Locación:
@@ -409,8 +609,8 @@ export default function InsumosView() {
                 <select
                   value={filtroLocacion}
                   onChange={(e) => {
-                    if (e.target.value === "__AGREGAR__") {
-                      setModalNuevoCampo(true);
+                    if (e.target.value === "__GESTIONAR__") {
+                      setModalGestionLocaciones(true);
                     } else {
                       setFiltroLocacion(e.target.value);
                     }
@@ -421,17 +621,22 @@ export default function InsumosView() {
                   {camposDisponibles.map((c) => (
                     <option key={c} value={c}>{c}</option>
                   ))}
-                  <option value="__AGREGAR__" className="text-[#33512f] font-bold">
-                    + Agregar campo...
+                  <option value="__GESTIONAR__" className="text-[#33512f] font-bold">
+                    ⚙ Gestionar locaciones (Agregar / Editar / Eliminar)...
                   </option>
                 </select>
                 <button
                   type="button"
-                  onClick={() => setModalNuevoCampo(true)}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-[#ded7c4] hover:bg-[#e7dfcb] text-[#33512f] transition-colors"
-                  title="Añadir otro campo"
+                  onClick={() => {
+                    setLocacionEditando(null);
+                    setLocacionConfirmarEliminar(null);
+                    setModalGestionLocaciones(true);
+                  }}
+                  className="px-2.5 h-7 flex items-center justify-center gap-1 rounded-lg bg-white border border-[#ded7c4] hover:bg-[#e7dfcb] text-[#182920] text-[11px] font-bold transition-colors"
+                  title="Abrir pantalla emergente para agregar, editar o eliminar locaciones"
                 >
-                  <i className="fa-solid fa-plus text-xs"></i>
+                  <i className="fa-solid fa-pen-to-square text-[#33512f]"></i>
+                  <span className="hidden sm:inline">Editar / Eliminar</span>
                 </button>
               </div>
 
@@ -459,133 +664,365 @@ export default function InsumosView() {
               </select>
             </div>
 
-            <div className="text-xs text-[#6b7c6d] self-end lg:self-center">
-              Mostrando: <strong className="text-[#182920]">{insumosFiltrados.length}</strong> artículos
+            {/* Controles derechos: Botón Eliminar Marcados + Selector Vista Tarjetas / Lista */}
+            <div className="flex items-center gap-2.5 self-end xl:self-center flex-wrap">
+              {seleccionadosInsumos.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInsumoAEliminar(null);
+                    setModalEliminarInsumos(true);
+                  }}
+                  className="bg-red-700 hover:bg-red-800 text-white font-bold text-xs uppercase px-3.5 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5"
+                >
+                  <i className="fa-solid fa-trash-can"></i>
+                  <span>Eliminar Marcados ({seleccionadosInsumos.length})</span>
+                </button>
+              )}
+
+              {/* Selector de Vista: Tarjetas vs Lista */}
+              <div className="flex items-center bg-[#f8f5eb] p-1 rounded-xl border border-[#ded7c4]">
+                <button
+                  type="button"
+                  onClick={() => setVistaStock("tarjetas")}
+                  className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all ${
+                    vistaStock === "tarjetas"
+                      ? "bg-[#182920] text-[#f1ecdd] shadow-sm"
+                      : "text-[#4a5c4e] hover:text-[#182920]"
+                  }`}
+                  title="Vista en Cuadrícula / Tarjetas"
+                >
+                  <i className="fa-solid fa-grip"></i>
+                  <span>Tarjetas</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVistaStock("lista")}
+                  className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all ${
+                    vistaStock === "lista"
+                      ? "bg-[#182920] text-[#f1ecdd] shadow-sm"
+                      : "text-[#4a5c4e] hover:text-[#182920]"
+                  }`}
+                  title="Vista de Lista / Tabla"
+                >
+                  <i className="fa-solid fa-list"></i>
+                  <span>Lista</span>
+                </button>
+              </div>
+
+              <div className="text-xs text-[#6b7c6d]">
+                Mostrando: <strong className="text-[#182920]">{insumosFiltrados.length}</strong>
+              </div>
             </div>
           </div>
 
-          {/* Grid de Productos con Conteo de Pertenencias y Añadir Stock */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {insumosFiltrados.length === 0 && (
-              <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-[#ded7c4] p-8">
-                <i className="fa-solid fa-boxes-stacked text-3xl text-[#8fb56b]/50 mb-2"></i>
-                <p className="text-sm font-semibold text-[#182920]">
-                  No hay insumos registrados en este establecimiento.
-                </p>
-                <p className="text-xs text-[#526354]">
-                  Hacé clic en "+ Nuevo Insumo" para dar de alta productos, fármacos o herramientas.
-                </p>
-              </div>
-            )}
-            {insumosFiltrados.map((item) => {
-              const esBajo = item.requiereReposicion || item.stockActual <= item.stockMinimo;
-
-              return (
-                <div
-                  key={item.id}
-                  className="bg-white rounded-2xl p-5 border border-[#ded7c4] shadow-sm flex flex-col justify-between transition-all hover:shadow-md hover:border-[#8fb56b]/60"
-                >
-                  <div>
-                    {/* Header Card */}
-                    <div className="flex items-center justify-between mb-2.5">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#4a5c4e] bg-[#f8f5eb] px-2 py-0.5 rounded border border-[#ded7c4]">
-                          {item.categoria}
-                        </span>
-                        {item.campo && (
-                          <span className="text-[9px] bg-[#182920] text-[#8fb56b] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                            <i className="fa-solid fa-location-dot text-[8px]"></i>
-                            {item.campo}
-                          </span>
-                        )}
-                      </div>
-
-                      <span
-                        className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase border ${esBajo
-                            ? "bg-red-100 text-red-800 border-red-300"
-                            : "bg-emerald-100 text-emerald-800 border-emerald-300"
-                          }`}
-                      >
-                        {esBajo ? "Bajo Stock" : "OK"}
-                      </span>
-                    </div>
-
-                    {/* Nombre y Ubicación */}
-                    <div className="flex items-start gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#e7dfcb] text-[#182920] flex items-center justify-center text-lg flex-shrink-0">
-                        <i className={`fa-solid ${item.icono || "fa-box-archive"}`}></i>
-                      </div>
-                      <div className="min-w-0">
-                        <h4 className="text-sm font-bold text-[#182920] leading-snug truncate">
-                          {item.nombre}
-                        </h4>
-                        <p className="text-[11px] text-[#6b7c6d] flex items-center gap-1.5 mt-0.5 flex-wrap">
-                          <i className="fa-solid fa-warehouse text-[#8fb56b]"></i>
-                          <span>{item.ubicacion}</span>
-                          <span className="text-[#a1b0a3]">&bull;</span>
-                          <span className="font-semibold text-[#182920]">{item.campo || "Campo 1 - El Rancho"}</span>
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Caja de Stock y Punto de Alerta */}
-                    <div className="bg-[#f8f5eb] p-3 rounded-xl border border-[#ded7c4] flex justify-between items-center mb-3">
-                      <div>
-                        <span className="text-[10px] font-bold text-[#6b7c6d] uppercase block">
-                          Stock Disponible
-                        </span>
-                        <span className="text-2xl font-extrabold text-[#182920]">
-                          {item.stockActual}{" "}
-                          <span className="text-xs font-semibold text-[#4a5c4e]">{item.unidad}</span>
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[10px] font-bold text-[#6b7c6d] uppercase block">
-                          Stock Mínimo
-                        </span>
-                        <span className="text-xs font-bold text-[#6b4a32]">
-                          {item.stockMinimo} {item.unidad}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Acciones: Conteo Físico + Añadir Stock */}
-                  <div className="pt-2 border-t border-[#ded7c4] flex items-center justify-between gap-2">
-                    {/* Botón de CONTEO DE PERTENENCIAS (Peón, Capataz, Veterinario) */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInsumoActivo(item);
-                        setCantidadConteo(item.stockActual);
-                        setModalConteo(true);
-                      }}
-                      className="flex-1 bg-[#f8f5eb] hover:bg-[#e7dfcb] text-[#182920] border border-[#ded7c4] font-bold text-[11px] py-1.5 px-2 rounded-xl transition-colors flex items-center justify-center gap-1"
-                      title="Realizar conteo físico de pertenencias y actualizar stock en mano"
-                    >
-                      <i className="fa-solid fa-calculator text-[#33512f]"></i>
-                      <span>Conteo Físico</span>
-                    </button>
-
-                    {/* Botón AÑADIR AL STOCK */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInsumoActivo(item);
-                        setCantidadReponer(10);
-                        setModalReponer(true);
-                      }}
-                      className="bg-[#182920] hover:bg-[#284835] text-[#f1ecdd] font-bold text-[11px] py-1.5 px-3 rounded-xl transition-colors flex items-center gap-1 shadow-sm"
-                      title="Añadir unidades al stock existente"
-                    >
-                      <i className="fa-solid fa-plus text-[#8fb56b]"></i>
-                      <span>Añadir Stock</span>
-                    </button>
-                  </div>
+          {/* ===================================================== */}
+          {/* MODO 1: VISTA DE TARJETAS / CUADRÍCULA                */}
+          {/* ===================================================== */}
+          {vistaStock === "tarjetas" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {insumosFiltrados.length === 0 && (
+                <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-[#ded7c4] p-8">
+                  <i className="fa-solid fa-boxes-stacked text-3xl text-[#8fb56b]/50 mb-2"></i>
+                  <p className="text-sm font-semibold text-[#182920]">
+                    No hay insumos registrados con este filtro.
+                  </p>
+                  <p className="text-xs text-[#526354]">
+                    Hacé clic en "+ Añadir Producto" para dar de alta productos, fármacos o herramientas.
+                  </p>
                 </div>
-              );
-            })}
-          </div>
+              )}
+
+              {insumosFiltrados.map((item) => {
+                const esBajo = item.requiereReposicion || item.stockActual <= item.stockMinimo;
+                const isChecked = seleccionadosInsumos.includes(item.id);
+
+                return (
+                  <div
+                    key={item.id}
+                    className={`bg-white rounded-2xl p-5 border shadow-sm flex flex-col justify-between transition-all hover:shadow-md ${
+                      isChecked
+                        ? "border-[#182920] ring-2 ring-[#8fb56b]/50 bg-[#f8f5eb]/40"
+                        : "border-[#ded7c4] hover:border-[#8fb56b]/60"
+                    }`}
+                  >
+                    <div>
+                      {/* Header Card con Checkbox de Marcado */}
+                      <div className="flex items-center justify-between mb-2.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleSeleccionInsumo(item.id)}
+                            className="rounded cursor-pointer w-4 h-4 accent-[#182920]"
+                            title="Marcar este insumo"
+                          />
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#4a5c4e] bg-[#f8f5eb] px-2 py-0.5 rounded border border-[#ded7c4]">
+                            {item.categoria}
+                          </span>
+                          {item.campo && (
+                            <span className="text-[9px] bg-[#182920] text-[#8fb56b] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                              <i className="fa-solid fa-location-dot text-[8px]"></i>
+                              {item.campo}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase border ${
+                              esBajo
+                                ? "bg-red-100 text-red-800 border-red-300"
+                                : "bg-emerald-100 text-emerald-800 border-emerald-300"
+                            }`}
+                          >
+                            {esBajo ? "Bajo Stock" : "OK"}
+                          </span>
+
+                          {puedeCrearProducto && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setInsumoAEliminar(item);
+                                setModalEliminarInsumos(true);
+                              }}
+                              className="w-6 h-6 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 flex items-center justify-center text-[10px] transition-colors"
+                              title="Eliminar este insumo"
+                            >
+                              <i className="fa-solid fa-trash-can"></i>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Nombre y Ubicación */}
+                      <div
+                        className="flex items-start gap-3 mb-3 cursor-pointer"
+                        onClick={() => toggleSeleccionInsumo(item.id)}
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-[#e7dfcb] text-[#182920] flex items-center justify-center text-lg flex-shrink-0">
+                          <i className={`fa-solid ${item.icono || "fa-box-archive"}`}></i>
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-bold text-[#182920] leading-snug truncate">
+                            {item.nombre}
+                          </h4>
+                          <p className="text-[11px] text-[#6b7c6d] flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            <i className="fa-solid fa-warehouse text-[#8fb56b]"></i>
+                            <span>{item.ubicacion}</span>
+                            <span className="text-[#a1b0a3]">&bull;</span>
+                            <span className="font-semibold text-[#182920]">{item.campo || "Campo Principal"}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Caja de Stock y Punto de Alerta */}
+                      <div className="bg-[#f8f5eb] p-3 rounded-xl border border-[#ded7c4] flex justify-between items-center mb-3">
+                        <div>
+                          <span className="text-[10px] font-bold text-[#6b7c6d] uppercase block">
+                            Stock Disponible
+                          </span>
+                          <span className="text-2xl font-extrabold text-[#182920]">
+                            {item.stockActual}{" "}
+                            <span className="text-xs font-semibold text-[#4a5c4e]">{item.unidad}</span>
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] font-bold text-[#6b7c6d] uppercase block">
+                            Stock Mínimo
+                          </span>
+                          <span className="text-xs font-bold text-[#6b4a32]">
+                            {item.stockMinimo} {item.unidad}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Acciones: Conteo Físico + Añadir Stock */}
+                    <div className="pt-2 border-t border-[#ded7c4] flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInsumoActivo(item);
+                          setCantidadConteo(item.stockActual);
+                          setModalConteo(true);
+                        }}
+                        className="flex-1 bg-[#f8f5eb] hover:bg-[#e7dfcb] text-[#182920] border border-[#ded7c4] font-bold text-[11px] py-1.5 px-2 rounded-xl transition-colors flex items-center justify-center gap-1"
+                        title="Realizar conteo físico de pertenencias y actualizar stock en mano"
+                      >
+                        <i className="fa-solid fa-calculator text-[#33512f]"></i>
+                        <span>Conteo Físico</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInsumoActivo(item);
+                          setCantidadReponer(10);
+                          setModalReponer(true);
+                        }}
+                        className="bg-[#182920] hover:bg-[#284835] text-[#f1ecdd] font-bold text-[11px] py-1.5 px-3 rounded-xl transition-colors flex items-center gap-1 shadow-sm"
+                        title="Añadir unidades al stock existente"
+                      >
+                        <i className="fa-solid fa-plus text-[#8fb56b]"></i>
+                        <span>Añadir Stock</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ===================================================== */}
+          {/* MODO 2: VISTA DE LISTA / TABLA COMPACTA               */}
+          {/* ===================================================== */}
+          {vistaStock === "lista" && (
+            <div className="bg-white rounded-2xl p-6 border border-[#ded7c4] shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead>
+                    <tr className="border-b border-[#ded7c4] text-[#4a5c4e] uppercase font-bold text-[10px]">
+                      <th className="py-2.5 px-3 w-8">
+                        <input
+                          type="checkbox"
+                          checked={
+                            seleccionadosInsumos.length === insumosFiltrados.length &&
+                            insumosFiltrados.length > 0
+                          }
+                          onChange={seleccionarTodosInsumos}
+                          className="rounded cursor-pointer"
+                          title="Seleccionar todos"
+                        />
+                      </th>
+                      <th className="py-2.5 px-3">Producto / Herramienta</th>
+                      <th className="py-2.5 px-3">Categoría</th>
+                      <th className="py-2.5 px-3">Locación & Sector</th>
+                      <th className="py-2.5 px-3">Stock Disponible</th>
+                      <th className="py-2.5 px-3">Stock Mínimo</th>
+                      <th className="py-2.5 px-3">Estado</th>
+                      <th className="py-2.5 px-3 text-right">Acciones de Stock y Conteo</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#ded7c4]">
+                    {insumosFiltrados.map((item) => {
+                      const esBajo = item.requiereReposicion || item.stockActual <= item.stockMinimo;
+                      const isChecked = seleccionadosInsumos.includes(item.id);
+
+                      return (
+                        <tr
+                          key={item.id}
+                          className={`hover:bg-[#f8f5eb] transition-colors ${
+                            isChecked ? "bg-[#f8f5eb]/80" : ""
+                          }`}
+                        >
+                          <td className="py-3 px-3">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleSeleccionInsumo(item.id)}
+                              className="rounded cursor-pointer"
+                            />
+                          </td>
+                          <td className="py-3 px-3 font-bold text-[#182920]">
+                            <div className="flex items-center gap-2.5">
+                              <span className="w-7 h-7 rounded-lg bg-[#e7dfcb] flex items-center justify-center text-xs text-[#182920] flex-shrink-0">
+                                <i className={`fa-solid ${item.icono || "fa-box-archive"}`}></i>
+                              </span>
+                              <span>{item.nombre}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="text-[10px] font-bold uppercase text-[#4a5c4e] bg-[#f8f5eb] px-2 py-0.5 rounded border border-[#ded7c4]">
+                              {item.categoria}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3">
+                            <div className="font-bold text-[#182920]">{item.campo || "Campo Principal"}</div>
+                            <div className="text-[11px] text-[#6b7c6d]">{item.ubicacion}</div>
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="text-sm font-extrabold text-[#182920]">
+                              {item.stockActual}
+                            </span>{" "}
+                            <span className="text-[11px] text-[#4a5c4e]">{item.unidad}</span>
+                          </td>
+                          <td className="py-3 px-3 font-semibold text-[#6b4a32]">
+                            {item.stockMinimo} {item.unidad}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span
+                              className={`text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase border ${
+                                esBajo
+                                  ? "bg-red-100 text-red-800 border-red-300"
+                                  : "bg-emerald-100 text-emerald-800 border-emerald-300"
+                              }`}
+                            >
+                              {esBajo ? "Bajo Stock" : "OK"}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-right space-x-1.5 whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setInsumoActivo(item);
+                                setCantidadConteo(item.stockActual);
+                                setModalConteo(true);
+                              }}
+                              className="bg-[#f8f5eb] hover:bg-[#e7dfcb] text-[#182920] border border-[#ded7c4] font-bold text-[10px] px-2.5 py-1.5 rounded-lg transition-colors"
+                              title="Realizar conteo físico"
+                            >
+                              <i className="fa-solid fa-calculator text-[#33512f]"></i> Conteo
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setInsumoActivo(item);
+                                setCantidadReponer(10);
+                                setModalReponer(true);
+                              }}
+                              className="bg-[#182920] hover:bg-[#284835] text-[#f1ecdd] font-bold text-[10px] px-2.5 py-1.5 rounded-lg transition-colors"
+                              title="Añadir unidades al stock"
+                            >
+                              <i className="fa-solid fa-plus text-[#8fb56b]"></i> + Stock
+                            </button>
+
+                            {puedeCrearProducto && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setInsumoAEliminar(item);
+                                  setModalEliminarInsumos(true);
+                                }}
+                                className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-[10px] px-2.5 py-1.5 rounded-lg transition-colors"
+                                title="Eliminar insumo"
+                              >
+                                <i className="fa-solid fa-trash-can"></i>
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                    {insumosFiltrados.length === 0 && (
+                      <tr>
+                        <td colSpan="8" className="py-12 text-center">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <i className="fa-solid fa-boxes-stacked text-3xl text-[#8fb56b]/50"></i>
+                            <p className="text-sm font-semibold text-[#182920]">
+                              No hay insumos registrados con este filtro.
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -617,25 +1054,26 @@ export default function InsumosView() {
             </div>
 
             {/* Filtros de Solicitudes */}
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
               <span className="text-xs font-bold text-[#182920] uppercase">Filtrar:</span>
               {["TODAS", "MIS_SOLICITUDES", "PENDIENTES", "ENTREGADAS"].map((f) => (
                 <button
                   key={f}
                   type="button"
                   onClick={() => setFiltroSolicitudes(f)}
-                  className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-colors ${filtroSolicitudes === f
+                  className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-colors ${
+                    filtroSolicitudes === f
                       ? "bg-[#182920] text-[#f1ecdd] border-[#182920]"
                       : "bg-[#f8f5eb] text-[#4a5c4e] border-[#ded7c4] hover:bg-[#e7dfcb]"
-                    }`}
+                  }`}
                 >
                   {f === "TODAS"
                     ? "Todas"
                     : f === "MIS_SOLICITUDES"
-                      ? "Mis Solicitudes"
-                      : f === "PENDIENTES"
-                        ? "Pendientes"
-                        : "Entregadas"}
+                    ? "Mis Solicitudes"
+                    : f === "PENDIENTES"
+                    ? "Pendientes"
+                    : "Entregadas"}
                 </button>
               ))}
             </div>
@@ -652,8 +1090,9 @@ export default function InsumosView() {
                   return (
                     <div
                       key={s.id}
-                      className={`p-4 rounded-xl border transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${esPendiente ? "bg-[#f8f5eb] border-amber-300" : "bg-white border-[#ded7c4]"
-                        }`}
+                      className={`p-4 rounded-xl border transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+                        esPendiente ? "bg-[#f8f5eb] border-amber-300" : "bg-white border-[#ded7c4]"
+                      }`}
                     >
                       <div className="space-y-1 max-w-2xl">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -663,7 +1102,9 @@ export default function InsumosView() {
                           <span className="text-xs font-extrabold text-[#33512f] bg-white px-2 py-0.5 rounded border border-[#ded7c4]">
                             Cant: {s.cantidad} {s.unidad}
                           </span>
-                          <span className="text-xs text-[#6b7c6d]">· Solicitado por: <strong>{s.solicitanteNombre}</strong> ({s.solicitanteRol})</span>
+                          <span className="text-xs text-[#6b7c6d]">
+                            · Solicitado por: <strong>{s.solicitanteNombre}</strong> ({s.solicitanteRol})
+                          </span>
                           <span className="text-xs text-[#6b7c6d]">· 📅 {s.fecha}</span>
                           <span className="text-[10px] bg-[#f8f5eb] text-[#6b4a32] font-bold px-2 py-0.5 rounded border border-[#ded7c4]">
                             Sector: {s.sector}
@@ -677,17 +1118,17 @@ export default function InsumosView() {
 
                       <div className="flex items-center gap-2 self-end md:self-center">
                         <span
-                          className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase border ${esEntregado
+                          className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase border ${
+                            esEntregado
                               ? "bg-emerald-100 text-emerald-800 border-emerald-300"
                               : s.estado === "Aprobado"
-                                ? "bg-blue-100 text-blue-800 border-blue-300"
-                                : "bg-amber-100 text-amber-800 border-amber-300"
-                            }`}
+                              ? "bg-blue-100 text-blue-800 border-blue-300"
+                              : "bg-amber-100 text-amber-800 border-amber-300"
+                          }`}
                         >
                           {esEntregado ? "✓ Entregado" : s.estado === "Aprobado" ? "✓ Aprobado" : "⏳ Pendiente"}
                         </span>
 
-                        {/* Botones de acción para Capataz, Oficina o Dueño */}
                         {puedeAprobarSolicitud && (
                           <div className="flex items-center gap-1.5">
                             {esPendiente && (
@@ -1086,8 +1527,8 @@ export default function InsumosView() {
                     <select
                       value={nuevoProducto.campo}
                       onChange={(e) => {
-                        if (e.target.value === "__AGREGAR__") {
-                          setModalNuevoCampo(true);
+                        if (e.target.value === "__GESTIONAR__") {
+                          setModalGestionLocaciones(true);
                         } else {
                           setNuevoProducto({ ...nuevoProducto, campo: e.target.value });
                         }
@@ -1097,15 +1538,15 @@ export default function InsumosView() {
                       {camposDisponibles.map((c) => (
                         <option key={c} value={c}>{c}</option>
                       ))}
-                      <option value="__AGREGAR__">+ Agregar campo...</option>
+                      <option value="__GESTIONAR__">⚙ Gestionar locaciones...</option>
                     </select>
                     <button
                       type="button"
-                      onClick={() => setModalNuevoCampo(true)}
+                      onClick={() => setModalGestionLocaciones(true)}
                       className="px-2.5 rounded-xl bg-[#e7dfcb] hover:bg-[#d8cfb7] text-[#182920] border border-[#ded7c4] text-xs font-bold"
-                      title="Añadir nuevo campo"
+                      title="Agregar, editar o eliminar locaciones"
                     >
-                      <i className="fa-solid fa-plus"></i>
+                      <i className="fa-solid fa-pen-to-square"></i>
                     </button>
                   </div>
                 </div>
@@ -1173,10 +1614,55 @@ export default function InsumosView() {
         </div>
       )}
 
-      {/* Modal para Agregar Nuevo Campo / Locación */}
-      {modalNuevoCampo && (
+      {/* ========================================================= */}
+      {/* MODAL 5: CONFIRMAR ELIMINACIÓN DE INSUMOS (MARCADOS/INDIV) */}
+      {/* ========================================================= */}
+      {modalEliminarInsumos && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 border border-red-200 shadow-2xl max-w-sm w-full animate-fade-in text-xs space-y-3">
+            <h3 className="text-base font-bold text-red-800 font-['Fraunces',serif] flex items-center gap-2">
+              <i className="fa-solid fa-trash-can"></i>
+              {insumoAEliminar
+                ? `Eliminar "${insumoAEliminar.nombre}"`
+                : `Eliminar ${seleccionadosInsumos.length} Artículos Marcados`}
+            </h3>
+            <p className="text-[#555] leading-relaxed">
+              {insumoAEliminar
+                ? `¿Confirmás que deseás eliminar el insumo "${insumoAEliminar.nombre}" (${insumoAEliminar.stockActual} ${insumoAEliminar.unidad}) del stock?`
+                : `¿Confirmás que deseás eliminar del inventario los ${seleccionadosInsumos.length} artículos seleccionados? Esta acción actualizará PostgreSQL inmediatamente.`}
+            </p>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setModalEliminarInsumos(false);
+                  setInsumoAEliminar(null);
+                }}
+                className="px-4 py-2 rounded-xl border border-[#ded7c4] text-[#182920] font-bold"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={procesando}
+                onClick={manejarConfirmarEliminarInsumos}
+                className="px-5 py-2 rounded-xl bg-red-700 hover:bg-red-800 text-white font-bold"
+              >
+                {procesando ? "Eliminando..." : "Confirmar Eliminación"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 6 (PANTALLA EMERGENTE): GESTIONAR LOCACIONES        */}
+      {/* (AGREGAR, EDITAR Y ELIMINAR LOCACIONES / CAMPOS)          */}
+      {/* ========================================================= */}
+      {modalGestionLocaciones && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 border border-[#ded7c4] shadow-2xl max-w-md w-full space-y-4 animate-scale-up">
+          <div className="bg-white rounded-3xl p-6 border border-[#ded7c4] shadow-2xl max-w-lg w-full space-y-4 animate-fade-in">
             <div className="flex items-center justify-between pb-3 border-b border-[#ded7c4]">
               <div className="flex items-center gap-2.5">
                 <div className="w-10 h-10 rounded-xl bg-[#182920] text-[#8fb56b] flex items-center justify-center text-lg shadow-sm">
@@ -1184,71 +1670,178 @@ export default function InsumosView() {
                 </div>
                 <div>
                   <h3 className="font-bold text-[#182920] text-base font-['Fraunces',serif]">
-                    Agregar Nuevo Campo / Locación
+                    Gestionar Locaciones / Campos
                   </h3>
                   <p className="text-xs text-[#6b7c6d]">
-                    Registra un nuevo campo o fracción para clasificar insumos.
+                    Agregá nuevas locaciones o editá y eliminá las existentes.
                   </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setModalNuevoCampo(false)}
+                onClick={() => {
+                  setModalGestionLocaciones(false);
+                  setLocacionEditando(null);
+                  setLocacionConfirmarEliminar(null);
+                }}
                 className="text-gray-400 hover:text-gray-600 text-lg"
               >
                 <i className="fa-solid fa-xmark"></i>
               </button>
             </div>
 
+            {/* Formulario para agregar nueva locación */}
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 agregarNuevoCampo(nombreNuevoCampo);
               }}
-              className="space-y-4"
+              className="flex gap-2"
             >
-              <div>
-                <label className="block font-bold text-xs text-[#182920] mb-1 uppercase tracking-wider">
-                  Nombre del Campo:
-                </label>
-                <input
-                  type="text"
-                  value={nombreNuevoCampo}
-                  onChange={(e) => setNombreNuevoCampo(e.target.value)}
-                  placeholder="Ej: Campo 3 - Santa María, Lote San José..."
-                  className="w-full bg-[#f8f5eb] border border-[#ded7c4] rounded-xl px-3 py-2.5 text-[#182920] text-sm outline-none font-semibold focus:border-[#33512f] focus:bg-white"
-                  autoFocus
-                  required
-                />
-              </div>
-
-              <div className="bg-[#f8f5eb] p-3 rounded-xl border border-[#ded7c4] text-xs text-[#526354] space-y-1">
-                <span className="font-bold text-[#182920] block">Campos actuales ({camposDisponibles.length}):</span>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {camposDisponibles.map((c) => (
-                    <span key={c} className="bg-white px-2 py-0.5 rounded border border-[#ded7c4] text-[11px] font-medium text-[#182920]">
-                      {c}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setModalNuevoCampo(false)}
-                  className="px-4 py-2 rounded-xl border border-[#ded7c4] text-[#182920] font-bold text-xs"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#182920] text-[#f1ecdd] font-bold text-xs hover:bg-[#284835] transition-colors shadow-sm"
-                >
-                  Guardar Campo
-                </button>
-              </div>
+              <input
+                type="text"
+                value={nombreNuevoCampo}
+                onChange={(e) => setNombreNuevoCampo(e.target.value)}
+                placeholder="Nueva locación (ej: Campo 3 - Santa María)..."
+                className="flex-1 bg-[#f8f5eb] border border-[#ded7c4] rounded-xl px-3 py-2 text-[#182920] text-xs outline-none font-semibold focus:border-[#33512f] focus:bg-white"
+              />
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-xl bg-[#182920] text-[#f1ecdd] font-bold text-xs hover:bg-[#284835] transition-colors shadow-sm flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <i className="fa-solid fa-plus text-[#8fb56b]"></i> Agregar
+              </button>
             </form>
+
+            {/* Lista de locaciones actuales con Editar y Eliminar */}
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+              <span className="text-[10px] font-bold uppercase text-[#6b7c6d] block">
+                Locaciones Registradas ({camposDisponibles.length}):
+              </span>
+
+              {camposDisponibles.length === 0 ? (
+                <p className="text-xs text-[#6b7c6d] italic py-4 text-center bg-[#f8f5eb] rounded-xl">
+                  No hay locaciones cargadas. Agregá una arriba.
+                </p>
+              ) : (
+                camposDisponibles.map((loc) => {
+                  const cantInsumos = insumos.filter(
+                    (i) => (i.campo || "").toLowerCase() === loc.toLowerCase()
+                  ).length;
+                  const estaEditando = locacionEditando === loc;
+                  const confirmandoEliminar = locacionConfirmarEliminar === loc;
+
+                  return (
+                    <div
+                      key={loc}
+                      className="p-3 rounded-xl bg-[#f8f5eb] border border-[#ded7c4] flex flex-col gap-2"
+                    >
+                      {estaEditando ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={nuevoNombreLocacion}
+                            onChange={(e) => setNuevoNombreLocacion(e.target.value)}
+                            className="flex-1 bg-white border border-[#33512f] rounded-lg px-2.5 py-1.5 text-xs font-bold text-[#182920] outline-none"
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            disabled={procesando}
+                            onClick={() => guardarEdicionLocacion(loc)}
+                            className="px-3 py-1.5 rounded-lg bg-[#182920] text-[#f1ecdd] text-xs font-bold hover:bg-[#284835]"
+                          >
+                            Guardar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setLocacionEditando(null)}
+                            className="px-2.5 py-1.5 rounded-lg border border-[#ded7c4] bg-white text-[#182920] text-xs font-bold"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      ) : confirmandoEliminar ? (
+                        <div className="flex items-center justify-between gap-2 bg-red-50 p-2 rounded-lg border border-red-200">
+                          <span className="text-[11px] text-red-800 font-semibold">
+                            ¿Eliminar locación <strong>"{loc}"</strong>?
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              disabled={procesando}
+                              onClick={() => confirmarEliminarLocacion(loc)}
+                              className="px-2.5 py-1 rounded-lg bg-red-700 hover:bg-red-800 text-white text-[11px] font-bold"
+                            >
+                              Sí, eliminar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setLocacionConfirmarEliminar(null)}
+                              className="px-2.5 py-1 rounded-lg bg-white border border-[#ded7c4] text-[#182920] text-[11px] font-bold"
+                            >
+                              No
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-[#182920] truncate flex items-center gap-1.5">
+                              <i className="fa-solid fa-location-dot text-[#33512f]"></i>
+                              <span>{loc}</span>
+                            </p>
+                            <span className="text-[10px] text-[#6b7c6d]">
+                              {cantInsumos} {cantInsumos === 1 ? "artículo asignado" : "artículos asignados"}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLocacionConfirmarEliminar(null);
+                                setLocacionEditando(loc);
+                                setNuevoNombreLocacion(loc);
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-[#e7dfcb] text-[#182920] border border-[#ded7c4] text-[11px] font-bold flex items-center gap-1 transition-colors"
+                              title="Editar nombre de locación"
+                            >
+                              <i className="fa-solid fa-pen text-amber-700"></i> Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLocacionEditando(null);
+                                setLocacionConfirmarEliminar(loc);
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-[11px] font-bold flex items-center gap-1 transition-colors"
+                              title="Eliminar locación"
+                            >
+                              <i className="fa-solid fa-trash-can"></i> Eliminar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-[#ded7c4]">
+              <button
+                type="button"
+                onClick={() => {
+                  setModalGestionLocaciones(false);
+                  setLocacionEditando(null);
+                  setLocacionConfirmarEliminar(null);
+                }}
+                className="px-5 py-2 rounded-xl bg-[#182920] text-[#f1ecdd] font-bold text-xs hover:bg-[#284835]"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}

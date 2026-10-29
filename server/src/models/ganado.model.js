@@ -54,6 +54,10 @@ class GanadoModel {
   }
 
   static async listarPotreros(establecimientoId) {
+    if (!establecimientoId) return [];
+
+    const POTREROS_PREDETERMINADOS_EXCLUIDOS = new Set(["pot-1", "pot-2", "pot-3", "pot-4", "pot-5"]);
+
     function extraerMetaGeo(potrero) {
       let metaGeo = {};
       try {
@@ -73,30 +77,33 @@ class GanadoModel {
     }
 
     try {
-      const whereClause = establecimientoId ? { establecimientoId } : {};
       const potreros = await prisma.potrero.findMany({
-        where: whereClause,
+        where: { establecimientoId },
         include: { animales: true },
         orderBy: { nombre: "asc" },
       });
-      return potreros.map((p) => {
-        const item = extraerMetaGeo(p);
-        const total = p.animales ? p.animales.length : 0;
-        return {
-          ...item,
-          totalAnimales: total,
-          porcentajeCarga: item.capacidad ? Math.min(100, Math.round((total / item.capacidad) * 100)) : 0,
-        };
-      });
+      return potreros
+        .filter((p) => !POTREROS_PREDETERMINADOS_EXCLUIDOS.has(p.id))
+        .map((p) => {
+          const item = extraerMetaGeo(p);
+          const total = p.animales ? p.animales.length : 0;
+          return {
+            ...item,
+            totalAnimales: total,
+            porcentajeCarga: item.capacidad ? Math.min(100, Math.round((total / item.capacidad) * 100)) : 0,
+          };
+        });
     } catch (e) {
       console.warn("Fallback memoria para potreros:", e.message);
       const fuente = Array.isArray(db.potreros) ? db.potreros : [];
-      const filtrados = establecimientoId
-        ? fuente.filter((p) => p.establecimientoId === establecimientoId)
-        : fuente;
+      const filtrados = fuente.filter(
+        (p) => p.establecimientoId === establecimientoId && !POTREROS_PREDETERMINADOS_EXCLUIDOS.has(p.id)
+      );
 
       // Calcular cantidad de animales en memoria
-      const ganadoFuente = Array.isArray(db.ganado) ? db.ganado : [];
+      const ganadoFuente = (Array.isArray(db.ganado) ? db.ganado : []).filter(
+        (g) => g.establecimientoId === establecimientoId
+      );
       return filtrados.map((p) => {
         const item = extraerMetaGeo(p);
         const count = ganadoFuente.filter((g) => (g.potreroId === p.id || g.potrero === p.nombre || g.potreroNombre === p.nombre)).length;
@@ -333,6 +340,31 @@ class GanadoModel {
     }
   }
 
+  static async darDeBajaMasivo(animalIds = [], motivo = "Venta", establecimientoId) {
+    if (!Array.isArray(animalIds) || animalIds.length === 0) {
+      throw new Error("Debe seleccionar al menos un animal para dar de baja.");
+    }
+
+    try {
+      const whereClause = { id: { in: animalIds } };
+      if (establecimientoId) whereClause.establecimientoId = establecimientoId;
+      const res = await prisma.ganado.deleteMany({
+        where: whereClause,
+      });
+      return { count: res.count, ids: animalIds, motivoBaja: motivo };
+    } catch (e) {
+      console.warn("[GanadoModel] Fallo en darDeBajaMasivo Prisma, usando memoria:", e.message);
+      if (Array.isArray(db.ganado)) {
+        const antes = db.ganado.length;
+        db.ganado = db.ganado.filter(
+          (g) => !animalIds.includes(g.id) || (establecimientoId && g.establecimientoId && g.establecimientoId !== establecimientoId)
+        );
+        return { count: antes - db.ganado.length, ids: animalIds, motivoBaja: motivo };
+      }
+      return { count: 0, ids: animalIds, motivoBaja: motivo };
+    }
+  }
+
   static async trasladoMasivo(animalIds = [], potreroDestinoId) {
     if (!animalIds || animalIds.length === 0) {
       throw new Error("Debe seleccionar al menos un animal para trasladar.");
@@ -427,6 +459,11 @@ class GanadoModel {
   static async eliminarPotrero(id, establecimientoId) {
     if (!id) throw new Error("ID de potrero requerido");
     try {
+      const potreroExistente = await prisma.potrero.findUnique({ where: { id } });
+      if (potreroExistente && establecimientoId && potreroExistente.establecimientoId && potreroExistente.establecimientoId !== establecimientoId) {
+        throw new Error("No tenés permisos para eliminar una parcela de otro establecimiento.");
+      }
+
       await prisma.ganado.updateMany({
         where: { potreroId: id },
         data: { potreroId: null },
@@ -436,7 +473,9 @@ class GanadoModel {
       });
     } catch (e) {
       if (Array.isArray(db.potreros)) {
-        const idx = db.potreros.findIndex((p) => p.id === id);
+        const idx = db.potreros.findIndex(
+          (p) => p.id === id && (!establecimientoId || p.establecimientoId === establecimientoId)
+        );
         if (idx !== -1) {
           const eliminado = db.potreros.splice(idx, 1)[0];
           if (Array.isArray(db.ganado)) {

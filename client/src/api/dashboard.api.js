@@ -45,6 +45,13 @@ export async function eliminarGanado(id, motivo = "Venta") {
   });
 }
 
+export async function bajaMasivaGanado({ animalIds, motivo = "Venta" }) {
+  return request("/dashboard/ganado/baja-masiva", {
+    method: "POST",
+    body: JSON.stringify({ animalIds, motivo }),
+  });
+}
+
 export async function trasladoMasivoGanado({ animalIds, potreroDestinoId }) {
   return request("/dashboard/ganado/traslado-masivo", {
     method: "POST",
@@ -108,6 +115,26 @@ export async function actualizarStockInsumo(id, cantidad, operacion = "sumar") {
   return request(`/dashboard/insumos/${id}/stock`, {
     method: "PATCH",
     body: JSON.stringify({ cantidad, operacion }),
+  });
+}
+
+export async function eliminarInsumo(id) {
+  return request(`/dashboard/insumos/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function eliminarInsumosMasivo(ids) {
+  return request("/dashboard/insumos/eliminar-masivo", {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
+}
+
+export async function gestionarLocacionInsumos({ nombreAnterior, nuevoNombre, accion = "editar" }) {
+  return request("/dashboard/insumos/locaciones", {
+    method: "PATCH",
+    body: JSON.stringify({ nombreAnterior, nuevoNombre, accion }),
   });
 }
 

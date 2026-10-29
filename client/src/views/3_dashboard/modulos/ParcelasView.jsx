@@ -177,23 +177,39 @@ function calcularCentroide(coordenadas) {
   return [sumLng / coordenadas.length, sumLat / coordenadas.length];
 }
 
-function leerParcelasLocales() {
+const POTREROS_PREDETERMINADOS_EXCLUIDOS = new Set(["pot-1", "pot-2", "pot-3", "pot-4", "pot-5"]);
+
+function obtenerStorageKeyCuenta(usuario) {
+  const scope = usuario?.establecimientoId || usuario?.id;
+  return scope ? `vakera_parcelas_cuenta_${scope}` : null;
+}
+
+function leerParcelasLocales(storageKey) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY_PARCELAS);
-    return raw ? JSON.parse(raw) : [];
+    // Limpiar clave global antigua que mezclaba parcelas entre cuentas
+    localStorage.removeItem("vakera_potreros_geometrias_v2");
+    if (!storageKey) return [];
+    const raw = localStorage.getItem(storageKey);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((p) => !POTREROS_PREDETERMINADOS_EXCLUIDOS.has(p?.id))
+      : [];
   } catch (_) {
     return [];
   }
 }
 
-function guardarParcelasLocales(lista) {
+function guardarParcelasLocales(storageKey, lista) {
   try {
-    localStorage.setItem(STORAGE_KEY_PARCELAS, JSON.stringify(lista));
+    localStorage.removeItem("vakera_potreros_geometrias_v2");
+    if (!storageKey) return;
+    localStorage.setItem(storageKey, JSON.stringify(lista));
   } catch (_) {}
 }
 
 export default function ParcelasView() {
-  const { rol } = useAuth();
+  const { rol, usuario } = useAuth();
+  const storageKeyCuenta = useMemo(() => obtenerStorageKeyCuenta(usuario), [usuario?.establecimientoId, usuario?.id]);
   const mapaContainerRef = useRef(null);
   const mapaInstanciaRef = useRef(null);
   const marcadoresVerticesRef = useRef([]);
@@ -251,8 +267,8 @@ export default function ParcelasView() {
     const mapa = mapaInstanciaRef.current;
     if (!mapa) return;
 
-    // 1. Proyectar todas las parcelas guardadas en coordenadas de pantalla
-    const listaPot = potrerosRef.current.length > 0 ? potrerosRef.current : leerParcelasLocales();
+    // 1. Proyectar únicamente las parcelas de la cuenta activa
+    const listaPot = potrerosRef.current;
     const potrerosProyectados = listaPot
       .filter((p) => Array.isArray(p.coordinates) && p.coordinates.length >= 3)
       .map((p) => {
@@ -296,9 +312,9 @@ export default function ParcelasView() {
     setSvgPuntos(proyectados);
   }, []);
 
-  // Generar GeoJSON de las parcelas guardadas con fallback reactivo
+  // Generar GeoJSON de las parcelas guardadas de la cuenta activa
   const construirGeoJSONParcelas = useCallback((lista) => {
-    const fuente = lista !== undefined ? lista : (potrerosRef.current.length > 0 ? potrerosRef.current : leerParcelasLocales());
+    const fuente = lista !== undefined ? lista : potrerosRef.current;
     const features = (fuente || [])
       .filter((p) => Array.isArray(p.coordinates) && p.coordinates.length >= 3)
       .map((p) => {
@@ -362,7 +378,7 @@ export default function ParcelasView() {
     }
   }, [construirGeoJSONParcelas]);
 
-  // Cargar datos reales
+  // Cargar datos reales aislados por cuenta/establecimiento
   async function cargarDatos() {
     setCargando(true);
     try {
@@ -371,36 +387,38 @@ export default function ParcelasView() {
         obtenerGanado(),
       ]);
 
-      const listaApi = Array.isArray(resPot?.data) ? resPot.data : [];
-      const listaLocal = leerParcelasLocales();
+      const listaApi = (Array.isArray(resPot?.data) ? resPot.data : []).filter(
+        (p) => !POTREROS_PREDETERMINADOS_EXCLUIDOS.has(p?.id)
+      );
+      const listaLocal = leerParcelasLocales(storageKeyCuenta);
+      const mapaLocal = new Map(listaLocal.map((p) => [p.id, p]));
 
-      const mapaPotreros = new Map();
-      listaLocal.forEach((p) => mapaPotreros.set(p.id, p));
-      listaApi.forEach((p) => {
-        const previo = mapaPotreros.get(p.id);
-        mapaPotreros.set(p.id, {
+      // Solo conservamos las parcelas que pertenecen a esta cuenta según el servidor
+      const listaFinal = listaApi.map((p) => {
+        const previo = mapaLocal.get(p.id);
+        return {
           ...previo,
           ...p,
-          coordinates: (Array.isArray(p.coordinates) && p.coordinates.length > 2)
-            ? p.coordinates
-            : (previo?.coordinates || []),
+          coordinates:
+            Array.isArray(p.coordinates) && p.coordinates.length > 2
+              ? p.coordinates
+              : previo?.coordinates || [],
           color: p.color || previo?.color || "#ea580c",
           pastura: p.pastura || previo?.pastura || "Campo Natural",
           aguada: p.aguada || previo?.aguada || "Aguada no especificada",
           estadoPastura: p.estadoPastura || previo?.estadoPastura || "Óptimo",
-        });
+        };
       });
 
-      const listaFinal = Array.from(mapaPotreros.values());
       potrerosRef.current = listaFinal;
       setPotreros(listaFinal);
-      guardarParcelasLocales(listaFinal);
+      guardarParcelasLocales(storageKeyCuenta, listaFinal);
 
       if (Array.isArray(resGan?.data)) setGanado(resGan.data);
       actualizarFuenteParcelas(listaFinal);
     } catch (err) {
       console.warn("Fallo al consultar potreros/ganado:", err.message);
-      const listaLocal = leerParcelasLocales();
+      const listaLocal = leerParcelasLocales(storageKeyCuenta);
       potrerosRef.current = listaLocal;
       setPotreros(listaLocal);
       actualizarFuenteParcelas(listaLocal);
@@ -410,8 +428,9 @@ export default function ParcelasView() {
   }
 
   useEffect(() => {
+    setParcelaSeleccionada(null);
     cargarDatos();
-  }, []);
+  }, [storageKeyCuenta]);
 
   function mostrarNotificacion(texto) {
     setMensaje(texto);
@@ -488,7 +507,7 @@ export default function ParcelasView() {
     }
 
     let centroInicial = CENTRO_BASE_DEFECTO;
-    const datosCentro = potrerosRef.current.length > 0 ? potrerosRef.current : leerParcelasLocales();
+    const datosCentro = potrerosRef.current;
     if (datosCentro.length > 0 && Array.isArray(datosCentro[0].coordinates) && datosCentro[0].coordinates.length > 0) {
       centroInicial = calcularCentroide(datosCentro[0].coordinates);
     }
@@ -509,7 +528,7 @@ export default function ParcelasView() {
 
     mapa.on("load", () => {
       // 1. CAPAS DE PARCELAS GUARDADAS EN MAPLIBRE
-      const datosIniciales = potrerosRef.current.length > 0 ? potrerosRef.current : leerParcelasLocales();
+      const datosIniciales = potrerosRef.current;
       mapa.addSource("parcelas-source", {
         type: "geojson",
         data: construirGeoJSONParcelas(datosIniciales),
@@ -803,7 +822,7 @@ export default function ParcelasView() {
       ];
       potrerosRef.current = listaActualizada;
       setPotreros(listaActualizada);
-      guardarParcelasLocales(listaActualizada);
+      guardarParcelasLocales(storageKeyCuenta, listaActualizada);
 
       // Actualizar inmediatamente la capa en MapLibre y SVG con el color elegido
       actualizarFuenteParcelas(listaActualizada);
@@ -851,7 +870,7 @@ export default function ParcelasView() {
       const actualizados = potreros.filter((p) => p.id !== id);
       potrerosRef.current = actualizados;
       setPotreros(actualizados);
-      guardarParcelasLocales(actualizados);
+      guardarParcelasLocales(storageKeyCuenta, actualizados);
       actualizarFuenteParcelas(actualizados);
       setParcelaSeleccionada(null);
       mostrarNotificacion(`Parcela "${nombre}" eliminada correctamente.`);
@@ -859,7 +878,7 @@ export default function ParcelasView() {
       const actualizados = potreros.filter((p) => p.id !== id);
       potrerosRef.current = actualizados;
       setPotreros(actualizados);
-      guardarParcelasLocales(actualizados);
+      guardarParcelasLocales(storageKeyCuenta, actualizados);
       actualizarFuenteParcelas(actualizados);
       setParcelaSeleccionada(null);
       mostrarNotificacion(`Parcela "${nombre}" eliminada del mapa.`);
@@ -872,7 +891,7 @@ export default function ParcelasView() {
   function enfocarCampoCompleto() {
     if (!mapaInstanciaRef.current) return;
     let centro = CENTRO_BASE_DEFECTO;
-    const listaActual = potrerosRef.current.length > 0 ? potrerosRef.current : leerParcelasLocales();
+    const listaActual = potrerosRef.current;
     if (listaActual.length > 0 && Array.isArray(listaActual[0].coordinates) && listaActual[0].coordinates.length > 0) {
       centro = calcularCentroide(listaActual[0].coordinates);
     }

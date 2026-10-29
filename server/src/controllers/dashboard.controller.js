@@ -6,7 +6,13 @@ const WeatherService = require("../services/weather.service");
 const { exito, error } = require("../utils/apiResponse");
 
 function obtenerEstablecimientoContexto(req) {
-  const estId = req.usuario?.establecimientoId || (req.usuario?.establecimiento === "El Rancho, Goya, Corrientes" ? "est-el-rancho" : null);
+  const estId =
+    req.usuario?.establecimientoId ||
+    (req.usuario?.email === "dueno@vakera.com"
+      ? "est-el-rancho"
+      : req.usuario?.id
+      ? `est-usr-${req.usuario.id}`
+      : null);
   const estNombre = req.usuario?.establecimiento || "Mi Establecimiento";
   return { estId, estNombre };
 }
@@ -102,6 +108,21 @@ class DashboardController {
     }
   }
 
+  static async darDeBajaMasivoGanado(req, res) {
+    try {
+      const { animalIds, motivo } = req.body || {};
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const resultado = await GanadoModel.darDeBajaMasivo(animalIds, motivo || "Venta", estId);
+      return exito(
+        res,
+        resultado,
+        `Se dieron de baja ${resultado.count || animalIds.length} animales exitosamente (${motivo || "Venta"}).`
+      );
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
   static async trasladoMasivoGanado(req, res) {
     try {
       const { animalIds, potreroDestinoId } = req.body || {};
@@ -192,6 +213,54 @@ class DashboardController {
       const { cantidad, operacion } = req.body;
       const actualizado = await InsumoModel.actualizarStock(id, cantidad, operacion);
       return exito(res, actualizado, "Stock de insumo actualizado correctamente.");
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
+  static async eliminarInsumo(req, res) {
+    try {
+      const { id } = req.params;
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const eliminado = await InsumoModel.eliminar(id, estId);
+      return exito(res, eliminado, "Insumo eliminado del inventario exitosamente.");
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
+  static async eliminarInsumosMasivo(req, res) {
+    try {
+      const { ids } = req.body || {};
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const resultado = await InsumoModel.eliminarMasivo(ids, estId);
+      return exito(
+        res,
+        resultado,
+        `Se eliminaron ${resultado.count || (ids && ids.length) || 0} insumos del inventario.`
+      );
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
+  static async gestionarLocacionInsumos(req, res) {
+    try {
+      const { nombreAnterior, nuevoNombre, accion } = req.body || {};
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const resultado = await InsumoModel.gestionarLocacion({
+        nombreAnterior,
+        nuevoNombre,
+        accion,
+        establecimientoId: estId,
+      });
+      return exito(
+        res,
+        resultado,
+        accion === "eliminar"
+          ? `Locación "${nombreAnterior}" eliminada correctamente.`
+          : `Locación renombrada a "${resultado.nuevoNombre}" correctamente.`
+      );
     } catch (err) {
       return error(res, err.message, 400);
     }

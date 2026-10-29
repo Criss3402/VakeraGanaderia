@@ -222,6 +222,100 @@ class InsumoModel {
     }
   }
 
+  static async eliminar(id, establecimientoId) {
+    if (!id) throw new Error("ID de insumo requerido.");
+    try {
+      const eliminado = await prisma.insumo.delete({
+        where: { id },
+      });
+      return eliminado;
+    } catch (e) {
+      console.warn("[InsumoModel] Fallo al eliminar en Prisma, usando fallback:", e.message);
+      if (Array.isArray(db.insumos)) {
+        const idx = db.insumos.findIndex(
+          (i) => i.id === id && (!establecimientoId || !i.establecimientoId || i.establecimientoId === establecimientoId)
+        );
+        if (idx !== -1) {
+          const [del] = db.insumos.splice(idx, 1);
+          return del;
+        }
+      }
+      throw new Error("Insumo no encontrado o ya eliminado.");
+    }
+  }
+
+  static async eliminarMasivo(ids = [], establecimientoId) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new Error("Debe seleccionar al menos un insumo para eliminar.");
+    }
+    try {
+      const whereClause = { id: { in: ids } };
+      if (establecimientoId) whereClause.establecimientoId = establecimientoId;
+      const res = await prisma.insumo.deleteMany({
+        where: whereClause,
+      });
+      if (Array.isArray(db.insumos)) {
+        db.insumos = db.insumos.filter((i) => !ids.includes(i.id));
+      }
+      return { count: res.count, ids };
+    } catch (e) {
+      console.warn("[InsumoModel] Fallo en eliminarMasivo Prisma, usando memoria:", e.message);
+      if (Array.isArray(db.insumos)) {
+        const antes = db.insumos.length;
+        db.insumos = db.insumos.filter((i) => !ids.includes(i.id));
+        return { count: antes - db.insumos.length, ids };
+      }
+      return { count: 0, ids };
+    }
+  }
+
+  static async gestionarLocacion({ nombreAnterior, nuevoNombre, accion = "editar", establecimientoId }) {
+    if (!nombreAnterior) {
+      throw new Error("Debe indicar la locación a modificar.");
+    }
+    const destino = accion === "eliminar"
+      ? (nuevoNombre ? nuevoNombre.trim() : "Depósito General")
+      : (nuevoNombre || "").trim();
+
+    if (accion === "editar" && !destino) {
+      throw new Error("El nuevo nombre de la locación no puede estar vacío.");
+    }
+
+    let actualizados = 0;
+    try {
+      const whereClause = establecimientoId ? { establecimientoId } : {};
+      const lista = await prisma.insumo.findMany({ where: whereClause });
+      for (const item of lista) {
+        const norm = normalizarInsumo(item);
+        if (norm.campo === nombreAnterior) {
+          const detalle = norm.ubicacion || "Depósito Central";
+          const nuevaUbicacion = `${destino} - ${detalle}`;
+          await prisma.insumo.update({
+            where: { id: item.id },
+            data: { ubicacion: nuevaUbicacion },
+          });
+          actualizados++;
+        }
+      }
+    } catch (e) {
+      console.warn("[InsumoModel] Fallo al actualizar locación en Prisma, usando memoria:", e.message);
+    }
+
+    if (Array.isArray(db.insumos)) {
+      db.insumos.forEach((item) => {
+        if (establecimientoId && item.establecimientoId && item.establecimientoId !== establecimientoId) return;
+        const norm = normalizarInsumo(item);
+        if (norm.campo === nombreAnterior) {
+          item.campo = destino;
+          item.ubicacion = `${destino} - ${norm.ubicacion || "Depósito Central"}`;
+          actualizados++;
+        }
+      });
+    }
+
+    return { nombreAnterior, nuevoNombre: destino, accion, actualizados };
+  }
+
   // --- SOLICITUDES DE INSUMOS (PEÓN, CAPATAZ, VETERINARIO) ---
   static listarSolicitudes(establecimientoId) {
     if (!establecimientoId) return solicitudesInsumos;

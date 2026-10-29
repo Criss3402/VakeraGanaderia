@@ -97,19 +97,8 @@ async function main() {
   }
   console.log(`- ${usuariosSeed.length} usuarios creados (contraseña demo: "${PASSWORD_DEMO}").`);
 
-  // 3. Potreros
-  const potrerosSeed = [
-    { id: "pot-1", nombre: "Potrero 1 - Los Eucaliptos", superficieHas: 120, capacidad: 150 },
-    { id: "pot-2", nombre: "Potrero 2 - La Loma", superficieHas: 95, capacidad: 110 },
-    { id: "pot-3", nombre: "Potrero 3 - El Trébol", superficieHas: 140, capacidad: 180 },
-    { id: "pot-4", nombre: "Potrero 4 - Bajo Hondo", superficieHas: 80, capacidad: 90 },
-    { id: "pot-5", nombre: "Potrero 5 - La Aguada", superficieHas: 160, capacidad: 200 },
-  ];
-
-  for (const p of potrerosSeed) {
-    await prisma.potrero.create({ data: p });
-  }
-  console.log(`- ${potrerosSeed.length} potreros creados.`);
+  // 3. Sin potreros predeterminados: cada cuenta traza sus propias parcelas desde cero
+  console.log("- 0 potreros predeterminados (aislamiento por cuenta).");
 
   // 4. Ganado
   const ganadoSeed = [
@@ -120,9 +109,11 @@ async function main() {
       raza: "Angus Negro",
       sexo: "Hembra",
       pesoKg: 460,
-      potreroId: "pot-3",
+      potreroId: null,
       estadoSanitario: "SALUDABLE",
       fechaNacimiento: new Date("2022-09-14"),
+      establecimientoId: "est-el-rancho",
+      establecimiento: "El Rancho, Goya, Corrientes",
     },
     {
       id: "gan-002",
@@ -131,9 +122,11 @@ async function main() {
       raza: "Hereford",
       sexo: "Macho",
       pesoKg: 780,
-      potreroId: "pot-1",
+      potreroId: null,
       estadoSanitario: "SALUDABLE",
       fechaNacimiento: new Date("2021-04-20"),
+      establecimientoId: "est-el-rancho",
+      establecimiento: "El Rancho, Goya, Corrientes",
     },
     {
       id: "gan-003",
@@ -142,9 +135,11 @@ async function main() {
       raza: "Angus Colorado",
       sexo: "Macho",
       pesoKg: 390,
-      potreroId: "pot-5",
+      potreroId: null,
       estadoSanitario: "EN_TRATAMIENTO",
       fechaNacimiento: new Date("2023-10-05"),
+      establecimientoId: "est-el-rancho",
+      establecimiento: "El Rancho, Goya, Corrientes",
     },
     {
       id: "gan-004",
@@ -153,9 +148,11 @@ async function main() {
       raza: "Braford",
       sexo: "Hembra",
       pesoKg: 145,
-      potreroId: "pot-2",
+      potreroId: null,
       estadoSanitario: "SALUDABLE",
       fechaNacimiento: new Date("2024-03-12"),
+      establecimientoId: "est-el-rancho",
+      establecimiento: "El Rancho, Goya, Corrientes",
     },
     {
       id: "gan-005",
@@ -164,9 +161,11 @@ async function main() {
       raza: "Angus Negro",
       sexo: "Hembra",
       pesoKg: 320,
-      potreroId: "pot-4",
+      potreroId: null,
       estadoSanitario: "OBSERVACION",
       fechaNacimiento: new Date("2023-08-18"),
+      establecimientoId: "est-el-rancho",
+      establecimiento: "El Rancho, Goya, Corrientes",
     },
   ];
 
@@ -188,6 +187,8 @@ async function main() {
       estado: "Bajo Stock",
       requiereReposicion: true,
       icono: "fa-prescription-bottle-medical",
+      establecimientoId: "est-el-rancho",
+      establecimiento: "El Rancho, Goya, Corrientes",
     },
     {
       id: "ins-2",
@@ -200,6 +201,8 @@ async function main() {
       estado: "Bajo Stock",
       requiereReposicion: true,
       icono: "fa-syringe",
+      establecimientoId: "est-el-rancho",
+      establecimiento: "El Rancho, Goya, Corrientes",
     },
     {
       id: "ins-3",
@@ -212,6 +215,8 @@ async function main() {
       estado: "OK",
       requiereReposicion: false,
       icono: "fa-box-archive",
+      establecimientoId: "est-el-rancho",
+      establecimiento: "El Rancho, Goya, Corrientes",
     },
     {
       id: "ins-4",
@@ -224,6 +229,8 @@ async function main() {
       estado: "OK",
       requiereReposicion: false,
       icono: "fa-sack-xmark",
+      establecimientoId: "est-el-rancho",
+      establecimiento: "El Rancho, Goya, Corrientes",
     },
   ];
 
@@ -243,7 +250,9 @@ async function main() {
       estado: "Pendiente",
       prioridad: "Alta",
       icono: "fa-syringe",
-      responsableId: "usr-5", // Dra. Sofía Navarro
+      responsableId: "usr-5",
+      establecimientoId: "est-el-rancho",
+      establecimiento: "El Rancho, Goya, Corrientes",
     },
     {
       id: "san-2",
@@ -255,28 +264,34 @@ async function main() {
       prioridad: "Urgente",
       icono: "fa-tags",
       responsableId: "usr-5",
+      establecimientoId: "est-el-rancho",
+      establecimiento: "El Rancho, Goya, Corrientes",
     },
     {
       id: "san-3",
       evento: "Tratamiento Antiparasitario",
       tipo: "Tratamiento",
-      lote: "Novillos Potrero 5",
+      lote: "Novillos Rodeo General",
       fechaProgramada: new Date("2026-09-18"),
       estado: "Completado",
       prioridad: "Normal",
       icono: "fa-bottle-droplet",
-      responsableId: "usr-2", // Martín Benítez
+      responsableId: "usr-2",
+      establecimientoId: "est-el-rancho",
+      establecimiento: "El Rancho, Goya, Corrientes",
     },
     {
       id: "san-4",
       evento: "Revisión de alambrados",
       tipo: "Mantenimiento",
-      lote: "Potrero 2 - La Loma",
+      lote: "Perímetro General",
       fechaProgramada: new Date("2026-10-05"),
       estado: "Programado",
       prioridad: "Normal",
       icono: "fa-clipboard-check",
-      responsableId: "usr-3", // Lucas Giménez
+      responsableId: "usr-3",
+      establecimientoId: "est-el-rancho",
+      establecimiento: "El Rancho, Goya, Corrientes",
     },
   ];
 
@@ -290,26 +305,30 @@ async function main() {
     {
       id: "pd-1",
       fecha: new Date("2026-09-19"),
-      peonId: "usr-3", // Lucas Giménez
-      potreroId: "pot-2",
+      peonId: "usr-3",
+      potreroId: null,
       novedades:
         "Nacimiento de 2 terneros machos en buen estado. Alambrado perimetral este con hilo caído por viento.",
       animalesRevisados: 85,
       solicitudInsumos: "Se necesitan 10 metros de alambre y varillas.",
       estado: "PENDIENTE",
+      establecimientoId: "est-el-rancho",
+      establecimiento: "El Rancho, Goya, Corrientes",
     },
     {
       id: "pd-2",
       fecha: new Date("2026-09-18"),
       peonId: "usr-3",
-      potreroId: "pot-5",
+      potreroId: null,
       novedades:
         "Novillo AR-84922 apartado con renguera en pata trasera derecha. Se apartó a corralillo.",
       animalesRevisados: 120,
       solicitudInsumos: null,
       estado: "APROBADO",
-      revisadoPorId: "usr-2", // Martín Benítez
+      revisadoPorId: "usr-2",
       fechaRevision: new Date("2026-09-18T17:40:00Z"),
+      establecimientoId: "est-el-rancho",
+      establecimiento: "El Rancho, Goya, Corrientes",
     },
   ];
 

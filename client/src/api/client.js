@@ -4,14 +4,6 @@ export function getToken() {
   return localStorage.getItem("vakera_token") || null;
 }
 
-export function setToken(token) {
-  if (token) {
-    localStorage.setItem("vakera_token", token);
-  } else {
-    localStorage.removeItem("vakera_token");
-  }
-}
-
 // Caché en memoria para optimizar navegación instantánea y reducir peticiones redundantes
 const cachePeticiones = new Map();
 
@@ -24,6 +16,15 @@ export function limpiarCacheApi(prefijo = "") {
     if (clave.startsWith(prefijo)) {
       cachePeticiones.delete(clave);
     }
+  }
+}
+
+export function setToken(token) {
+  limpiarCacheApi();
+  if (token) {
+    localStorage.setItem("vakera_token", token);
+  } else {
+    localStorage.removeItem("vakera_token");
   }
 }
 
