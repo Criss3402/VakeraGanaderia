@@ -1,8 +1,8 @@
 /**
  * Suite de Tests Unitarios — Cliente API y Caché Inteligente en Memoria (ESM)
- * Ejecutado con el runner nativo `node --test`.
+ * Ejecutado con Vitest (migrado desde el runner nativo `node --test`; aserciones sin cambios).
  */
-import { describe, it, beforeEach } from "node:test";
+import { describe, it, beforeEach } from "vitest";
 import assert from "node:assert/strict";
 
 // Mock de localStorage para entorno Node.js

@@ -17,6 +17,9 @@
     "test:client": "npm --prefix client test",
     "py:check": "python server_py/manage.py check",
     "py:test": "python server_py/manage.py test core nutricion reportes",
+    "test:py": "python -m pytest server_py",
+    "test:int": "npm --prefix server run test:int && python -m pytest server_py -m integration",
+    "test:coverage": "npm --prefix server run test:coverage && npm --prefix client run test:coverage && python -m pytest server_py --cov=core --cov=nutricion --cov=reportes --cov-report=term-missing",
     "test": "npm run test:node && npm run test:client && npm run py:test"
   },
   "prisma": {

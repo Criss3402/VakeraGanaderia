@@ -67,7 +67,14 @@ database_url = os.getenv(
     "postgresql://postgres:postgres@localhost:5433/vakera_db?schema=public",
 )
 
-if "test" in sys.argv:
+# DJANGO_TEST_DB controla la base usada al correr tests:
+#   - "sqlite": fuerza SQLite en memoria (tests unitarios).
+#   - "postgres": usa la conexión real definida por DATABASE_URL (tests de integración).
+#   - sin definir: SQLite en memoria si se ejecuta `manage.py test` o pytest.
+_modo_test_db = os.getenv("DJANGO_TEST_DB", "").lower()
+_corriendo_tests = "test" in sys.argv or "pytest" in sys.modules
+
+if _modo_test_db == "sqlite" or (_corriendo_tests and _modo_test_db != "postgres"):
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
