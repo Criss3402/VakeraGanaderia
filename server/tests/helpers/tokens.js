@@ -13,6 +13,22 @@ process.env.DATABASE_URL =
   process.env.DATABASE_URL_TEST || "postgresql://test:test@127.0.0.1:1/vakera_test_inexistente?schema=public";
 
 const jwt = require("jsonwebtoken");
+const prisma = require("../../src/config/prisma");
+
+// En tests sin base de datos real montada, Prisma debe fallar inmediatamente
+// para que los modelos ejecuten de forma instantánea el patrón de fallback en memoria
+// sin incurrir en esperas de timeout de red TCP (de 2 a 4 segundos por consulta).
+const fallarPrismaInmediato = async () => {
+  throw new Error("Simulación DB desconectada para tests (fallback en memoria inmediato)");
+};
+
+if (prisma && prisma.usuario) {
+  prisma.usuario.findUnique = fallarPrismaInmediato;
+  prisma.usuario.findFirst = fallarPrismaInmediato;
+  prisma.usuario.findMany = fallarPrismaInmediato;
+  prisma.usuario.create = fallarPrismaInmediato;
+  prisma.usuario.update = fallarPrismaInmediato;
+}
 
 /**
  * Firma un JWT con la misma forma que `generarToken` de auth.controller.js.
@@ -42,4 +58,3 @@ function encabezadoBearer(token) {
 }
 
 module.exports = { firmarToken, encabezadoBearer };
-
