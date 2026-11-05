@@ -6,6 +6,26 @@ const { ROLES, ROLES_LIST } = require("../utils/roles.constants");
 const SALT_ROUNDS = 10;
 
 class UsuarioModel {
+  /**
+   * Sanitiza un usuario removiendo contraseñas y tokens sensibles (R6)
+   * y normalizando el rol a minúsculas.
+   */
+  static sanitizarUsuario(usuario) {
+    if (!usuario) return null;
+    const {
+      password: _p,
+      tokenVerificacion: _tv,
+      tokenExpiracion: _te,
+      tokenRecuperacion: _tr,
+      expiracionRecuperacion: _er,
+      ...usuarioLimpio
+    } = usuario;
+    return {
+      ...usuarioLimpio,
+      rol: (usuario.rol || "").toLowerCase(),
+    };
+  }
+
   static async listarTodos(establecimientoId) {
     if (!establecimientoId) return [];
     try {
@@ -13,19 +33,12 @@ class UsuarioModel {
         where: { establecimientoId },
         orderBy: { fechaRegistro: "asc" },
       });
-      return usuarios.map(({ password, ...u }) => ({
-        ...u,
-        // Normalizar a lowercase para consistencia en frontend y RBAC
-        rol: (u.rol || "").toLowerCase(),
-      }));
+      return usuarios.map((u) => this.sanitizarUsuario(u));
     } catch (e) {
       console.warn("Fallo al consultar Prisma, usando fallback en memoria:", e.message);
       return (db.usuarios || [])
         .filter((u) => u.establecimientoId === establecimientoId)
-        .map(({ password, ...u }) => ({
-          ...u,
-          rol: (u.rol || "").toLowerCase(),
-        }));
+        .map((u) => this.sanitizarUsuario(u));
     }
   }
 
@@ -34,18 +47,18 @@ class UsuarioModel {
     try {
       const usuario = await prisma.usuario.findUnique({ where: { id } });
       if (usuario) {
-        const { password, ...resto } = usuario;
-        const rolFinal = (id === "usr-1" || usuario.email === "dueno@vakera.com") ? "dueno" : (usuario.rol || "").toLowerCase();
-        return { ...resto, rol: rolFinal };
+        const usuarioLimpio = this.sanitizarUsuario(usuario);
+        const rolFinal = (id === "usr-1" || usuario.email === "dueno@vakera.com") ? "dueno" : usuarioLimpio.rol;
+        return { ...usuarioLimpio, rol: rolFinal };
       }
     } catch (e) {
       console.warn("Fallo al consultar usuario por ID en Prisma:", e.message);
     }
     const usuarioMemoria = (db.usuarios || []).find((u) => u.id === id);
     if (usuarioMemoria) {
-      const { password, ...resto } = usuarioMemoria;
-      const rolFinal = (id === "usr-1" || usuarioMemoria.email === "dueno@vakera.com") ? "dueno" : (resto.rol || "").toLowerCase();
-      return { ...resto, rol: rolFinal };
+      const usuarioLimpio = this.sanitizarUsuario(usuarioMemoria);
+      const rolFinal = (id === "usr-1" || usuarioMemoria.email === "dueno@vakera.com") ? "dueno" : usuarioLimpio.rol;
+      return { ...usuarioLimpio, rol: rolFinal };
     }
     return null;
   }
@@ -84,18 +97,18 @@ class UsuarioModel {
         where: { email: emailNormalizado },
       });
       if (usuario) {
-        const { password, ...resto } = usuario;
-        const rolFinal = emailNormalizado === "dueno@vakera.com" ? "dueno" : (usuario.rol || "").toLowerCase();
-        return { ...resto, rol: rolFinal };
+        const usuarioLimpio = this.sanitizarUsuario(usuario);
+        const rolFinal = emailNormalizado === "dueno@vakera.com" ? "dueno" : usuarioLimpio.rol;
+        return { ...usuarioLimpio, rol: rolFinal };
       }
     } catch (e) {
       console.warn("Fallo al consultar usuario en Prisma:", e.message);
     }
     const usuarioMemoria = (db.usuarios || []).find((u) => u.email.toLowerCase() === emailNormalizado);
     if (usuarioMemoria) {
-      const { password, ...resto } = usuarioMemoria;
-      const rolFinal = emailNormalizado === "dueno@vakera.com" ? "dueno" : (resto.rol || "").toLowerCase();
-      return { ...resto, rol: rolFinal };
+      const usuarioLimpio = this.sanitizarUsuario(usuarioMemoria);
+      const rolFinal = emailNormalizado === "dueno@vakera.com" ? "dueno" : usuarioLimpio.rol;
+      return { ...usuarioLimpio, rol: rolFinal };
     }
     return null;
   }
@@ -130,16 +143,14 @@ class UsuarioModel {
           tokenExpiracion: null,
         },
       });
-      const { password, ...resto } = actualizado;
-      return { ...resto, rol: (actualizado.rol || "").toLowerCase() };
+      return this.sanitizarUsuario(actualizado);
     } catch {
       const usuario = db.usuarios.find((u) => u.id === id);
       if (!usuario) return null;
       usuario.emailVerificado = true;
       usuario.tokenVerificacion = null;
       usuario.tokenExpiracion = null;
-      const { password, ...resto } = usuario;
-      return { ...resto, rol: (resto.rol || "").toLowerCase() };
+      return this.sanitizarUsuario(usuario);
     }
   }
 
@@ -220,8 +231,7 @@ class UsuarioModel {
           emailVerificado: true, // Si recuperó vía email, confirmamos su correo
         },
       });
-      const { password, ...resto } = actualizado;
-      return { ...resto, rol: (actualizado.rol || "").toLowerCase() };
+      return this.sanitizarUsuario(actualizado);
     } catch {
       const usuario = db.usuarios.find((u) => u.id === id);
       if (!usuario) return null;
@@ -229,8 +239,7 @@ class UsuarioModel {
       usuario.tokenRecuperacion = null;
       usuario.expiracionRecuperacion = null;
       usuario.emailVerificado = true;
-      const { password, ...resto } = usuario;
-      return { ...resto, rol: (resto.rol || "").toLowerCase() };
+      return this.sanitizarUsuario(usuario);
     }
   }
 
@@ -286,8 +295,7 @@ class UsuarioModel {
         },
       });
 
-      const { password: _, ...usuarioCreado } = nuevo;
-      return { ...usuarioCreado, rol: (nuevo.rol || "").toLowerCase() };
+      return this.sanitizarUsuario(nuevo);
     } catch (err) {
       console.warn("Fallo al persistir en Prisma, guardando en memoria:", err.message);
       const nuevoUsuario = {
@@ -309,8 +317,7 @@ class UsuarioModel {
       };
 
       db.usuarios.push(nuevoUsuario);
-      const { password: _, ...usuarioCreado } = nuevoUsuario;
-      return { ...usuarioCreado, rol: (usuarioCreado.rol || "").toLowerCase() };
+      return this.sanitizarUsuario(nuevoUsuario);
     }
   }
 
@@ -332,8 +339,7 @@ class UsuarioModel {
         where: { id },
         data: { rol: rolNormalizado },
       });
-      const { password, ...usuarioActualizado } = usuario;
-      return { ...usuarioActualizado, rol: (usuario.rol || "").toLowerCase() };
+      return this.sanitizarUsuario(usuario);
     } catch (err) {
       if (err.code === "P2025") {
         throw new Error("Usuario no encontrado.");
@@ -343,8 +349,7 @@ class UsuarioModel {
         throw new Error("Usuario no encontrado.");
       }
       usuario.rol = nuevoRol.toLowerCase();
-      const { password, ...usuarioActualizado } = usuario;
-      return { ...usuarioActualizado, rol: (usuarioActualizado.rol || "").toLowerCase() };
+      return this.sanitizarUsuario(usuario);
     }
   }
 
@@ -378,8 +383,7 @@ class UsuarioModel {
           cargo: cargoFinal,
         },
       });
-      const { password, ...resto } = actualizado;
-      return { ...resto, rol: (actualizado.rol || "").toLowerCase() };
+      return this.sanitizarUsuario(actualizado);
     } catch (e) {
       const u = db.usuarios.find((usr) => usr.id === usuarioExistente.id);
       if (u) {
@@ -387,8 +391,7 @@ class UsuarioModel {
         u.establecimiento = establecimiento;
         u.rol = rolMayus.toLowerCase();
         u.cargo = cargoFinal;
-        const { password, ...resto } = u;
-        return { ...resto, rol: (u.rol || "").toLowerCase() };
+        return this.sanitizarUsuario(u);
       }
       throw e;
     }
@@ -412,16 +415,14 @@ class UsuarioModel {
           cargo: "Sin asignar",
         },
       });
-      const { password, ...resto } = actualizado;
-      return { ...resto, rol: (actualizado.rol || "").toLowerCase() };
+      return this.sanitizarUsuario(actualizado);
     } catch (e) {
       const u = db.usuarios.find((usr) => usr.id === id);
       if (u) {
         u.establecimientoId = null;
         u.establecimiento = null;
         u.cargo = "Sin asignar";
-        const { password, ...resto } = u;
-        return { ...resto, rol: (u.rol || "").toLowerCase() };
+        return this.sanitizarUsuario(u);
       }
       throw e;
     }

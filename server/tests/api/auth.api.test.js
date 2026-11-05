@@ -51,7 +51,7 @@ describe("API — /api/auth (Autenticación, Registro y Ciclo de Vida de Credenc
       assert.equal(res.body.data.usuario.password, undefined);
     });
 
-    it("el body de la respuesta no contiene tokenVerificacion, password ni tokenExpiracion (R1)", { todo: "R1: el endpoint de registro filtra tokenVerificacion en data.usuario" }, async () => {
+    it("el body de la respuesta no contiene tokenVerificacion, password ni tokenExpiracion (R1)", async () => {
       const res = await request(app)
         .post("/api/auth/registro")
         .send({
@@ -64,7 +64,7 @@ describe("API — /api/auth (Autenticación, Registro y Ciclo de Vida de Credenc
       assertSinSecretos(res.body);
     });
 
-    it("intento de escalada: usuario no puede registrarse como dueño de un tenant ajeno (R2)", { todo: "R2: escalada de privilegios en registro permite asociar establecimientoId arbitrario" }, async () => {
+    it("intento de escalada: usuario no puede registrarse como dueño de un tenant ajeno (R2)", async () => {
       const res = await request(app)
         .post("/api/auth/registro")
         .send({
@@ -155,7 +155,7 @@ describe("API — /api/auth (Autenticación, Registro y Ciclo de Vida de Credenc
       assert.equal(decodificado.establecimientoId, "est-el-rancho");
     });
 
-    it("la respuesta de login no expone secretos ni tokens en el objeto usuario (R6)", { todo: "R6: login expone tokenVerificacion y tokenRecuperacion en usuario" }, async () => {
+    it("la respuesta de login no expone secretos ni tokens en el objeto usuario (R6)", async () => {
       const res = await request(app)
         .post("/api/auth/login")
         .send({
@@ -494,7 +494,7 @@ describe("API — /api/auth (Autenticación, Registro y Ciclo de Vida de Credenc
       assert.equal(res.body.data.usuario.password, undefined);
     });
 
-    it("/me no expone secretos ni tokens en el cuerpo de respuesta (R6)", { todo: "R6: /me expone tokenVerificacion y tokenRecuperacion" }, async () => {
+    it("/me no expone secretos ni tokens en el cuerpo de respuesta (R6)", async () => {
       const token = firmarToken({ id: "usr-1", rol: "dueno" });
 
       const res = await request(app)

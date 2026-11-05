@@ -116,7 +116,7 @@ describe("UsuarioModel — Lógica de Persistencia y Reglas de Negocio", () => {
       assert.equal(usuario.password, undefined);
     });
 
-    it("buscarPorId no expone tokens de verificación ni recuperación en la respuesta (R6)", { todo: "R6: buscarPorId solo remueve password y conserva tokens" }, async () => {
+    it("buscarPorId no expone tokens de verificación ni recuperación en la respuesta (R6)", async () => {
       const usuario = await UsuarioModel.buscarPorId("usr-2");
       assert.ok(usuario);
       assertSinSecretos(usuario);
@@ -146,7 +146,7 @@ describe("UsuarioModel — Lógica de Persistencia y Reglas de Negocio", () => {
       assert.equal(usuario.password, undefined);
     });
 
-    it("buscarPorEmail no expone tokens de verificación ni recuperación en la respuesta (R6)", { todo: "R6: buscarPorEmail conserva tokens" }, async () => {
+    it("buscarPorEmail no expone tokens de verificación ni recuperación en la respuesta (R6)", async () => {
       const usuario = await UsuarioModel.buscarPorEmail("capataz@vakera.com");
       assert.ok(usuario);
       assertSinSecretos(usuario);
@@ -301,8 +301,8 @@ describe("UsuarioModel — Lógica de Persistencia y Reglas de Negocio", () => {
 
       const activado = await UsuarioModel.marcarEmailVerificado(nuevo.id);
       assert.equal(activado.emailVerificado, true);
-      assert.equal(activado.tokenVerificacion, null);
-      assert.equal(activado.tokenExpiracion, null);
+      assert.ok(!activado.tokenVerificacion);
+      assert.ok(!activado.tokenExpiracion);
 
       const yaNoEncuentra = await UsuarioModel.buscarPorTokenVerificacion("123456");
       assert.equal(yaNoEncuentra, null);
@@ -324,7 +324,7 @@ describe("UsuarioModel — Lógica de Persistencia y Reglas de Negocio", () => {
 
       const restablecido = await UsuarioModel.restablecerPassword(nuevo.id, "nuevaPassword456");
       assert.ok(restablecido);
-      assert.equal(restablecido.tokenRecuperacion, null);
+      assert.ok(!restablecido.tokenRecuperacion);
 
       // Comprobar que la nueva clave funciona
       const conClave = await UsuarioModel.buscarPorEmailConPassword("recuperar@example.test");

@@ -140,7 +140,7 @@ describe("API — /api/permisos (Gestión de Roles, Asignación y Control de Emp
       assert.match(res.body.error, /Acceso denegado/i);
     });
 
-    it("los usuarios listados no exponen secretos ni tokens sensibles (R6)", { todo: "R6: permisos/usuarios expone tokenVerificacion y tokenRecuperacion" }, async () => {
+    it("los usuarios listados no exponen secretos ni tokens sensibles (R6)", async () => {
       const token = firmarToken({
         id: "usr-1",
         rol: ROLES.DUENO,
@@ -326,7 +326,7 @@ describe("API — /api/permisos (Gestión de Roles, Asignación y Control de Emp
       assert.equal(res.body.data.password, undefined);
     });
 
-    it("la respuesta de vinculación no expone secretos (R6)", { todo: "R6: solicitar-empleado expone tokens de verificación/recuperación" }, async () => {
+    it("la respuesta de vinculación no expone secretos (R6)", async () => {
       db.usuarios.push({
         id: "usr-candidato-2",
         nombre: "Candidato 2",

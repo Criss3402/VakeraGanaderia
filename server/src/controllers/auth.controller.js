@@ -53,7 +53,7 @@ class AuthController {
     }
 
     const token = generarToken(usuario);
-    const { password: _, ...usuarioSinPassword } = usuario;
+    const usuarioSinPassword = UsuarioModel.sanitizarUsuario(usuario);
 
     return exito(
       res,
@@ -66,7 +66,7 @@ class AuthController {
   }
 
   static async registro(req, res) {
-    const { nombre, email, password, rol, cargo, establecimiento, establecimientoId, telefono } = req.body || {};
+    const { nombre, email, password, rol, cargo, establecimiento, telefono } = req.body || {};
 
     if (!nombre || !email || !password) {
       return error(res, "Nombre, email y contraseña son obligatorios.", 400);
@@ -93,7 +93,7 @@ class AuthController {
         rol: rol || "dueno",
         cargo: cargo || (rol === "dueno" ? "Propietario / Director" : "Colaborador"),
         establecimiento: establecimiento || "Mi Establecimiento Ganadero",
-        establecimientoId,
+        establecimientoId: undefined, // Seguridad (R2): ignorar establecimientoId externo en registro público
         telefono,
         emailVerificado: false,
         tokenVerificacion,
