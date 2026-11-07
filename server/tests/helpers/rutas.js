@@ -35,6 +35,8 @@ for (const model of modelosPrisma) {
       "deleteMany",
       "updateMany",
       "count",
+      "aggregate",
+      "groupBy",
     ]) {
       if (typeof prisma[model][method] === "function") {
         prisma[model][method] = fallarPrismaInmediato;

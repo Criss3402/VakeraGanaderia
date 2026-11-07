@@ -27,6 +27,7 @@ const {
   MATRIZ_RBAC_ESPERADA,
 } = require("../helpers/rutas");
 const app = require("../../src/index");
+const db = require("../../src/config/db");
 const { ROLES } = require("../../src/utils/roles.constants");
 
 describe("Fase 3B — Test de Completitud de Rutas de Express", () => {
@@ -87,12 +88,6 @@ describe("Fase 3B — Test de Completitud de Rutas de Express", () => {
 });
 
 describe("Fase 3B — Matriz RBAC Completa por Tabla (36 rutas protegidas × 6 identidades)", () => {
-  beforeEach(() => {
-    resetearMemoria();
-  });
-
-  const rutasProtegidas = MATRIZ_RBAC_ESPERADA.filter((r) => r.requiereAuth);
-
   // Generar tokens para cada uno de los 5 roles del sistema
   const tokensPorRol = {};
   for (const rol of ROLES_SISTEMA) {
@@ -100,8 +95,29 @@ describe("Fase 3B — Matriz RBAC Completa por Tabla (36 rutas protegidas × 6 i
       id: `usr-${rol}-test`,
       rol,
       establecimientoId: "est-el-rancho",
+      establecimiento: "El Rancho, Goya, Corrientes",
     });
   }
+
+  beforeEach(() => {
+    resetearMemoria();
+
+    // Sembrar usuarios con emailVerificado para cada rol evaluado
+    if (!Array.isArray(db.usuarios)) db.usuarios = [];
+    for (const rol of ROLES_SISTEMA) {
+      db.usuarios.push({
+        id: `usr-${rol}-test`,
+        nombre: `Usuario ${rol}`,
+        email: `${rol}@vakera.test`,
+        rol,
+        emailVerificado: true,
+        establecimientoId: "est-el-rancho",
+        establecimiento: "El Rancho, Goya, Corrientes",
+      });
+    }
+  });
+
+  const rutasProtegidas = MATRIZ_RBAC_ESPERADA.filter((r) => r.requiereAuth);
 
   for (const item of rutasProtegidas) {
     const { metodo, ruta, rolesPermitidos, bodyEjemplo } = item;
@@ -151,7 +167,7 @@ describe("Fase 3B — Matriz RBAC Completa por Tabla (36 rutas protegidas × 6 i
             assert.notEqual(
               res.status,
               403,
-              `Rol ${rol} debería tener acceso permitido en ${metodo} ${rutaResuelta}, pero recibió 403: ${res.body.error}`
+              `Rol ${rol} debería tener acceso permitido en ${metodo} ${rutaResuelta}, pero recibió 403: ${res.body?.error}`
             );
           });
         } else {
@@ -231,4 +247,3 @@ describe("Fase 3B — Defecto de Seguridad R4: GET /api/contacto", () => {
     }
   );
 });
-
