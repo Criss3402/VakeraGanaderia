@@ -2,7 +2,7 @@
  * Suite de Tests Unitarios — Cliente API y Caché Inteligente en Memoria (ESM)
  * Ejecutado con Vitest (migrado desde el runner nativo `node --test`; aserciones sin cambios).
  */
-import { describe, it, beforeEach } from "vitest";
+import { describe, it, beforeEach, vi } from "vitest";
 import assert from "node:assert/strict";
 
 // Mock de localStorage para entorno Node.js
@@ -110,6 +110,105 @@ describe("Frontend API Client y Caché en Memoria (client.js)", () => {
         assert.equal(err.message, "Acceso restringido al rol Dueño");
         assert.equal(err.status, 403);
         assert.deepEqual(err.detalles, { rolRequerido: "dueno" });
+        return true;
+      }
+    );
+  });
+
+  it("invalida la caché una vez vencido el TTL configurado (reloj virtual)", async () => {
+    vi.useFakeTimers();
+    try {
+      await request("/dashboard/metricas");
+      assert.equal(fetchCalls.length, 1);
+
+      // Dentro del TTL de 30 segundos: lee de caché
+      vi.advanceTimersByTime(25000);
+      await request("/dashboard/metricas");
+      assert.equal(fetchCalls.length, 1);
+
+      // Superados los 30 segundos (35 segundos total): caché expirada
+      vi.advanceTimersByTime(10000);
+      await request("/dashboard/metricas");
+      assert.equal(fetchCalls.length, 2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("setToken purga completamente la memoria caché para evitar fuga de datos entre sesiones", async () => {
+    await request("/dashboard/metricas");
+    assert.equal(fetchCalls.length, 1);
+
+    // Cambio de sesión o usuario
+    setToken("nuevo-token-usuario-2");
+
+    // Debe volver a consultar a la red
+    await request("/dashboard/metricas");
+    assert.equal(fetchCalls.length, 2);
+  });
+
+  it("soporta ttlMs: 0 deshabilitando el almacenamiento en caché para peticiones efímeras", async () => {
+    await request("/dashboard/metricas", { ttlMs: 0 });
+    await request("/dashboard/metricas", { ttlMs: 0 });
+
+    assert.equal(fetchCalls.length, 2);
+  });
+
+  it("una mutación solo invalida el prefijo correspondiente sin afectar otros recursos cacheados", async () => {
+    // 1. Cachear dos recursos con distinta raíz
+    await request("/dashboard/ganado");
+    await request("/contacto/info");
+    assert.equal(fetchCalls.length, 2);
+
+    // 2. Mutación en /dashboard
+    await request("/dashboard/ganado", {
+      method: "POST",
+      body: JSON.stringify({ caravana: "AR-1234" }),
+    });
+    assert.equal(fetchCalls.length, 3);
+
+    // 3. /contacto/info debe permanecer en caché (no incrementa llamadas a red)
+    await request("/contacto/info");
+    assert.equal(fetchCalls.length, 3);
+
+    // 4. /dashboard/ganado fue purgado y requiere nueva petición
+    await request("/dashboard/ganado");
+    assert.equal(fetchCalls.length, 4);
+  });
+
+  it("maneja respuestas no-JSON ante fallos HTTP 502/500 con mensaje por defecto", async () => {
+    globalThis.fetch = async () => ({
+      ok: false,
+      status: 502,
+      json: async () => {
+        throw new Error("Unexpected token < in JSON at position 0");
+      },
+    });
+
+    await assert.rejects(
+      async () => {
+        await request("/servicios");
+      },
+      (err) => {
+        assert.equal(err.message, "Error HTTP 502");
+        assert.equal(err.status, 502);
+        return true;
+      }
+    );
+  });
+
+  it("propaga excepciones de red cuando fetch falla (TypeError: Failed to fetch)", async () => {
+    globalThis.fetch = async () => {
+      throw new TypeError("Failed to fetch");
+    };
+
+    await assert.rejects(
+      async () => {
+        await request("/dashboard/metricas");
+      },
+      (err) => {
+        assert.equal(err.name, "TypeError");
+        assert.equal(err.message, "Failed to fetch");
         return true;
       }
     );
