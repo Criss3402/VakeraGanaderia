@@ -26,6 +26,7 @@ const presentacionRoutes = require("./routes/presentacion.routes");
 const authRoutes = require("./routes/auth.routes");
 const dashboardRoutes = require("./routes/dashboard.routes");
 const permisosRoutes = require("./routes/permisos.routes");
+const chatRoutes = require("./routes/chat.routes");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -79,6 +80,9 @@ app.use("/api/dashboard", dashboardRoutes);
 
 // [PARTE 4: PERMISOS Y ROLES] -> /api/permisos/roles, /api/permisos/usuarios
 app.use("/api/permisos", permisosRoutes);
+
+// [PARTE 5: CHAT COMPARTIMENTADO POR ROL Y CAMPO] -> /api/chat/contactos, /api/chat/mensajes
+app.use("/api/chat", chatRoutes);
 
 // Manejo de rutas inexistentes
 app.use((req, res) => {

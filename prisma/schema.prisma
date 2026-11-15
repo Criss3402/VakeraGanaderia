@@ -56,9 +56,13 @@ model Usuario {
   expiracionRecuperacion DateTime?
 
   // Relaciones
-  partesCreados   ParteDiario[]   @relation("PeonPartes")
-  partesRevisados ParteDiario[]   @relation("RevisorPartes")
-  eventosACargo   SanidadEvento[] @relation("ResponsableEventos")
+  partesCreados     ParteDiario[]         @relation("PeonPartes")
+  partesRevisados   ParteDiario[]         @relation("RevisorPartes")
+  eventosACargo     SanidadEvento[]       @relation("ResponsableEventos")
+  mensajesEnviados  MensajeChat[]         @relation("MensajesEnviados")
+  mensajesRecibidos MensajeChat[]         @relation("MensajesRecibidos")
+  contactosOcultos  ChatContactoOculto[]  @relation("ContactosOcultosUsuario")
+  ocultadoPor       ChatContactoOculto[]  @relation("ContactosOcultosObjetivo")
 
   @@map("usuarios")
 }
@@ -200,4 +204,41 @@ model MensajeContacto {
   fechaEnvio DateTime @default(now())
 
   @@map("mensajes_contacto")
+}
+
+// 8. Módulo de Chat Compartimentado por Establecimiento y Rol
+model MensajeChat {
+  id                String   @id @default(cuid())
+  contenido         String
+  leido             Boolean  @default(false)
+  fechaEnvio        DateTime @default(now())
+  establecimientoId String
+
+  remitenteId       String
+  remitente         Usuario  @relation("MensajesEnviados", fields: [remitenteId], references: [id], onDelete: Cascade)
+
+  destinatarioId    String
+  destinatario      Usuario  @relation("MensajesRecibidos", fields: [destinatarioId], references: [id], onDelete: Cascade)
+
+  @@index([establecimientoId, fechaEnvio])
+  @@index([remitenteId, destinatarioId])
+  @@index([destinatarioId, leido])
+  @@map("mensajes_chat")
+}
+
+// 9. Contactos Ocultos / Borrados de la Vista Activa de Chat (Soft Delete)
+model ChatContactoOculto {
+  id                String   @id @default(cuid())
+  establecimientoId String
+  fechaOcultado     DateTime @default(now())
+
+  usuarioId         String
+  usuario           Usuario  @relation("ContactosOcultosUsuario", fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  contactoId        String
+  contacto          Usuario  @relation("ContactosOcultosObjetivo", fields: [contactoId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, contactoId])
+  @@index([usuarioId, establecimientoId])
+  @@map("chat_contactos_ocultos")
 }

@@ -343,6 +343,10 @@ const db = {
   ],
 
   mensajesContacto: [],
+
+  mensajesChat: [],
+
+  chatContactosOcultos: [],
 };
 
 module.exports = db;

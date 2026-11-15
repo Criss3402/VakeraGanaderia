@@ -17,6 +17,9 @@ const InsumoModel = require("../src/models/insumo.model");
 const ParteDiarioModel = require("../src/models/parteDiario.model");
 const PermisosController = require("../src/controllers/permisos.controller");
 const DashboardController = require("../src/controllers/dashboard.controller");
+const ChatController = require("../src/controllers/chat.controller");
+const { ChatModel, MATRIZ_CHAT_ROLES } = require("../src/models/chat.model");
+const db = require("../src/config/db");
 
 const JWT_SECRET = process.env.JWT_SECRET || "vakera_dev_secret_no_usar_en_produccion";
 
@@ -387,4 +390,180 @@ describe("5. Controladores y Cabeceras de Optimización", () => {
     assert.match(res.body.error, /Estado inválido/i);
   });
 });
+
+describe("6. Módulo de Chat Compartimentado (Matriz Estricta por Rol y Espacio/Campo)", () => {
+  const campoTest = "est-chat-test";
+  let snapshotUsuarios;
+  let origFindUnique;
+  let origFindMany;
+
+  before(() => {
+    snapshotUsuarios = structuredClone(db.usuarios);
+    origFindUnique = prisma.usuario.findUnique;
+    origFindMany = prisma.usuario.findMany;
+
+    // Forzar fallback en memoria durante el test unitario
+    prisma.usuario.findUnique = async () => {
+      throw new Error("Usar memoria en test de chat");
+    };
+    prisma.usuario.findMany = async () => {
+      throw new Error("Usar memoria en test de chat");
+    };
+
+    // Registrar los 5 roles dentro del mismo campoTest y 1 usuario fuera del campo
+    db.usuarios.push(
+      {
+        id: "usr-chat-dueno",
+        nombre: "Dueño Estancia",
+        email: "dueno.chat@vakera.com",
+        rol: "dueno",
+        establecimientoId: campoTest,
+        establecimiento: "Campo Norte",
+      },
+      {
+        id: "usr-chat-admin",
+        nombre: "Admin Oficina",
+        email: "admin.chat@vakera.com",
+        rol: "oficina",
+        establecimientoId: campoTest,
+        establecimiento: "Campo Norte",
+      },
+      {
+        id: "usr-chat-vet",
+        nombre: "Vet Estancia",
+        email: "vet.chat@vakera.com",
+        rol: "veterinario",
+        establecimientoId: campoTest,
+        establecimiento: "Campo Norte",
+      },
+      {
+        id: "usr-chat-capataz",
+        nombre: "Capataz Estancia",
+        email: "capataz.chat@vakera.com",
+        rol: "capataz",
+        establecimientoId: campoTest,
+        establecimiento: "Campo Norte",
+      },
+      {
+        id: "usr-chat-peon",
+        nombre: "Peón Estancia",
+        email: "peon.chat@vakera.com",
+        rol: "peon",
+        establecimientoId: campoTest,
+        establecimiento: "Campo Norte",
+      },
+      {
+        id: "usr-chat-otro-campo",
+        nombre: "Capataz Ajeno",
+        email: "ajeno.chat@vakera.com",
+        rol: "capataz",
+        establecimientoId: "est-otro-campo",
+        establecimiento: "Otro Campo",
+      },
+      {
+        id: "usr-chat-sin-campo",
+        nombre: "Veterinario Sin Campo",
+        email: "sincampo.chat@vakera.com",
+        rol: "veterinario",
+        establecimientoId: null,
+        establecimiento: null,
+      }
+    );
+  });
+
+  after(() => {
+    db.usuarios = snapshotUsuarios;
+    db.mensajesChat = [];
+    db.chatContactosOcultos = [];
+    prisma.usuario.findUnique = origFindUnique;
+    prisma.usuario.findMany = origFindMany;
+  });
+
+  it("verifica la matriz exacta de permisos para PEÓN, CAPATAZ, VETERINARIO, ADMINISTRADOR y DUEÑO", () => {
+    assert.deepEqual(MATRIZ_CHAT_ROLES.peon, ["capataz"]);
+    assert.deepEqual(MATRIZ_CHAT_ROLES.capataz.slice().sort(), ["oficina", "peon", "veterinario"]);
+    assert.deepEqual(MATRIZ_CHAT_ROLES.veterinario.slice().sort(), ["capataz", "dueno", "oficina"]);
+    assert.deepEqual(MATRIZ_CHAT_ROLES.oficina.slice().sort(), ["capataz", "dueno", "veterinario"]);
+    assert.deepEqual(MATRIZ_CHAT_ROLES.dueno.slice().sort(), ["oficina", "veterinario"]);
+  });
+
+  it("PEÓN solo ve al CAPATAZ registrado en su mismo espacio (campo)", async () => {
+    const res = await ChatModel.listarContactosPermitidos("usr-chat-peon");
+    assert.equal(res.contactos.length, 1);
+    assert.equal(res.contactos[0].id, "usr-chat-capataz");
+    assert.equal(res.contactos[0].rol, "capataz");
+  });
+
+  it("CAPATAZ ve únicamente a ADMINISTRADOR, PEÓN y VETERINARIO de su campo (no ve a DUEÑO ni a otros campos)", async () => {
+    const res = await ChatModel.listarContactosPermitidos("usr-chat-capataz");
+    const ids = res.contactos.map((c) => c.id).sort();
+    assert.deepEqual(ids, ["usr-chat-admin", "usr-chat-peon", "usr-chat-vet"]);
+  });
+
+  it("VETERINARIO ve únicamente a DUEÑO, ADMINISTRADOR y CAPATAZ de su campo", async () => {
+    const res = await ChatModel.listarContactosPermitidos("usr-chat-vet");
+    const ids = res.contactos.map((c) => c.id).sort();
+    assert.deepEqual(ids, ["usr-chat-admin", "usr-chat-capataz", "usr-chat-dueno"]);
+  });
+
+  it("ADMINISTRADOR (oficina) ve únicamente a CAPATAZ, VETERINARIO y DUEÑO de su campo", async () => {
+    const res = await ChatModel.listarContactosPermitidos("usr-chat-admin");
+    const ids = res.contactos.map((c) => c.id).sort();
+    assert.deepEqual(ids, ["usr-chat-capataz", "usr-chat-dueno", "usr-chat-vet"]);
+  });
+
+  it("DUEÑO ve únicamente a VETERINARIO y ADMINISTRADOR de su campo", async () => {
+    const res = await ChatModel.listarContactosPermitidos("usr-chat-dueno");
+    const ids = res.contactos.map((c) => c.id).sort();
+    assert.deepEqual(ids, ["usr-chat-admin", "usr-chat-vet"]);
+  });
+
+  it("bloquea con 403 el envío de mensajes entre roles no permitidos (ej. PEÓN -> DUEÑO) o de distinto campo", async () => {
+    const reqProhibidoRol = {
+      usuario: { id: "usr-chat-peon" },
+      body: { destinatarioId: "usr-chat-dueno", contenido: "Hola patrón" },
+    };
+    const resRol = crearMockRes();
+    await ChatController.enviarMensaje(reqProhibidoRol, resRol);
+    assert.equal(resRol.statusCode, 403);
+    assert.equal(resRol.body.ok, false);
+
+    const reqOtroCampo = {
+      usuario: { id: "usr-chat-peon" },
+      body: { destinatarioId: "usr-chat-otro-campo", contenido: "Hola otro campo" },
+    };
+    const resCampo = crearMockRes();
+    await ChatController.enviarMensaje(reqOtroCampo, resCampo);
+    assert.equal(resCampo.statusCode, 403);
+    assert.equal(resCampo.body.ok, false);
+  });
+
+  it("permite enviar mensajes entre roles autorizados y ocultar/borrar contacto de la vista activa", async () => {
+    const reqEnvio = {
+      usuario: { id: "usr-chat-peon" },
+      body: { destinatarioId: "usr-chat-capataz", contenido: "Potrero 3 revisado sin novedades." },
+    };
+    const resEnvio = crearMockRes();
+    await ChatController.enviarMensaje(reqEnvio, resEnvio);
+    assert.equal(resEnvio.statusCode, 201);
+    assert.equal(resEnvio.body.ok, true);
+    assert.equal(resEnvio.body.data.contenido, "Potrero 3 revisado sin novedades.");
+
+    // Ocultar / borrar el contacto de la lista activa del peón
+    const reqOcultar = {
+      usuario: { id: "usr-chat-peon" },
+      params: { contactoId: "usr-chat-capataz" },
+    };
+    const resOcultar = crearMockRes();
+    await ChatController.ocultarContacto(reqOcultar, resOcultar);
+    assert.equal(resOcultar.statusCode, 200);
+    assert.equal(resOcultar.body.data.oculto, true);
+
+    // Verificar que ya no aparece en la vista activa de contactos del peón
+    const listaDespues = await ChatModel.listarContactosPermitidos("usr-chat-peon");
+    assert.equal(listaDespues.contactos.length, 0);
+    assert.equal(listaDespues.ocultosCount, 1);
+  });
+});
+
 
