@@ -199,12 +199,126 @@ function leerParcelasLocales(storageKey) {
   }
 }
 
-function guardarParcelasLocales(storageKey, lista) {
+function obtenerCuentaScope(usuario) {
+  return (
+    usuario?.establecimientoId ||
+    usuario?.id ||
+    usuario?.email ||
+    "default"
+  );
+}
+
+function leerRenombresParcelas(usuario) {
+  try {
+    const cuentaScope = obtenerCuentaScope(usuario);
+    const raw = localStorage.getItem(`vakera_parcelas_renombres_${cuentaScope}`);
+    return raw ? JSON.parse(raw) : {};
+  } catch (err) {
+    console.warn("Aviso al leer renombres de parcelas:", err.message);
+    return {};
+  }
+}
+
+function guardarParcelasLocales(storageKey, lista, usuario, { desbloquearNombre = null } = {}) {
   try {
     localStorage.removeItem("vakera_potreros_geometrias_v2");
     if (!storageKey) return;
     localStorage.setItem(storageKey, JSON.stringify(lista));
-  } catch (_) {}
+
+    // Sincronizar automáticamente las parcelas delimitadas con las Locaciones / Campos de Insumos
+    const cuentaScope = obtenerCuentaScope(usuario);
+    const storageKeyLocaciones = `vakera_locaciones_${cuentaScope}`;
+    const storageKeyEliminadas = `vakera_locaciones_excluidas_${cuentaScope}`;
+    const renombres = leerRenombresParcelas(usuario);
+
+    let excluidasActuales = [];
+    try {
+      const rawExcl = localStorage.getItem(storageKeyEliminadas);
+      if (rawExcl) {
+        const parsedExcl = JSON.parse(rawExcl);
+        if (Array.isArray(parsedExcl)) excluidasActuales = parsedExcl;
+      }
+    } catch (err) {
+      console.warn("Aviso al leer locaciones excluidas:", err.message);
+    }
+
+    if (desbloquearNombre) {
+      const desbloqLower = desbloquearNombre.trim().toLowerCase();
+      excluidasActuales = excluidasActuales.filter(
+        (loc) => String(loc).trim().toLowerCase() !== desbloqLower
+      );
+      localStorage.setItem(storageKeyEliminadas, JSON.stringify(excluidasActuales));
+    }
+
+    const nombresParcelas = (Array.isArray(lista) ? lista : [])
+      .map((p) => (p?.nombre || "").trim())
+      .filter(
+        (nombre) =>
+          Boolean(nombre) &&
+          !excluidasActuales.some(
+            (ex) => String(ex).trim().toLowerCase() === nombre.toLowerCase()
+          )
+      );
+
+    if (nombresParcelas.length > 0) {
+      let locacionesActuales = [];
+      try {
+        const rawLoc = localStorage.getItem(storageKeyLocaciones);
+        if (rawLoc) {
+          const parsedLoc = JSON.parse(rawLoc);
+          if (Array.isArray(parsedLoc)) locacionesActuales = parsedLoc;
+        }
+      } catch (err) {
+        console.warn("Aviso al leer locaciones sincronizadas:", err.message);
+      }
+
+      // Reemplazar nombres antiguos si fueron renombrados en Insumos y quitar excluidos
+      const locacionesNormalizadas = locacionesActuales
+        .map((loc) => {
+          const keyLower = String(loc || "").trim().toLowerCase();
+          return renombres[keyLower] || loc;
+        })
+        .filter(
+          (loc) =>
+            Boolean(loc) &&
+            !excluidasActuales.some(
+              (ex) => String(ex).trim().toLowerCase() === String(loc).trim().toLowerCase()
+            )
+        );
+
+      const locacionesCombinadas = Array.from(
+        new Set([...nombresParcelas, ...locacionesNormalizadas])
+      );
+      localStorage.setItem(storageKeyLocaciones, JSON.stringify(locacionesCombinadas));
+    }
+  } catch (err) {
+    console.warn("No se pudieron persistir parcelas locales:", err.message);
+  }
+}
+
+function eliminarParcelaDeLocacionesLocales(usuario, nombreParcela) {
+  const limpio = (nombreParcela || "").trim();
+  if (!limpio) return;
+  try {
+    const cuentaScope =
+      usuario?.establecimientoId ||
+      usuario?.id ||
+      usuario?.email ||
+      "default";
+    const storageKeyLocaciones = `vakera_locaciones_${cuentaScope}`;
+    const rawLoc = localStorage.getItem(storageKeyLocaciones);
+    if (rawLoc) {
+      const parsedLoc = JSON.parse(rawLoc);
+      if (Array.isArray(parsedLoc)) {
+        const filtradas = parsedLoc.filter(
+          (loc) => String(loc).trim().toLowerCase() !== limpio.toLowerCase()
+        );
+        localStorage.setItem(storageKeyLocaciones, JSON.stringify(filtradas));
+      }
+    }
+  } catch (err) {
+    console.warn("No se pudo desvincular parcela de locaciones:", err.message);
+  }
 }
 
 export default function ParcelasView() {
@@ -392,13 +506,27 @@ export default function ParcelasView() {
       );
       const listaLocal = leerParcelasLocales(storageKeyCuenta);
       const mapaLocal = new Map(listaLocal.map((p) => [p.id, p]));
+      const renombres = leerRenombresParcelas(usuario);
 
-      // Solo conservamos las parcelas que pertenecen a esta cuenta según el servidor
+      // Solo conservamos las parcelas que pertenecen a esta cuenta según el servidor, respetando renombres hechos en Insumos
       const listaFinal = listaApi.map((p) => {
         const previo = mapaLocal.get(p.id);
+        const nombreApiLimpio = (p.nombre || "").trim();
+        const nombreRenombrado =
+          renombres[p.id] ||
+          renombres[nombreApiLimpio.toLowerCase()] ||
+          previo?.nombrePersonalizado ||
+          p.nombre;
+
         return {
           ...previo,
           ...p,
+          nombre: nombreRenombrado,
+          nombrePersonalizado:
+            renombres[p.id] ||
+            renombres[nombreApiLimpio.toLowerCase()] ||
+            previo?.nombrePersonalizado ||
+            undefined,
           coordinates:
             Array.isArray(p.coordinates) && p.coordinates.length > 2
               ? p.coordinates
@@ -412,16 +540,28 @@ export default function ParcelasView() {
 
       potrerosRef.current = listaFinal;
       setPotreros(listaFinal);
-      guardarParcelasLocales(storageKeyCuenta, listaFinal);
+      guardarParcelasLocales(storageKeyCuenta, listaFinal, usuario);
 
       if (Array.isArray(resGan?.data)) setGanado(resGan.data);
       actualizarFuenteParcelas(listaFinal);
+      actualizarSvgOverlay();
     } catch (err) {
       console.warn("Fallo al consultar potreros/ganado:", err.message);
-      const listaLocal = leerParcelasLocales(storageKeyCuenta);
+      const renombres = leerRenombresParcelas(usuario);
+      const listaLocal = leerParcelasLocales(storageKeyCuenta).map((p) => {
+        const nombreLimpio = (p?.nombre || "").trim();
+        const nombreRenombrado =
+          renombres[p?.id] ||
+          renombres[nombreLimpio.toLowerCase()] ||
+          p?.nombrePersonalizado ||
+          p?.nombre;
+        return { ...p, nombre: nombreRenombrado };
+      });
       potrerosRef.current = listaLocal;
       setPotreros(listaLocal);
+      guardarParcelasLocales(storageKeyCuenta, listaLocal, usuario);
       actualizarFuenteParcelas(listaLocal);
+      actualizarSvgOverlay();
     } finally {
       setCargando(false);
     }
@@ -822,7 +962,22 @@ export default function ParcelasView() {
       ];
       potrerosRef.current = listaActualizada;
       setPotreros(listaActualizada);
-      guardarParcelasLocales(storageKeyCuenta, listaActualizada);
+
+      try {
+        const cuentaScope = obtenerCuentaScope(usuario);
+        const renombres = leerRenombresParcelas(usuario);
+        const keyLower = (nuevaParcelaGuardada.nombre || "").trim().toLowerCase();
+        if (renombres[keyLower]) {
+          delete renombres[keyLower];
+          localStorage.setItem(`vakera_parcelas_renombres_${cuentaScope}`, JSON.stringify(renombres));
+        }
+      } catch (err) {
+        console.warn("Aviso limpiando renombre previo:", err.message);
+      }
+
+      guardarParcelasLocales(storageKeyCuenta, listaActualizada, usuario, {
+        desbloquearNombre: nuevaParcelaGuardada.nombre,
+      });
 
       // Actualizar inmediatamente la capa en MapLibre y SVG con el color elegido
       actualizarFuenteParcelas(listaActualizada);
@@ -837,7 +992,7 @@ export default function ParcelasView() {
       marcadoresVerticesRef.current.forEach((m) => m.remove());
       marcadoresVerticesRef.current = [];
 
-      mostrarNotificacion(`¡Parcela "${formularioZona.nombre}" delimitada y coloreada exitosamente!`);
+      mostrarNotificacion(`¡Parcela "${formularioZona.nombre}" delimitada y sincronizada con las locaciones del campo!`);
 
       // Seleccionar y enfocar en la nueva parcela
       setParcelaSeleccionada(nuevaParcelaGuardada);
@@ -870,7 +1025,8 @@ export default function ParcelasView() {
       const actualizados = potreros.filter((p) => p.id !== id);
       potrerosRef.current = actualizados;
       setPotreros(actualizados);
-      guardarParcelasLocales(storageKeyCuenta, actualizados);
+      eliminarParcelaDeLocacionesLocales(usuario, nombre);
+      guardarParcelasLocales(storageKeyCuenta, actualizados, usuario);
       actualizarFuenteParcelas(actualizados);
       setParcelaSeleccionada(null);
       mostrarNotificacion(`Parcela "${nombre}" eliminada correctamente.`);
@@ -878,7 +1034,8 @@ export default function ParcelasView() {
       const actualizados = potreros.filter((p) => p.id !== id);
       potrerosRef.current = actualizados;
       setPotreros(actualizados);
-      guardarParcelasLocales(storageKeyCuenta, actualizados);
+      eliminarParcelaDeLocacionesLocales(usuario, nombre);
+      guardarParcelasLocales(storageKeyCuenta, actualizados, usuario);
       actualizarFuenteParcelas(actualizados);
       setParcelaSeleccionada(null);
       mostrarNotificacion(`Parcela "${nombre}" eliminada del mapa.`);

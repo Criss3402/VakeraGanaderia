@@ -313,6 +313,50 @@ class InsumoModel {
       });
     }
 
+    // Sincronizar también el nombre de la Parcela (Potrero) si corresponde a una edición de locación
+    if (accion === "editar" && destino) {
+      const buscadoLimpio = nombreAnterior.trim();
+      try {
+        const wherePotrero = {
+          nombre: { equals: buscadoLimpio, mode: "insensitive" },
+        };
+        if (establecimientoId) wherePotrero.establecimientoId = establecimientoId;
+        const resUpdate = await prisma.potrero.updateMany({
+          where: wherePotrero,
+          data: { nombre: destino },
+        });
+        if (!resUpdate || resUpdate.count === 0) {
+          await prisma.potrero.updateMany({
+            where: { nombre: { equals: buscadoLimpio, mode: "insensitive" } },
+            data: { nombre: destino },
+          });
+        }
+      } catch (e) {
+        console.warn("[InsumoModel] Fallo al sincronizar potrero en Prisma:", e.message);
+      }
+
+      if (Array.isArray(db.potreros)) {
+        db.potreros.forEach((p) => {
+          if (establecimientoId && p.establecimientoId && p.establecimientoId !== establecimientoId) return;
+          if ((p.nombre || "").trim().toLowerCase() === buscadoLimpio.toLowerCase()) {
+            p.nombre = destino;
+          }
+        });
+      }
+
+      if (Array.isArray(db.ganado)) {
+        db.ganado.forEach((g) => {
+          if (establecimientoId && g.establecimientoId && g.establecimientoId !== establecimientoId) return;
+          if ((g.potrero || "").trim().toLowerCase() === buscadoLimpio.toLowerCase()) {
+            g.potrero = destino;
+          }
+          if ((g.potreroNombre || "").trim().toLowerCase() === buscadoLimpio.toLowerCase()) {
+            g.potreroNombre = destino;
+          }
+        });
+      }
+    }
+
     return { nombreAnterior, nuevoNombre: destino, accion, actualizados };
   }
 

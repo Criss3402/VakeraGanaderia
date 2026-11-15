@@ -46,6 +46,9 @@ describe("Vista de Inventario e Insumos (InsumosView.jsx)", () => {
       }),
       http.get("*/api/dashboard/insumos/solicitudes", () => {
         return HttpResponse.json({ ok: true, data: [] });
+      }),
+      http.get("*/api/dashboard/potreros", () => {
+        return HttpResponse.json({ ok: true, data: [] });
       })
     );
   });
@@ -278,5 +281,41 @@ describe("Vista de Inventario e Insumos (InsumosView.jsx)", () => {
     expect(
       screen.queryByRole("button", { name: /\+ Añadir Producto/i })
     ).not.toBeInTheDocument();
+  });
+
+  it("sincroniza automáticamente las parcelas delimitadas con las locaciones de insumos permitiendo además agregar manuales", async () => {
+    server.use(
+      http.get("*/api/dashboard/potreros", () => {
+        return HttpResponse.json({
+          ok: true,
+          data: [
+            { id: "pot-custom-1", nombre: "Parcela Norte - Goya", superficieHas: 120 },
+            { id: "pot-custom-2", nombre: "Lote Sur Aguada", superficieHas: 85 },
+          ],
+        });
+      })
+    );
+
+    render(<InsumosView />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Parcela Norte - Goya")).toBeInTheDocument();
+      expect(screen.getByText("Lote Sur Aguada")).toBeInTheDocument();
+    });
+
+    // Abrir modal de gestión de locaciones y verificar que figura como parcela sincronizada y permite agregar manual
+    const btnGestionar = screen.getByRole("button", { name: /Editar \/ Eliminar/i });
+    await userEvent.click(btnGestionar);
+
+    expect(screen.getAllByText(/Parcela sincronizada/i).length).toBeGreaterThanOrEqual(2);
+
+    const inputNueva = screen.getByPlaceholderText(/Nueva locación/i);
+    await userEvent.type(inputNueva, "Galpón Manual Auxiliar");
+    const btnAgregar = screen.getByRole("button", { name: /Agregar/i });
+    await userEvent.click(btnAgregar);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Galpón Manual Auxiliar").length).toBeGreaterThanOrEqual(1);
+    });
   });
 });

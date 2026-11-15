@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   obtenerInsumos,
+  obtenerPotreros,
   registrarInsumo,
   actualizarStockInsumo,
   eliminarInsumo,
@@ -12,6 +13,50 @@ import {
   registrarConteoPertenencias,
 } from "../../../api/dashboard.api";
 import { useAuth } from "../../../context/AuthContext";
+
+const POTREROS_PREDETERMINADOS_EXCLUIDOS = new Set([
+  "pot-1",
+  "pot-2",
+  "pot-3",
+  "pot-4",
+  "pot-5",
+]);
+
+function leerRenombresCuentaLocal(cuentaScope) {
+  try {
+    const raw = localStorage.getItem(`vakera_parcelas_renombres_${cuentaScope}`);
+    return raw ? JSON.parse(raw) : {};
+  } catch (err) {
+    console.warn("No se pudieron leer renombres de parcelas en Insumos:", err);
+    return {};
+  }
+}
+
+function leerParcelasCuentaLocal(storageKeyParcelas, cuentaScope = "default") {
+  if (!storageKeyParcelas) return [];
+  try {
+    const raw = localStorage.getItem(storageKeyParcelas);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    const renombres = leerRenombresCuentaLocal(cuentaScope);
+    return Array.isArray(parsed)
+      ? parsed
+          .filter((p) => !POTREROS_PREDETERMINADOS_EXCLUIDOS.has(p?.id))
+          .map((p) => {
+            const nombreLimpio = (p?.nombre || "").trim();
+            const nombreRenombrado =
+              renombres[p?.id] ||
+              renombres[nombreLimpio.toLowerCase()] ||
+              p?.nombrePersonalizado ||
+              p?.nombre;
+            return { ...p, nombre: nombreRenombrado };
+          })
+      : [];
+  } catch (err) {
+    console.warn("No se pudieron leer parcelas locales en Insumos:", err);
+    return [];
+  }
+}
 
 export default function InsumosView() {
   const { rol, usuario } = useAuth();
@@ -25,7 +70,7 @@ export default function InsumosView() {
   // Modo de visualización en Stock: 'tarjetas' | 'lista'
   const [vistaStock, setVistaStock] = useState("tarjetas");
 
-  // Clave aislada por cuenta para locaciones
+  // Clave aislada por cuenta para locaciones y parcelas
   const cuentaScope =
     usuario?.establecimientoId ||
     usuario?.id ||
@@ -33,6 +78,12 @@ export default function InsumosView() {
     "default";
   const storageKeyLocaciones = `vakera_locaciones_${cuentaScope}`;
   const storageKeyEliminadas = `vakera_locaciones_excluidas_${cuentaScope}`;
+  const parcelScope = usuario?.establecimientoId || usuario?.id;
+  const storageKeyParcelas = parcelScope ? `vakera_parcelas_cuenta_${parcelScope}` : null;
+
+  const [parcelasCampo, setParcelasCampo] = useState(() =>
+    leerParcelasCuentaLocal(storageKeyParcelas, cuentaScope)
+  );
 
   const locacionesPorDefecto =
     cuentaScope === "est-el-rancho" || usuario?.email === "dueno@vakera.com"
@@ -71,10 +122,11 @@ export default function InsumosView() {
       }
       const excluidos = localStorage.getItem(storageKeyEliminadas);
       setCamposExcluidos(excluidos ? JSON.parse(excluidos) : []);
+      setParcelasCampo(leerParcelasCuentaLocal(storageKeyParcelas, cuentaScope));
     } catch (err) {
       console.warn("Error sincronizando locaciones por cuenta:", err);
     }
-  }, [storageKeyLocaciones, storageKeyEliminadas]);
+  }, [storageKeyLocaciones, storageKeyEliminadas, storageKeyParcelas]);
 
   function persistirLocaciones(nuevosCampos, nuevosExcluidos = camposExcluidos) {
     setCamposGuardados(nuevosCampos);
@@ -87,10 +139,16 @@ export default function InsumosView() {
     }
   }
 
-  // Campos consolidados: guardados + extraídos de insumos activos (excepto los eliminados explícitamente)
+  // Nombres de parcelas delimitadas activas en el campo
+  const nombresParcelasActivas = parcelasCampo
+    .map((p) => (p?.nombre || "").trim())
+    .filter((c) => Boolean(c) && !camposExcluidos.includes(c));
+
+  // Campos consolidados: parcelas sincronizadas + locaciones manuales guardadas + extraídos de insumos activos
   const camposDisponibles = Array.from(
     new Set([
-      ...camposGuardados,
+      ...nombresParcelasActivas,
+      ...camposGuardados.filter((c) => Boolean(c) && !camposExcluidos.includes(c)),
       ...insumos
         .map((i) => i.campo)
         .filter((c) => Boolean(c) && !camposExcluidos.includes(c)),
@@ -158,12 +216,53 @@ export default function InsumosView() {
 
   async function cargarDatos() {
     try {
-      const [resIns, resSol] = await Promise.all([
+      const [resIns, resSol, resPot] = await Promise.all([
         obtenerInsumos(),
         obtenerSolicitudesInsumos(),
+        obtenerPotreros().catch(() => ({ data: [] })),
       ]);
       if (resIns?.data) setInsumos(resIns.data);
       if (resSol?.data) setSolicitudes(resSol.data);
+
+      const listaApiParcelas = (Array.isArray(resPot?.data) ? resPot.data : []).filter(
+        (p) => !POTREROS_PREDETERMINADOS_EXCLUIDOS.has(p?.id)
+      );
+      const listaLocalParcelas = leerParcelasCuentaLocal(storageKeyParcelas, cuentaScope);
+      const renombres = leerRenombresCuentaLocal(cuentaScope);
+      const mapaCombinado = new Map();
+      listaLocalParcelas.forEach((p) => {
+        if (p?.id) mapaCombinado.set(p.id, p);
+      });
+      listaApiParcelas.forEach((p) => {
+        if (p?.id) {
+          const prev = mapaCombinado.get(p.id) || {};
+          const nombreApiLimpio = (p.nombre || "").trim();
+          const nombreRenombrado =
+            renombres[p.id] ||
+            renombres[nombreApiLimpio.toLowerCase()] ||
+            prev.nombrePersonalizado ||
+            p.nombre;
+          mapaCombinado.set(p.id, {
+            ...prev,
+            ...p,
+            nombre: nombreRenombrado,
+            nombrePersonalizado:
+              renombres[p.id] ||
+              renombres[nombreApiLimpio.toLowerCase()] ||
+              prev.nombrePersonalizado ||
+              undefined,
+          });
+        }
+      });
+      const parcelasConsolidadas = Array.from(mapaCombinado.values());
+      setParcelasCampo(parcelasConsolidadas);
+      if (storageKeyParcelas && parcelasConsolidadas.length > 0) {
+        try {
+          localStorage.setItem(storageKeyParcelas, JSON.stringify(parcelasConsolidadas));
+        } catch (err) {
+          console.warn("Aviso al persistir parcelas consolidadas:", err);
+        }
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -173,7 +272,13 @@ export default function InsumosView() {
 
   useEffect(() => {
     cargarDatos();
-  }, []);
+  }, [storageKeyParcelas]);
+
+  useEffect(() => {
+    if (camposDisponibles.length > 0 && !camposDisponibles.includes(nuevoProducto.campo)) {
+      setNuevoProducto((prev) => ({ ...prev, campo: camposDisponibles[0] }));
+    }
+  }, [camposDisponibles]);
 
   function mostrarNotificacion(texto) {
     setMensaje(texto);
@@ -215,6 +320,40 @@ export default function InsumosView() {
         (c) => c !== limpio
       );
       persistirLocaciones(actualizados, nuevosExcluidos);
+
+      // Persistir el renombre para que ParcelasView y el mapa reflejen el nuevo nombre inmediatamente
+      try {
+        const renombres = leerRenombresCuentaLocal(cuentaScope);
+        const keyAnteriorLower = nombreAnterior.trim().toLowerCase();
+        renombres[keyAnteriorLower] = limpio;
+        Object.keys(renombres).forEach((k) => {
+          if (String(renombres[k] || "").trim().toLowerCase() === keyAnteriorLower) {
+            renombres[k] = limpio;
+          }
+        });
+        delete renombres[limpio.toLowerCase()];
+
+        const parcelasRenombradas = parcelasCampo.map((p) => {
+          if ((p?.nombre || "").trim().toLowerCase() === keyAnteriorLower) {
+            if (p?.id) renombres[p.id] = limpio;
+            return { ...p, nombre: limpio, nombrePersonalizado: limpio };
+          }
+          return p;
+        });
+
+        localStorage.setItem(
+          `vakera_parcelas_renombres_${cuentaScope}`,
+          JSON.stringify(renombres)
+        );
+
+        setParcelasCampo(parcelasRenombradas);
+        if (storageKeyParcelas) {
+          localStorage.setItem(storageKeyParcelas, JSON.stringify(parcelasRenombradas));
+        }
+      } catch (err) {
+        console.warn("Aviso al sincronizar renombre de parcela local:", err);
+      }
+
       if (filtroLocacion === nombreAnterior) setFiltroLocacion(limpio);
       if (nuevoProducto.campo === nombreAnterior) {
         setNuevoProducto((prev) => ({ ...prev, campo: limpio }));
@@ -1673,7 +1812,7 @@ export default function InsumosView() {
                     Gestionar Locaciones / Campos
                   </h3>
                   <p className="text-xs text-[#6b7c6d]">
-                    Agregá nuevas locaciones o editá y eliminá las existentes.
+                    Sincronizado con las Parcelas del campo. También podés agregar locaciones manualmente.
                   </p>
                 </div>
               </div>
@@ -1728,6 +1867,9 @@ export default function InsumosView() {
                   const cantInsumos = insumos.filter(
                     (i) => (i.campo || "").toLowerCase() === loc.toLowerCase()
                   ).length;
+                  const esParcelaSincronizada = parcelasCampo.some(
+                    (p) => (p?.nombre || "").trim().toLowerCase() === loc.toLowerCase()
+                  );
                   const estaEditando = locacionEditando === loc;
                   const confirmandoEliminar = locacionConfirmarEliminar === loc;
 
@@ -1787,9 +1929,14 @@ export default function InsumosView() {
                       ) : (
                         <div className="flex items-center justify-between gap-2">
                           <div className="min-w-0">
-                            <p className="text-xs font-bold text-[#182920] truncate flex items-center gap-1.5">
+                            <p className="text-xs font-bold text-[#182920] truncate flex items-center gap-1.5 flex-wrap">
                               <i className="fa-solid fa-location-dot text-[#33512f]"></i>
                               <span>{loc}</span>
+                              {esParcelaSincronizada && (
+                                <span className="text-[9px] font-extrabold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded-full">
+                                  Parcela sincronizada
+                                </span>
+                              )}
                             </p>
                             <span className="text-[10px] text-[#6b7c6d]">
                               {cantInsumos} {cantInsumos === 1 ? "artículo asignado" : "artículos asignados"}

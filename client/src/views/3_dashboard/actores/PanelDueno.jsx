@@ -6,8 +6,18 @@ import {
   obtenerInsumosCriticos,
   obtenerPartesDiarios,
 } from "../../../api/dashboard.api";
+import { useAuth } from "../../../context/AuthContext";
+
+const POTREROS_PREDETERMINADOS_EXCLUIDOS = new Set([
+  "pot-1",
+  "pot-2",
+  "pot-3",
+  "pot-4",
+  "pot-5",
+]);
 
 export default function PanelDueno({ alCambiarVista }) {
+  const { usuario } = useAuth();
   const [metricas, setMetricas] = useState(null);
   const [reportes, setReportes] = useState(null);
   const [potreros, setPotreros] = useState([]);
@@ -16,6 +26,9 @@ export default function PanelDueno({ alCambiarVista }) {
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
+    const scope = usuario?.establecimientoId || usuario?.id;
+    const storageKeyParcelas = scope ? `vakera_parcelas_cuenta_${scope}` : null;
+
     Promise.all([
       obtenerMetricas().catch(() => null),
       obtenerReportes().catch(() => null),
@@ -25,12 +38,60 @@ export default function PanelDueno({ alCambiarVista }) {
     ]).then(([resMet, resRep, resPot, resIns, resPart]) => {
       if (resMet?.data) setMetricas(resMet.data);
       if (resRep?.data) setReportes(resRep.data);
-      if (resPot?.data) setPotreros(resPot.data);
+
+      const listaApi = (Array.isArray(resPot?.data) ? resPot.data : []).filter(
+        (p) => !POTREROS_PREDETERMINADOS_EXCLUIDOS.has(p?.id)
+      );
+      let listaLocal = [];
+      if (storageKeyParcelas) {
+        try {
+          const raw = localStorage.getItem(storageKeyParcelas);
+          const parsed = raw ? JSON.parse(raw) : [];
+          if (Array.isArray(parsed)) {
+            listaLocal = parsed.filter(
+              (p) => !POTREROS_PREDETERMINADOS_EXCLUIDOS.has(p?.id)
+            );
+          }
+        } catch (err) {
+          console.warn("No se pudieron leer parcelas locales en PanelDueno:", err);
+        }
+      }
+      let renombres = {};
+      try {
+        const cuentaScope =
+          usuario?.establecimientoId ||
+          usuario?.id ||
+          usuario?.email ||
+          "default";
+        const rawRen = localStorage.getItem(`vakera_parcelas_renombres_${cuentaScope}`);
+        if (rawRen) renombres = JSON.parse(rawRen);
+      } catch (err) {
+        console.warn("Aviso al leer renombres en PanelDueno:", err);
+      }
+
+      const mapaCombinado = new Map();
+      listaLocal.forEach((p) => {
+        if (p?.id) mapaCombinado.set(p.id, p);
+      });
+      listaApi.forEach((p) => {
+        if (p?.id) {
+          const prev = mapaCombinado.get(p.id) || {};
+          const nombreApiLimpio = (p.nombre || "").trim();
+          const nombreRenombrado =
+            renombres[p.id] ||
+            renombres[nombreApiLimpio.toLowerCase()] ||
+            prev.nombrePersonalizado ||
+            p.nombre;
+          mapaCombinado.set(p.id, { ...prev, ...p, nombre: nombreRenombrado });
+        }
+      });
+      setPotreros(Array.from(mapaCombinado.values()));
+
       if (resIns?.data) setInsumosCriticos(resIns.data);
       if (resPart?.data) setPartes(resPart.data);
       setCargando(false);
     });
-  }, []);
+  }, [usuario?.establecimientoId, usuario?.id]);
 
   const totalCabezas = metricas?.resumenGanado?.totalCabezas ?? 0;
   const pesoPromedio = metricas?.resumenGanado?.pesoPromedioKg ?? 0;
@@ -82,7 +143,9 @@ export default function PanelDueno({ alCambiarVista }) {
             <span className="text-xs text-[#33512f] font-bold bg-[#f8f5eb] px-2 py-0.5 rounded">Rodeo</span>
           </div>
           <p className="text-3xl font-extrabold text-[#182920] mt-1">{totalCabezas}</p>
-          <span className="text-[11px] text-[#33512f] font-medium">Cabezas registradas en 5 potreros</span>
+          <span className="text-[11px] text-[#33512f] font-medium">
+            Cabezas registradas en {potreros.length} {potreros.length === 1 ? "parcela" : "parcelas"}
+          </span>
         </div>
 
         <div className="bg-white rounded-2xl p-5 border border-[#ded7c4] shadow-sm hover:border-[#6b4a32] transition-colors">
@@ -216,17 +279,37 @@ export default function PanelDueno({ alCambiarVista }) {
             </div>
 
             <div className="space-y-2.5">
-              {potreros.map((p) => (
-                <div key={p.id} className="p-2.5 rounded-xl bg-[#f8f5eb] border border-[#ded7c4] flex justify-between items-center text-xs">
-                  <div>
-                    <p className="font-bold text-[#182920]">{p.nombre}</p>
-                    <p className="text-[10px] text-[#6b7c6d]">{p.superficieHas || 100} Has</p>
-                  </div>
-                  <span className="font-extrabold text-[#33512f]">
-                    {p.totalAnimales ?? 0} cabezas
-                  </span>
+              {potreros.length === 0 ? (
+                <div className="p-4 rounded-xl bg-[#f8f5eb] border border-[#ded7c4] text-center space-y-2">
+                  <p className="text-xs font-bold text-[#182920]">Sin parcelas delimitadas</p>
+                  <p className="text-[11px] text-[#6b7c6d]">
+                    Las parcelas trazadas en el mapa se sincronizan con las locaciones de campo e insumos.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => alCambiarVista && alCambiarVista("parcelas")}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-[#8fb56b] hover:bg-[#a1c97c] text-[#182920] px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    <i className="fa-solid fa-draw-polygon"></i> Ir a Parcelas
+                  </button>
                 </div>
-              ))}
+              ) : (
+                potreros.map((p) => (
+                  <div
+                    key={p.id}
+                    onClick={() => alCambiarVista && alCambiarVista("parcelas")}
+                    className="p-2.5 rounded-xl bg-[#f8f5eb] border border-[#ded7c4] hover:border-[#33512f] cursor-pointer transition-colors flex justify-between items-center text-xs"
+                  >
+                    <div>
+                      <p className="font-bold text-[#182920]">{p.nombre}</p>
+                      <p className="text-[10px] text-[#6b7c6d]">{p.superficieHas || 100} Has</p>
+                    </div>
+                    <span className="font-extrabold text-[#33512f]">
+                      {p.totalAnimales ?? 0} cabezas
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
