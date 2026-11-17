@@ -79,6 +79,28 @@ export async function eliminarPotrero(id) {
   });
 }
 
+export async function obtenerPermisosParcelas() {
+  return request("/dashboard/potreros/permisos");
+}
+
+export async function solicitarPermisoParcelas(datos = {}) {
+  return request("/dashboard/potreros/permisos/solicitar", {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export async function responderPermisoParcelas(solicitudId, estado) {
+  return request(`/dashboard/potreros/permisos/${solicitudId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ estado }),
+  });
+}
+
+export async function obtenerNotificaciones() {
+  return request("/dashboard/notificaciones");
+}
+
 // Sanidad y Vacunaciones
 export async function obtenerAlertasSanitarias() {
   return request("/dashboard/alertas");

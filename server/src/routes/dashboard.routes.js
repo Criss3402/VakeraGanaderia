@@ -11,6 +11,7 @@ router.use(authMiddleware);
 
 // 1. Métricas generales y KPIs (Todos los roles autenticados)
 router.get("/metricas", DashboardController.obtenerMetricas);
+router.get("/notificaciones", DashboardController.obtenerNotificaciones);
 
 // 2. Condiciones climáticas (Google Weather API / Contingencia)
 router.get("/clima", DashboardController.obtenerClima);
@@ -19,14 +20,29 @@ router.get("/clima", DashboardController.obtenerClima);
 router.get("/ganado", DashboardController.obtenerGanado);
 router.get("/ganado/:id", DashboardController.obtenerFichaAnimal);
 router.get("/potreros", DashboardController.obtenerPotreros);
+router.get(
+  "/potreros/permisos",
+  rbacMiddleware(ROLES.DUENO, ROLES.OFICINA, ROLES.CAPATAZ),
+  DashboardController.obtenerPermisosParcelas
+);
+router.post(
+  "/potreros/permisos/solicitar",
+  rbacMiddleware(ROLES.OFICINA),
+  DashboardController.solicitarPermisoParcelas
+);
+router.patch(
+  "/potreros/permisos/:solicitudId",
+  rbacMiddleware(ROLES.DUENO),
+  DashboardController.responderPermisoParcelas
+);
 router.post(
   "/potreros",
-  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ),
+  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ, ROLES.OFICINA),
   DashboardController.registrarPotrero
 );
 router.patch(
   "/potreros/:id",
-  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ),
+  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ, ROLES.OFICINA),
   DashboardController.actualizarPotrero
 );
 router.delete(

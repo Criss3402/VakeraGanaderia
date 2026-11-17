@@ -476,6 +476,7 @@ describe("6. Módulo de Chat Compartimentado (Matriz Estricta por Rol y Espacio/
     db.usuarios = snapshotUsuarios;
     db.mensajesChat = [];
     db.chatContactosOcultos = [];
+    db.solicitudesChat = [];
     prisma.usuario.findUnique = origFindUnique;
     prisma.usuario.findMany = origFindMany;
   });
@@ -484,15 +485,23 @@ describe("6. Módulo de Chat Compartimentado (Matriz Estricta por Rol y Espacio/
     assert.deepEqual(MATRIZ_CHAT_ROLES.peon, ["capataz"]);
     assert.deepEqual(MATRIZ_CHAT_ROLES.capataz.slice().sort(), ["oficina", "peon", "veterinario"]);
     assert.deepEqual(MATRIZ_CHAT_ROLES.veterinario.slice().sort(), ["capataz", "dueno", "oficina"]);
-    assert.deepEqual(MATRIZ_CHAT_ROLES.oficina.slice().sort(), ["capataz", "dueno", "veterinario"]);
-    assert.deepEqual(MATRIZ_CHAT_ROLES.dueno.slice().sort(), ["oficina", "veterinario"]);
+    assert.deepEqual(MATRIZ_CHAT_ROLES.oficina.slice().sort(), ["capataz", "dueno", "peon", "veterinario"]);
+    assert.deepEqual(MATRIZ_CHAT_ROLES.dueno.slice().sort(), ["oficina", "peon", "veterinario"]);
   });
 
-  it("PEÓN solo ve al CAPATAZ registrado en su mismo espacio (campo)", async () => {
+  it("PEÓN ve a CAPATAZ habilitado y a ADMINISTRADOR y DUEÑO de su campo requiriendo solicitud", async () => {
     const res = await ChatModel.listarContactosPermitidos("usr-chat-peon");
-    assert.equal(res.contactos.length, 1);
-    assert.equal(res.contactos[0].id, "usr-chat-capataz");
-    assert.equal(res.contactos[0].rol, "capataz");
+    const ids = res.contactos.map((c) => c.id).sort();
+    assert.deepEqual(ids, ["usr-chat-admin", "usr-chat-capataz", "usr-chat-dueno"]);
+    const capataz = res.contactos.find((c) => c.id === "usr-chat-capataz");
+    const admin = res.contactos.find((c) => c.id === "usr-chat-admin");
+    const dueno = res.contactos.find((c) => c.id === "usr-chat-dueno");
+    assert.equal(capataz.requiereSolicitud, false);
+    assert.equal(capataz.chatHabilitado, true);
+    assert.equal(admin.requiereSolicitud, true);
+    assert.equal(admin.chatHabilitado, false);
+    assert.equal(dueno.requiereSolicitud, true);
+    assert.equal(dueno.chatHabilitado, false);
   });
 
   it("CAPATAZ ve únicamente a ADMINISTRADOR, PEÓN y VETERINARIO de su campo (no ve a DUEÑO ni a otros campos)", async () => {
@@ -507,27 +516,103 @@ describe("6. Módulo de Chat Compartimentado (Matriz Estricta por Rol y Espacio/
     assert.deepEqual(ids, ["usr-chat-admin", "usr-chat-capataz", "usr-chat-dueno"]);
   });
 
-  it("ADMINISTRADOR (oficina) ve únicamente a CAPATAZ, VETERINARIO y DUEÑO de su campo", async () => {
+  it("ADMINISTRADOR (oficina) ve a CAPATAZ, VETERINARIO, DUEÑO y PEÓN de su campo", async () => {
     const res = await ChatModel.listarContactosPermitidos("usr-chat-admin");
     const ids = res.contactos.map((c) => c.id).sort();
-    assert.deepEqual(ids, ["usr-chat-capataz", "usr-chat-dueno", "usr-chat-vet"]);
+    assert.deepEqual(ids, ["usr-chat-capataz", "usr-chat-dueno", "usr-chat-peon", "usr-chat-vet"]);
   });
 
-  it("DUEÑO ve únicamente a VETERINARIO y ADMINISTRADOR de su campo", async () => {
+  it("DUEÑO ve a VETERINARIO, ADMINISTRADOR y PEÓN de su campo", async () => {
     const res = await ChatModel.listarContactosPermitidos("usr-chat-dueno");
     const ids = res.contactos.map((c) => c.id).sort();
-    assert.deepEqual(ids, ["usr-chat-admin", "usr-chat-vet"]);
+    assert.deepEqual(ids, ["usr-chat-admin", "usr-chat-peon", "usr-chat-vet"]);
   });
 
-  it("bloquea con 403 el envío de mensajes entre roles no permitidos (ej. PEÓN -> DUEÑO) o de distinto campo", async () => {
-    const reqProhibidoRol = {
+  it("DUEÑO y ADMINISTRACIÓN pueden escribir directamente al PEÓN sin solicitud previa", async () => {
+    const reqDueno = {
+      usuario: { id: "usr-chat-dueno" },
+      body: { destinatarioId: "usr-chat-peon", contenido: "Buen día, revisar potrero 3" },
+    };
+    const resDueno = crearMockRes();
+    await ChatController.enviarMensaje(reqDueno, resDueno);
+    assert.equal(resDueno.statusCode, 201);
+    assert.equal(resDueno.body.ok, true);
+
+    const reqAdmin = {
+      usuario: { id: "usr-chat-admin" },
+      body: { destinatarioId: "usr-chat-peon", contenido: "Pasar planilla de insumos" },
+    };
+    const resAdmin = crearMockRes();
+    await ChatController.enviarMensaje(reqAdmin, resAdmin);
+    assert.equal(resAdmin.statusCode, 201);
+    assert.equal(resAdmin.body.ok, true);
+  });
+
+  it("PEÓN debe solicitar permiso a DUEÑO o ADMINISTRACIÓN para chatear: bloquea con 403 hasta aprobación y habilita al aprobar", async () => {
+    db.mensajesChat = [];
+    db.solicitudesChat = [];
+
+    // 1. Antes de solicitar, PEÓN -> DUEÑO falla con 403
+    const reqSinSol = {
       usuario: { id: "usr-chat-peon" },
       body: { destinatarioId: "usr-chat-dueno", contenido: "Hola patrón" },
     };
-    const resRol = crearMockRes();
-    await ChatController.enviarMensaje(reqProhibidoRol, resRol);
-    assert.equal(resRol.statusCode, 403);
-    assert.equal(resRol.body.ok, false);
+    const resSinSol = crearMockRes();
+    await ChatController.enviarMensaje(reqSinSol, resSinSol);
+    assert.equal(resSinSol.statusCode, 403);
+    assert.equal(resSinSol.body.ok, false);
+
+    // 2. PEÓN envía solicitud al DUEÑO -> 201 PENDIENTE
+    const reqSolicitar = {
+      usuario: { id: "usr-chat-peon" },
+      body: { destinatarioId: "usr-chat-dueno", motivo: "Necesito informar sobre aguada norte" },
+    };
+    const resSolicitar = crearMockRes();
+    await ChatController.solicitarChat(reqSolicitar, resSolicitar);
+    assert.equal(resSolicitar.statusCode, 201);
+    assert.equal(resSolicitar.body.ok, true);
+    assert.equal(resSolicitar.body.data.estado, "PENDIENTE");
+    const solicitudId = resSolicitar.body.data.id;
+
+    // 3. Mientras esté PENDIENTE, PEÓN -> DUEÑO sigue bloqueado (403)
+    const resPend = crearMockRes();
+    await ChatController.enviarMensaje(reqSinSol, resPend);
+    assert.equal(resPend.statusCode, 403);
+
+    // 4. DUEÑO rechaza primero -> sigue bloqueado (403)
+    const resRechazo = crearMockRes();
+    await ChatController.responderSolicitud(
+      { usuario: { id: "usr-chat-dueno" }, params: { solicitudId }, body: { estado: "RECHAZADA" } },
+      resRechazo
+    );
+    assert.equal(resRechazo.statusCode, 200);
+    assert.equal(resRechazo.body.data.estado, "RECHAZADA");
+
+    const resPostRechazo = crearMockRes();
+    await ChatController.enviarMensaje(reqSinSol, resPostRechazo);
+    assert.equal(resPostRechazo.statusCode, 403);
+
+    // 5. DUEÑO aprueba -> ahora PEÓN puede enviar mensaje al DUEÑO (201)
+    const resAprobado = crearMockRes();
+    await ChatController.responderSolicitud(
+      { usuario: { id: "usr-chat-dueno" }, params: { solicitudId }, body: { estado: "APROBADA" } },
+      resAprobado
+    );
+    assert.equal(resAprobado.statusCode, 200);
+    assert.equal(resAprobado.body.data.estado, "APROBADA");
+
+    const resPermitido = crearMockRes();
+    await ChatController.enviarMensaje(reqSinSol, resPermitido);
+    assert.equal(resPermitido.statusCode, 201);
+    assert.equal(resPermitido.body.ok, true);
+
+    // 6. Envío y solicitud a contacto de otro establecimiento se bloquean con 403
+    const resOtroCampoSol = crearMockRes();
+    await ChatController.solicitarChat(
+      { usuario: { id: "usr-chat-peon" }, body: { destinatarioId: "usr-chat-otro-campo", motivo: "Hola" } },
+      resOtroCampoSol
+    );
+    assert.equal(resOtroCampoSol.statusCode, 403);
 
     const reqOtroCampo = {
       usuario: { id: "usr-chat-peon" },
@@ -537,6 +622,63 @@ describe("6. Módulo de Chat Compartimentado (Matriz Estricta por Rol y Espacio/
     await ChatController.enviarMensaje(reqOtroCampo, resCampo);
     assert.equal(resCampo.statusCode, 403);
     assert.equal(resCampo.body.ok, false);
+  });
+
+  it("cuando un superior (DUEÑO o ADMINISTRACIÓN) envía un mensaje al PEÓN, el PEÓN puede responder aunque su solicitud haya sido RECHAZADA o esté PENDIENTE", async () => {
+    db.mensajesChat = [];
+    db.solicitudesChat = [];
+
+    // 1. PEÓN solicita a ADMINISTRACIÓN y luego ADMINISTRACIÓN rechaza
+    const resSol = crearMockRes();
+    await ChatController.solicitarChat(
+      { usuario: { id: "usr-chat-peon" }, body: { destinatarioId: "usr-chat-admin", motivo: "Consulta" } },
+      resSol
+    );
+    assert.equal(resSol.statusCode, 201);
+
+    const resRechazo = crearMockRes();
+    await ChatController.responderSolicitud(
+      {
+        usuario: { id: "usr-chat-admin" },
+        params: { solicitudId: resSol.body.data.id },
+        body: { estado: "RECHAZADA" },
+      },
+      resRechazo
+    );
+    assert.equal(resRechazo.statusCode, 200);
+    assert.equal(resRechazo.body.data.estado, "RECHAZADA");
+
+    // 2. ADMINISTRACIÓN (superior) decide escribirle un mensaje al PEÓN
+    const resMsgAdmin = crearMockRes();
+    await ChatController.enviarMensaje(
+      {
+        usuario: { id: "usr-chat-admin" },
+        body: { destinatarioId: "usr-chat-peon", contenido: "Confirmame si recibiste el alambre" },
+      },
+      resMsgAdmin
+    );
+    assert.equal(resMsgAdmin.statusCode, 201);
+
+    // 3. Tanto listarContactosPermitidos como obtenerMensajesConversacion marcan chatHabilitado = true para el PEÓN
+    const contactosPeon = await ChatModel.listarContactosPermitidos("usr-chat-peon");
+    const adminContacto = contactosPeon.contactos.find((c) => c.id === "usr-chat-admin");
+    assert.equal(adminContacto.estadoSolicitud, "RECHAZADA");
+    assert.equal(adminContacto.chatHabilitado, true);
+
+    const convPeon = await ChatModel.obtenerMensajesConversacion("usr-chat-peon", "usr-chat-admin");
+    assert.equal(convPeon.contacto.chatHabilitado, true);
+
+    // 4. El PEÓN ahora puede responder directamente sin tener que volver a solicitar (201)
+    const resRespuestaPeon = crearMockRes();
+    await ChatController.enviarMensaje(
+      {
+        usuario: { id: "usr-chat-peon" },
+        body: { destinatarioId: "usr-chat-admin", contenido: "Sí, ya llegó el rollo al galpón" },
+      },
+      resRespuestaPeon
+    );
+    assert.equal(resRespuestaPeon.statusCode, 201);
+    assert.equal(resRespuestaPeon.body.ok, true);
   });
 
   it("permite enviar mensajes entre roles autorizados y ocultar/borrar contacto de la vista activa", async () => {
@@ -560,9 +702,12 @@ describe("6. Módulo de Chat Compartimentado (Matriz Estricta por Rol y Espacio/
     assert.equal(resOcultar.statusCode, 200);
     assert.equal(resOcultar.body.data.oculto, true);
 
-    // Verificar que ya no aparece en la vista activa de contactos del peón
+    // Verificar que capataz ya no aparece en la vista activa de contactos del peón
     const listaDespues = await ChatModel.listarContactosPermitidos("usr-chat-peon");
-    assert.equal(listaDespues.contactos.length, 0);
+    assert.equal(
+      listaDespues.contactos.some((c) => c.id === "usr-chat-capataz"),
+      false
+    );
     assert.equal(listaDespues.ocultosCount, 1);
   });
 });
@@ -797,6 +942,151 @@ describe("7. Eliminación de Actos Sanitarios y Partes Diarios de Campo", () => 
     } finally {
       prisma.potrero.findUnique = origFindUnique;
       db.potreros = db.potreros.filter((p) => p.id !== "pot-edit-1" && p.id !== "pot-edit-2");
+    }
+  });
+});
+
+describe("8. Permisos de Modificación de Parcelas (Administrador -> Dueño) y Notificaciones", () => {
+  it("Administrador (oficina) requiere solicitud aprobada por el Dueño para agregar o editar parcelas y genera notificación al Dueño", async () => {
+    db.solicitudesParcelas = [];
+    const origFindUnique = prisma.potrero.findUnique;
+    prisma.potrero.findUnique = async () => {
+      throw new Error("Usar memoria");
+    };
+
+    db.potreros.push({
+      id: "pot-perm-1",
+      nombre: "Potrero Permiso",
+      superficieHas: 4,
+      capacidad: 10,
+      establecimientoId: "est-perm-parcela",
+    });
+
+    const usrAdmin = {
+      id: "usr-oficina-perm",
+      rol: "oficina",
+      establecimientoId: "est-perm-parcela",
+      nombre: "Valeria Admin",
+    };
+    const usrDueno = {
+      id: "usr-dueno-perm",
+      rol: "dueno",
+      establecimientoId: "est-perm-parcela",
+      nombre: "Esteban Dueño",
+    };
+
+    try {
+      // 1. Sin permiso aprobado, oficina recibe 403 al intentar agregar o editar
+      const resCrearSin = crearMockRes();
+      await DashboardController.registrarPotrero(
+        { usuario: usrAdmin, body: { nombre: "Potrero Nuevo", superficieHas: 2 } },
+        resCrearSin
+      );
+      assert.equal(resCrearSin.statusCode, 403);
+
+      const resEditSin = crearMockRes();
+      await DashboardController.actualizarPotrero(
+        { usuario: usrAdmin, params: { id: "pot-perm-1" }, body: { nombre: "Editado" } },
+        resEditSin
+      );
+      assert.equal(resEditSin.statusCode, 403);
+
+      // 2. Oficina solicita permiso al Dueño -> 201 PENDIENTE
+      const resSol = crearMockRes();
+      await DashboardController.solicitarPermisoParcelas(
+        {
+          usuario: usrAdmin,
+          body: { accion: "GESTIONAR", motivo: "Necesito delimitar potrero nuevo" },
+        },
+        resSol
+      );
+      assert.equal(resSol.statusCode, 201);
+      assert.equal(resSol.body.data.estado, "PENDIENTE");
+      const solicitudId = resSol.body.data.id;
+
+      // 3. El Dueño recibe la notificación pendiente en /api/dashboard/notificaciones
+      const resNotif = crearMockRes();
+      await DashboardController.obtenerNotificaciones({ usuario: usrDueno }, resNotif);
+      assert.equal(resNotif.statusCode, 200);
+      assert.equal(
+        resNotif.body.data.notificaciones.some(
+          (n) => n.tipo === "permiso_parcela" && n.solicitudId === solicitudId
+        ),
+        true
+      );
+
+      // 4. Si el Dueño rechaza, oficina sigue bloqueada con 403
+      const resRech = crearMockRes();
+      await DashboardController.responderPermisoParcelas(
+        { usuario: usrDueno, params: { solicitudId }, body: { estado: "RECHAZADA" } },
+        resRech
+      );
+      assert.equal(resRech.statusCode, 200);
+      assert.equal(resRech.body.data.estado, "RECHAZADA");
+
+      const resPostRech = crearMockRes();
+      await DashboardController.actualizarPotrero(
+        { usuario: usrAdmin, params: { id: "pot-perm-1" }, body: { nombre: "Editado" } },
+        resPostRech
+      );
+      assert.equal(resPostRech.statusCode, 403);
+
+      // 5. Oficina solicita permiso puntual para editar pot-perm-1 y Dueño aprueba -> 1 edición permitida (200), luego se consume y vuelve a exigir solicitud (403)
+      const resReSol = crearMockRes();
+      await DashboardController.solicitarPermisoParcelas(
+        {
+          usuario: usrAdmin,
+          body: { accion: "EDITAR", parcelaId: "pot-perm-1", parcelaNombre: "Potrero Permiso", motivo: "Reenvío" },
+        },
+        resReSol
+      );
+      assert.equal(resReSol.statusCode, 201);
+      const solEditId = resReSol.body.data.id;
+
+      const resAprob = crearMockRes();
+      await DashboardController.responderPermisoParcelas(
+        { usuario: usrDueno, params: { solicitudId: solEditId }, body: { estado: "APROBADA" } },
+        resAprob
+      );
+      assert.equal(resAprob.statusCode, 200);
+      assert.equal(resAprob.body.data.estado, "APROBADA");
+
+      // No habilita agregar otra parcela ni editar una parcela distinta
+      const resAgregarNoAut = crearMockRes();
+      await DashboardController.registrarPotrero(
+        { usuario: usrAdmin, body: { nombre: "Potrero Extra", superficieHas: 2 } },
+        resAgregarNoAut
+      );
+      assert.equal(resAgregarNoAut.statusCode, 403);
+
+      // Primera edición de pot-perm-1 permitida (200) y consume el permiso
+      const resEditOk = crearMockRes();
+      await DashboardController.actualizarPotrero(
+        {
+          usuario: usrAdmin,
+          params: { id: "pot-perm-1" },
+          body: { nombre: "Potrero Permiso Editado" },
+        },
+        resEditOk
+      );
+      assert.equal(resEditOk.statusCode, 200);
+      assert.equal(resEditOk.body.data.nombre, "Potrero Permiso Editado");
+
+      // Segunda edición inmediata sobre pot-perm-1 exige nueva solicitud (403)
+      const resSegundaEdit = crearMockRes();
+      await DashboardController.actualizarPotrero(
+        {
+          usuario: usrAdmin,
+          params: { id: "pot-perm-1" },
+          body: { nombre: "Segundo Cambio Sin Permiso" },
+        },
+        resSegundaEdit
+      );
+      assert.equal(resSegundaEdit.statusCode, 403);
+    } finally {
+      prisma.potrero.findUnique = origFindUnique;
+      db.potreros = db.potreros.filter((p) => p.id !== "pot-perm-1");
+      db.solicitudesParcelas = [];
     }
   });
 });

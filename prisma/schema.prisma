@@ -59,10 +59,12 @@ model Usuario {
   partesCreados     ParteDiario[]         @relation("PeonPartes")
   partesRevisados   ParteDiario[]         @relation("RevisorPartes")
   eventosACargo     SanidadEvento[]       @relation("ResponsableEventos")
-  mensajesEnviados  MensajeChat[]         @relation("MensajesEnviados")
-  mensajesRecibidos MensajeChat[]         @relation("MensajesRecibidos")
-  contactosOcultos  ChatContactoOculto[]  @relation("ContactosOcultosUsuario")
-  ocultadoPor       ChatContactoOculto[]  @relation("ContactosOcultosObjetivo")
+  mensajesEnviados         MensajeChat[]         @relation("MensajesEnviados")
+  mensajesRecibidos        MensajeChat[]         @relation("MensajesRecibidos")
+  contactosOcultos         ChatContactoOculto[]  @relation("ContactosOcultosUsuario")
+  ocultadoPor              ChatContactoOculto[]  @relation("ContactosOcultosObjetivo")
+  solicitudesChatEnviadas  SolicitudChat[]       @relation("SolicitudesChatEnviadas")
+  solicitudesChatRecibidas SolicitudChat[]       @relation("SolicitudesChatRecibidas")
 
   @@map("usuarios")
 }
@@ -241,4 +243,44 @@ model ChatContactoOculto {
   @@unique([usuarioId, contactoId])
   @@index([usuarioId, establecimientoId])
   @@map("chat_contactos_ocultos")
+}
+
+// 10. Solicitudes de Chat (Peón -> Administrador / Dueño)
+model SolicitudChat {
+  id                String    @id @default(cuid())
+  estado            String    @default("PENDIENTE")
+  motivo            String?
+  establecimientoId String
+  fechaSolicitud    DateTime  @default(now())
+  fechaRespuesta    DateTime?
+
+  solicitanteId     String
+  solicitante       Usuario   @relation("SolicitudesChatEnviadas", fields: [solicitanteId], references: [id], onDelete: Cascade)
+
+  destinatarioId    String
+  destinatario      Usuario   @relation("SolicitudesChatRecibidas", fields: [destinatarioId], references: [id], onDelete: Cascade)
+
+  @@unique([solicitanteId, destinatarioId])
+  @@index([destinatarioId, estado])
+  @@index([establecimientoId])
+  @@map("solicitudes_chat")
+}
+
+// 11. Solicitudes de Permiso para Modificación/Alta de Parcelas (Administrador -> Dueño)
+model SolicitudPermisoParcela {
+  id                String    @id @default(cuid())
+  solicitanteId     String
+  establecimientoId String
+  accion            String    @default("GESTIONAR")
+  parcelaId         String?
+  parcelaNombre     String?
+  motivo            String?
+  estado            String    @default("PENDIENTE")
+  revisorId         String?
+  fechaSolicitud    DateTime  @default(now())
+  fechaRespuesta    DateTime?
+
+  @@index([solicitanteId, establecimientoId, estado])
+  @@index([establecimientoId, estado])
+  @@map("solicitudes_permiso_parcela")
 }

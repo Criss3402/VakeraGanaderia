@@ -33,4 +33,16 @@ router.get("/mensajes/:contactoId", ChatController.obtenerMensajes);
 // Enviar mensaje a un contacto permitido
 router.post("/mensajes", ChatController.enviarMensaje);
 
+// Solicitudes de habilitación de chat (Peón -> Administrador / Dueño)
+router.post(
+  "/solicitudes",
+  rbacMiddleware(ROLES.PEON),
+  ChatController.solicitarChat
+);
+router.patch(
+  "/solicitudes/:solicitudId",
+  rbacMiddleware(ROLES.DUENO, ROLES.OFICINA),
+  ChatController.responderSolicitud
+);
+
 module.exports = router;

@@ -80,13 +80,17 @@ describe("Vista de Chat Compartimentado por Rol y Espacio (ChatView.jsx)", () =>
   });
 
   it("aplica la matriz estricta de roles y filtra únicamente agentes del mismo espacio (campo)", () => {
-    // 1. PEÓN: solo ve al CAPATAZ de su mismo campo
+    // 1. PEÓN: ve a CAPATAZ (directo) y a ADMINISTRADOR y DUEÑO (vía solicitud) de su mismo campo
     const visiblesPeon = filtrarContactosPermitidos(todosLosContactosCandidatos, {
       id: "usr-peon",
       rol: "peon",
       establecimientoId: "est-el-rancho",
     });
-    expect(visiblesPeon.map((c) => c.id)).toEqual(["usr-capataz"]);
+    expect(visiblesPeon.map((c) => c.id).sort()).toEqual([
+      "usr-admin",
+      "usr-capataz",
+      "usr-dueno",
+    ]);
 
     // 2. CAPATAZ: ve a ADMINISTRADOR (oficina), PEÓN y VETERINARIO de su campo
     const visiblesCapataz = filtrarContactosPermitidos(todosLosContactosCandidatos, {
@@ -112,7 +116,7 @@ describe("Vista de Chat Compartimentado por Rol y Espacio (ChatView.jsx)", () =>
       "usr-dueno",
     ]);
 
-    // 4. ADMINISTRADOR: ve a CAPATAZ, VETERINARIO y DUEÑO de su campo
+    // 4. ADMINISTRADOR: ve a CAPATAZ, VETERINARIO, DUEÑO y PEÓN de su campo
     const visiblesAdmin = filtrarContactosPermitidos(todosLosContactosCandidatos, {
       id: "usr-admin",
       rol: "administrador",
@@ -121,16 +125,17 @@ describe("Vista de Chat Compartimentado por Rol y Espacio (ChatView.jsx)", () =>
     expect(visiblesAdmin.map((c) => c.id).sort()).toEqual([
       "usr-capataz",
       "usr-dueno",
+      "usr-peon",
       "usr-vet",
     ]);
 
-    // 5. DUEÑO: ve a VETERINARIO y ADMINISTRADOR de su campo
+    // 5. DUEÑO: ve a VETERINARIO, ADMINISTRADOR y PEÓN de su campo
     const visiblesDueno = filtrarContactosPermitidos(todosLosContactosCandidatos, {
       id: "usr-dueno",
       rol: "dueno",
       establecimientoId: "est-el-rancho",
     });
-    expect(visiblesDueno.map((c) => c.id).sort()).toEqual(["usr-admin", "usr-vet"]);
+    expect(visiblesDueno.map((c) => c.id).sort()).toEqual(["usr-admin", "usr-peon", "usr-vet"]);
   });
 
   it("renderiza la interfaz divisoria con contactos permitidos, abre conversación y envía mensaje", async () => {
@@ -517,5 +522,276 @@ describe("Vista de Chat Compartimentado por Rol y Espacio (ChatView.jsx)", () =>
 
     expect(screen.getByLabelText("Filtrar contactos permitidos")).toBeInTheDocument();
     expect(screen.getAllByText("Valeria Rossi").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("permite al PEÓN enviar una solicitud de chat al DUEÑO antes de chatear", async () => {
+    let estadoSolicitud = null;
+    let payloadEnviado = null;
+
+    server.use(
+      http.get("*/api/chat/contactos", () => {
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            usuarioActual: {
+              id: "usr-peon",
+              nombre: "Carlos Mendoza",
+              rol: "peon",
+              establecimientoId: "est-el-rancho",
+              establecimiento: "El Rancho, Goya, Corrientes",
+            },
+            rolesPermitidos: MATRIZ_CHAT_ROLES.peon,
+            contactos: [
+              {
+                ...todosLosContactosCandidatos[0],
+                requiereSolicitud: true,
+                estadoSolicitud,
+                solicitudId: estadoSolicitud ? "sol-chat-1" : null,
+                chatHabilitado: estadoSolicitud === "APROBADA",
+                mensajesNoLeidos: 0,
+              },
+            ],
+            solicitudesPendientes: [],
+            ocultosCount: 0,
+          },
+        });
+      }),
+      http.get("*/api/chat/mensajes/usr-dueno", () => {
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            contacto: {
+              ...todosLosContactosCandidatos[0],
+              requiereSolicitud: true,
+              estadoSolicitud,
+              solicitudId: estadoSolicitud ? "sol-chat-1" : null,
+              chatHabilitado: estadoSolicitud === "APROBADA",
+            },
+            mensajes: [],
+          },
+        });
+      }),
+      http.post("*/api/chat/solicitudes", async ({ request }) => {
+        payloadEnviado = await request.json();
+        estadoSolicitud = "PENDIENTE";
+        return HttpResponse.json(
+          {
+            ok: true,
+            data: {
+              solicitud: {
+                id: "sol-chat-1",
+                solicitanteId: "usr-peon",
+                destinatarioId: "usr-dueno",
+                estado: "PENDIENTE",
+                motivo: payloadEnviado.motivo,
+              },
+            },
+          },
+          { status: 201 }
+        );
+      })
+    );
+
+    render(<ChatView abiertoInicial={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Cristian Joaquín")).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByTestId("contacto-item-usr-dueno"));
+
+    const inputMotivo = await screen.findByLabelText("Motivo de solicitud de chat");
+    await userEvent.type(inputMotivo, "Consulta sobre rodeo de cría");
+    await userEvent.click(screen.getByRole("button", { name: /Solicitar chat/i }));
+
+    await waitFor(() => {
+      expect(payloadEnviado).toEqual({
+        destinatarioId: "usr-dueno",
+        motivo: "Consulta sobre rodeo de cría",
+      });
+    });
+  });
+
+  it("permite al DUEÑO o ADMINISTRACIÓN aprobar una solicitud de chat de un PEÓN desde el banner", async () => {
+    let solicitudAprobadaPayload = null;
+    let pendientes = [
+      {
+        id: "sol-chat-99",
+        solicitanteId: "usr-peon",
+        destinatarioId: "usr-dueno",
+        estado: "PENDIENTE",
+        motivo: "Necesito confirmar traslado",
+        solicitante: {
+          id: "usr-peon",
+          nombre: "Carlos Mendoza",
+          rol: "peon",
+        },
+      },
+    ];
+
+    server.use(
+      http.get("*/api/chat/contactos", () => {
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            usuarioActual: {
+              id: "usr-dueno",
+              nombre: "Esteban Gómez",
+              rol: "dueno",
+              establecimientoId: "est-el-rancho",
+              establecimiento: "El Rancho, Goya, Corrientes",
+            },
+            rolesPermitidos: MATRIZ_CHAT_ROLES.dueno,
+            contactos: [
+              {
+                ...todosLosContactosCandidatos[3],
+                requiereSolicitud: false,
+                estadoSolicitud: pendientes.length > 0 ? "PENDIENTE" : "APROBADA",
+                solicitudId: "sol-chat-99",
+                chatHabilitado: true,
+                solicitudEntrante: pendientes[0] || null,
+                mensajesNoLeidos: 0,
+              },
+            ],
+            solicitudesPendientes: pendientes,
+            ocultosCount: 0,
+          },
+        });
+      }),
+      http.patch("*/api/chat/solicitudes/sol-chat-99", async ({ request }) => {
+        solicitudAprobadaPayload = await request.json();
+        pendientes = [];
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            solicitud: {
+              id: "sol-chat-99",
+              solicitanteId: "usr-peon",
+              destinatarioId: "usr-dueno",
+              estado: solicitudAprobadaPayload.estado,
+            },
+          },
+        });
+      })
+    );
+
+    render(<ChatView abiertoInicial={true} />);
+
+    const btnAprobar = await screen.findByRole("button", { name: /Aprobar/i });
+    await userEvent.click(btnAprobar);
+
+    await waitFor(() => {
+      expect(solicitudAprobadaPayload).toEqual({ estado: "APROBADA" });
+    });
+  });
+
+  it("permite al PEÓN responder directamente cuando un superior le envió un mensaje aunque su solicitud figure RECHAZADA", async () => {
+    let mensajeEnviado = null;
+
+    server.use(
+      http.get("*/api/chat/contactos", () => {
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            usuarioActual: {
+              id: "usr-peon",
+              nombre: "Carlos Mendoza",
+              rol: "peon",
+              establecimientoId: "est-el-rancho",
+              establecimiento: "El Rancho, Goya, Corrientes",
+            },
+            rolesPermitidos: MATRIZ_CHAT_ROLES.peon,
+            contactos: [
+              {
+                ...todosLosContactosCandidatos[0],
+                requiereSolicitud: true,
+                estadoSolicitud: "RECHAZADA",
+                solicitudId: "sol-rech-1",
+                chatHabilitado: true,
+                ultimoMensaje: {
+                  id: "msg-sup-1",
+                  contenido: "Revisar aguada sur hoy",
+                  fechaEnvio: "2026-11-16T23:36:00.000Z",
+                  esMio: false,
+                  leido: false,
+                },
+                mensajesNoLeidos: 1,
+              },
+            ],
+            solicitudesPendientes: [],
+            ocultosCount: 0,
+          },
+        });
+      }),
+      http.get("*/api/chat/mensajes/usr-dueno", () => {
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            contacto: {
+              ...todosLosContactosCandidatos[0],
+              requiereSolicitud: true,
+              estadoSolicitud: "RECHAZADA",
+              solicitudId: "sol-rech-1",
+              chatHabilitado: true,
+            },
+            mensajes: [
+              {
+                id: "msg-sup-1",
+                remitenteId: "usr-dueno",
+                destinatarioId: "usr-peon",
+                establecimientoId: "est-el-rancho",
+                contenido: "Revisar aguada sur hoy",
+                leido: true,
+                esMio: false,
+                fechaEnvio: "2026-11-16T23:36:00.000Z",
+              },
+            ],
+          },
+        });
+      }),
+      http.post("*/api/chat/mensajes", async ({ request }) => {
+        mensajeEnviado = await request.json();
+        return HttpResponse.json(
+          {
+            ok: true,
+            data: {
+              id: "msg-peon-resp-1",
+              remitenteId: "usr-peon",
+              destinatarioId: "usr-dueno",
+              establecimientoId: "est-el-rancho",
+              contenido: mensajeEnviado.contenido,
+              leido: false,
+              esMio: true,
+              fechaEnvio: "2026-11-16T23:37:00.000Z",
+            },
+          },
+          { status: 201 }
+        );
+      })
+    );
+
+    render(<ChatView abiertoInicial={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Cristian Joaquín")).toBeInTheDocument();
+    });
+
+    // No debe mostrar badge de bloqueado ni pedir nueva solicitud
+    expect(screen.queryByText("Rechazada")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId("contacto-item-usr-dueno"));
+
+    const inputMensaje = await screen.findByLabelText("Escribir mensaje");
+    expect(screen.queryByTestId("chat-panel-solicitud-peon")).not.toBeInTheDocument();
+
+    await userEvent.type(inputMensaje, "Listo, ya voy para la aguada");
+    await userEvent.click(screen.getByRole("button", { name: /^Enviar$/i }));
+
+    await waitFor(() => {
+      expect(mensajeEnviado).toEqual({
+        destinatarioId: "usr-dueno",
+        contenido: "Listo, ya voy para la aguada",
+      });
+    });
   });
 });

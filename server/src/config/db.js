@@ -347,6 +347,10 @@ const db = {
   mensajesChat: [],
 
   chatContactosOcultos: [],
+
+  solicitudesChat: [],
+
+  solicitudesParcelas: [],
 };
 
 module.exports = db;

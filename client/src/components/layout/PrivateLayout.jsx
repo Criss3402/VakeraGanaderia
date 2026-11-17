@@ -39,6 +39,7 @@ export default function PrivateLayout({
         <PrivateHeader
           alAbrirMenu={() => setMenuAbierto(true)}
           alIrALanding={alIrALanding}
+          alCambiarVista={alCambiarVista}
           colapsado={colapsado}
           alToggleColapso={() => setColapsado((prev) => !prev)}
         />

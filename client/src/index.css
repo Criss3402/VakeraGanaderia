@@ -3657,3 +3657,198 @@ ul {
     display: inline-flex;
   }
 }
+
+/* Solicitudes de Chat (Peón -> Administración / Dueño) */
+.chat-rol-pill--solicitud {
+  background: #f6eed6;
+  color: #6b4a16;
+  border-color: #d9bf7a;
+}
+
+.chat-solicitudes-banner {
+  background: #fff9ea;
+  border-bottom: 1px solid #ead8a4;
+  padding: 8px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.chat-solicitudes-banner__titulo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #6b4a16;
+}
+
+.chat-solicitudes-banner__lista {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 110px;
+  overflow-y: auto;
+}
+
+.chat-solicitud-item-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #ffffff;
+  border: 1px solid #ead8a4;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 0.74rem;
+}
+
+.chat-solicitud-item-banner__info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.chat-solicitud-item-banner__motivo {
+  color: #5b6a5d;
+  font-size: 0.72rem;
+}
+
+.chat-solicitud-item-banner__acciones {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.chat-btn-solicitud {
+  border: none;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.chat-btn-solicitud:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.chat-btn-solicitud--aprobar {
+  background: var(--verde-profundo);
+  color: var(--crema);
+}
+
+.chat-btn-solicitud--rechazar {
+  background: #fdf2f0;
+  color: #96281b;
+  border: 1px solid #e6c3be;
+}
+
+.chat-contacto-estado-sol {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.chat-contacto-estado-sol--ninguna {
+  background: #f5efe0;
+  color: #6b5228;
+  border-color: #dfd0ad;
+}
+
+.chat-contacto-estado-sol--pendiente {
+  background: #fff4d6;
+  color: #7c5206;
+  border-color: #e6c675;
+}
+
+.chat-contacto-estado-sol--rechazada {
+  background: #fdecec;
+  color: #96281b;
+  border-color: #e6c3be;
+}
+
+.chat-solicitud-inline {
+  background: #fff9ea;
+  border-bottom: 1px solid #ead8a4;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 0.74rem;
+  color: #5c4314;
+}
+
+.chat-solicitud-inline__texto {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.chat-solicitud-compositor {
+  padding: 12px 14px;
+  background: #faf7ee;
+  border-top: 1px solid #ded7c4;
+  flex-shrink: 0;
+}
+
+.chat-solicitud-pendiente-estado {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #6b4a16;
+  font-size: 0.78rem;
+}
+
+.chat-solicitud-pendiente-estado p {
+  margin: 2px 0 0 0;
+  font-size: 0.73rem;
+  color: #5b6a5d;
+}
+
+.chat-solicitud-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-solicitud-form__info {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--verde-profundo);
+}
+
+.chat-solicitud-form__controles {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-solicitud-form__input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid #d5ccb4;
+  background: #ffffff;
+  color: var(--verde-profundo);
+  font-size: 0.8rem;
+  outline: none;
+}
+
+.chat-solicitud-form__input:focus {
+  border-color: var(--verde-musgo);
+}
