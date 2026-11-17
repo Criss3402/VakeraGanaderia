@@ -7,6 +7,11 @@ import {
   eliminarPartesDiariosMasivo,
   obtenerPotreros,
 } from "../../../api/dashboard.api";
+import {
+  leerColaPartesOffline,
+  encolarParteOffline,
+  sincronizarPartesOffline,
+} from "../../../api/offlineQueue";
 import { useAuth } from "../../../context/AuthContext";
 
 export default function PartesView() {
@@ -21,6 +26,8 @@ export default function PartesView() {
   const [modalEliminarMasivo, setModalEliminarMasivo] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [procesandoId, setProcesandoId] = useState(null);
+  const [partesOffline, setPartesOffline] = useState(() => leerColaPartesOffline());
+  const [sincronizandoOffline, setSincronizandoOffline] = useState(false);
 
   // Formulario nuevo parte
   const [nuevoParte, setNuevoParte] = useState({
@@ -55,23 +62,64 @@ export default function PartesView() {
     }
   }
 
+  async function intentarSincronizarOffline() {
+    if (sincronizandoOffline) return;
+    setSincronizandoOffline(true);
+    try {
+      const res = await sincronizarPartesOffline(registrarParteDiario);
+      setPartesOffline(leerColaPartesOffline());
+      if (res.sincronizados > 0) {
+        setMensaje(`Se sincronizaron ${res.sincronizados} parte(s) diario(s) pendientes del Modo Rural.`);
+        await cargarDatos();
+        setTimeout(() => setMensaje(""), 4500);
+      }
+    } finally {
+      setSincronizandoOffline(false);
+    }
+  }
+
   useEffect(() => {
     cargarDatos();
+    if (leerColaPartesOffline().length > 0 && navigator.onLine !== false) {
+      intentarSincronizarOffline();
+    }
+    function alVolverConexion() {
+      intentarSincronizarOffline();
+    }
+    window.addEventListener("online", alVolverConexion);
+    return () => window.removeEventListener("online", alVolverConexion);
   }, []);
 
   async function manejarCrearParte(e) {
     e.preventDefault();
     if (!nuevoParte.novedades) return;
     setGuardando(true);
+    const potreroObj = potreros.find((p) => p.id === nuevoParte.potreroId);
+    const payload = {
+      potreroId: nuevoParte.potreroId,
+      potrero: potreroObj ? potreroObj.nombre : "Potrero",
+      novedades: nuevoParte.novedades,
+      animalesRevisados: Number(nuevoParte.animalesRevisados) || 0,
+      solicitudInsumos: nuevoParte.solicitudInsumos,
+    };
+
     try {
-      const potreroObj = potreros.find((p) => p.id === nuevoParte.potreroId);
-      await registrarParteDiario({
-        potreroId: nuevoParte.potreroId,
-        potrero: potreroObj ? potreroObj.nombre : "Potrero",
-        novedades: nuevoParte.novedades,
-        animalesRevisados: Number(nuevoParte.animalesRevisados) || 0,
-        solicitudInsumos: nuevoParte.solicitudInsumos,
-      });
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        encolarParteOffline(payload);
+        setPartesOffline(leerColaPartesOffline());
+        setMensaje("Sin señal: parte guardado en cola offline (se sincronizará al volver la conexión).");
+        setModalAbierto(false);
+        setNuevoParte({
+          potreroId: potreros[0]?.id || "",
+          novedades: "",
+          animalesRevisados: 50,
+          solicitudInsumos: "",
+        });
+        setTimeout(() => setMensaje(""), 4500);
+        return;
+      }
+
+      await registrarParteDiario(payload);
 
       setMensaje("Parte diario registrado exitosamente en la base de datos.");
       setModalAbierto(false);
@@ -84,7 +132,15 @@ export default function PartesView() {
       await cargarDatos();
       setTimeout(() => setMensaje(""), 4000);
     } catch (err) {
-      alert("Error: " + err.message);
+      if (!err?.status) {
+        encolarParteOffline(payload);
+        setPartesOffline(leerColaPartesOffline());
+        setMensaje("Sin señal de red: parte guardado en cola offline para sincronizar luego.");
+        setModalAbierto(false);
+        setTimeout(() => setMensaje(""), 4500);
+      } else {
+        alert("Error: " + err.message);
+      }
     } finally {
       setGuardando(false);
     }
@@ -264,6 +320,29 @@ export default function PartesView() {
           </span>
         </div>
       </div>
+
+      {/* Cola Offline de Partes Diarios (Modo Rural) */}
+      {partesOffline.length > 0 && (
+        <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+          <div className="text-xs text-amber-950">
+            <p className="font-bold flex items-center gap-1.5">
+              <i className="fa-solid fa-wifi text-amber-700"></i>
+              <span>{partesOffline.length} parte(s) en cola offline (Modo Rural)</span>
+            </p>
+            <p className="text-[11px] text-amber-800 mt-0.5">
+              Se enviarán automáticamente al recuperar señal o al pulsar Sincronizar.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={sincronizandoOffline}
+            onClick={intentarSincronizarOffline}
+            className="bg-[#182920] hover:bg-[#33512f] text-[#f1ecdd] text-xs font-bold px-3.5 py-2 rounded-xl transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+          >
+            {sincronizandoOffline ? "Sincronizando..." : "Sincronizar ahora"}
+          </button>
+        </div>
+      )}
 
       {/* Lista de Partes */}
       <div className="bg-white rounded-2xl p-6 border border-[#ded7c4] shadow-sm space-y-4">

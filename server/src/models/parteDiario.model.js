@@ -52,6 +52,47 @@ class ParteDiarioModel {
     return todos.filter((p) => p.estado === "PENDIENTE");
   }
 
+  /**
+   * Calcula conteos consolidados de partes diarios directamente en PostgreSQL
+   * mediante `count()` en paralelo, con respaldo en memoria.
+   */
+  static async obtenerResumen(establecimientoId) {
+    try {
+      const baseWhere = establecimientoId ? { establecimientoId } : {};
+      const [totalPartes, partesAprobados, partesPendientes, tratamientosCompletados] = await Promise.all([
+        prisma.parteDiario.count({ where: baseWhere }),
+        prisma.parteDiario.count({ where: { ...baseWhere, estado: "APROBADO" } }),
+        prisma.parteDiario.count({ where: { ...baseWhere, estado: "PENDIENTE" } }),
+        prisma.parteDiario.count({
+          where: {
+            ...baseWhere,
+            OR: [
+              { novedades: { contains: "vacun", mode: "insensitive" } },
+              { novedades: { contains: "curac", mode: "insensitive" } },
+              { novedades: { contains: "sanit", mode: "insensitive" } },
+            ],
+          },
+        }),
+      ]);
+      return { totalPartes, partesAprobados, partesPendientes, tratamientosCompletados };
+    } catch (err) {
+      console.warn("[ParteDiarioModel.obtenerResumen] Fallback a memoria:", err.message);
+      const fuente = Array.isArray(db.partesDiarios) ? db.partesDiarios : [];
+      const lista = establecimientoId
+        ? fuente.filter((p) => p.establecimientoId === establecimientoId)
+        : fuente;
+      return {
+        totalPartes: lista.length,
+        partesAprobados: lista.filter((p) => (p.estado || "").toUpperCase() === "APROBADO").length,
+        partesPendientes: lista.filter((p) => (p.estado || "").toUpperCase() === "PENDIENTE").length,
+        tratamientosCompletados: lista.filter((p) => {
+          const txt = (p.novedades || "").toLowerCase();
+          return txt.includes("vacun") || txt.includes("curac") || txt.includes("sanit");
+        }).length,
+      };
+    }
+  }
+
   static async registrar({
     peonId,
     peonNombre,

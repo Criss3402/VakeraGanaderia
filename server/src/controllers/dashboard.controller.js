@@ -563,10 +563,11 @@ class DashboardController {
   static async obtenerReportes(req, res) {
     try {
       const { estId } = obtenerEstablecimientoContexto(req);
-      const [metricasGanado, insumosCriticos, partes, potreros, hacienda] = await Promise.all([
+      const [metricasGanado, sumaPesoKg, insumosCriticos, resumenPartes, potreros, hacienda] = await Promise.all([
         GanadoModel.obtenerMetricas(estId),
+        GanadoModel.obtenerSumaPesoKg(estId),
         InsumoModel.obtenerCriticos(estId),
-        ParteDiarioModel.listarTodos(estId),
+        ParteDiarioModel.obtenerResumen(estId),
         GanadoModel.listarPotreros(estId),
         GanadoModel.listarTodos(estId),
       ]);
@@ -575,7 +576,7 @@ class DashboardController {
       const totalCabezas = metricasGanado.totalCabezas || 0;
       const pesoPromedio = metricasGanado.pesoPromedioKg || 0;
       const valorHaciendaEstimado = totalCabezas > 0
-        ? Math.round(hacienda.reduce((acc, a) => acc + (Number(a.pesoKg) || 0) * precioKgVivo, 0))
+        ? Math.round(sumaPesoKg * precioKgVivo)
         : 0;
 
       const resumenGeneral = {
@@ -583,10 +584,7 @@ class DashboardController {
         pesoPromedio,
         valorHaciendaEstimado,
         tasaMortalidad: metricasGanado.tasaMortalidadMensual || "0.0%",
-        tratamientosCompletados: partes.filter((p) => {
-          const txt = (p.novedades || "").toLowerCase();
-          return txt.includes("vacun") || txt.includes("curac") || txt.includes("sanit");
-        }).length,
+        tratamientosCompletados: resumenPartes.tratamientosCompletados || 0,
       };
 
       const reporte = {
@@ -595,9 +593,9 @@ class DashboardController {
         distribucionPotreros: potreros,
         haciendaDetalle: hacienda,
         insumosCriticos,
-        totalPartes: partes.length,
-        partesAprobados: partes.filter((p) => (p.estado || "").toUpperCase() === "APROBADO").length,
-        partesPendientes: partes.filter((p) => (p.estado || "").toUpperCase() === "PENDIENTE").length,
+        totalPartes: resumenPartes.totalPartes || 0,
+        partesAprobados: resumenPartes.partesAprobados || 0,
+        partesPendientes: resumenPartes.partesPendientes || 0,
         fechaGeneracion: new Date().toISOString(),
       };
 

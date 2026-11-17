@@ -1,0 +1,27 @@
+{
+  "name": "Vakera — Gestión Ganadera",
+  "short_name": "Vakera",
+  "description": "Sistema de Gestión y Trazabilidad Ganadera con soporte offline para zonas rurales.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f5eb",
+  "theme_color": "#182920",
+  "lang": "es-AR",
+  "icons": [
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

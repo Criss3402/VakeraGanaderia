@@ -1,8 +1,10 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import ProtectedRoute from "./views/4_permisos/ProtectedRoute.jsx";
-import PrivateLayout from "./components/layout/PrivateLayout.jsx";
 import LandingView from "./views/1_inicio_presentacion/LandingView.jsx";
+
+// Layout privado diferido para no penalizar el bundle público inicial
+const PrivateLayout = lazy(() => import("./components/layout/PrivateLayout.jsx"));
 
 // Vistas Secundarias Públicas diferidas (Code Splitting)
 const LoginView = lazy(() => import("./views/2_login_registro/LoginView.jsx"));
@@ -151,33 +153,35 @@ function AppContenido() {
   // Renderizar Aplicación Privada Protegida
   return (
     <ProtectedRoute alIrALogin={() => setRuta("login")}>
-      <PrivateLayout
-        vistaActiva={subVistaApp}
-        alCambiarVista={(nuevaSubVista) => setSubVistaApp(nuevaSubVista)}
-        tituloVista={titulosVistas[subVistaApp] || "Panel General"}
-        alIrALanding={() => setRuta("landing")}
-      >
-        <Suspense fallback={<VistaCargando />}>
-          {subVistaApp === "permisos" && (
-            <ProtectedRoute rolesPermitidos={["dueno"]} alIrALogin={() => setRuta("login")}>
-              <GestionUsuariosView />
-            </ProtectedRoute>
-          )}
+      <Suspense fallback={<VistaCargando />}>
+        <PrivateLayout
+          vistaActiva={subVistaApp}
+          alCambiarVista={(nuevaSubVista) => setSubVistaApp(nuevaSubVista)}
+          tituloVista={titulosVistas[subVistaApp] || "Panel General"}
+          alIrALanding={() => setRuta("landing")}
+        >
+          <Suspense fallback={<VistaCargando />}>
+            {subVistaApp === "permisos" && (
+              <ProtectedRoute rolesPermitidos={["dueno"]} alIrALogin={() => setRuta("login")}>
+                <GestionUsuariosView />
+              </ProtectedRoute>
+            )}
 
-          {subVistaApp === "ganado" && <GanadoView />}
-          {subVistaApp === "parcelas" && <ParcelasView />}
-          {subVistaApp === "partes" && <PartesView />}
-          {subVistaApp === "sanidad" && <SanidadView />}
-          {subVistaApp === "insumos" && <InsumosView />}
-          {subVistaApp === "reportes" && <ReportesView />}
+            {subVistaApp === "ganado" && <GanadoView />}
+            {subVistaApp === "parcelas" && <ParcelasView />}
+            {subVistaApp === "partes" && <PartesView />}
+            {subVistaApp === "sanidad" && <SanidadView />}
+            {subVistaApp === "insumos" && <InsumosView />}
+            {subVistaApp === "reportes" && <ReportesView />}
 
-          {subVistaApp === "metricas" && (
-            <DashboardView
-              alCambiarVista={(nuevaSubVista) => setSubVistaApp(nuevaSubVista)}
-            />
-          )}
-        </Suspense>
-      </PrivateLayout>
+            {subVistaApp === "metricas" && (
+              <DashboardView
+                alCambiarVista={(nuevaSubVista) => setSubVistaApp(nuevaSubVista)}
+              />
+            )}
+          </Suspense>
+        </PrivateLayout>
+      </Suspense>
     </ProtectedRoute>
   );
 }

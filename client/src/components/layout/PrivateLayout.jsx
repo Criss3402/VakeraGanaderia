@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import Sidebar from "./Sidebar";
 import PrivateHeader from "./PrivateHeader";
-import ChatView from "../../views/3_dashboard/modulos/ChatView";
+
+const ChatView = lazy(() => import("../../views/3_dashboard/modulos/ChatView"));
 
 export default function PrivateLayout({
   children,
@@ -48,7 +49,9 @@ export default function PrivateLayout({
         </div>
 
         {/* Interfaz Flotante de Chat Compartimentado (Esquina Inferior Derecha) */}
-        <ChatView />
+        <Suspense fallback={null}>
+          <ChatView />
+        </Suspense>
       </main>
     </div>
   );

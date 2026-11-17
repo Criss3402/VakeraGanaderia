@@ -240,6 +240,28 @@ class GanadoModel {
     }
   }
 
+  /**
+   * Calcula la suma total de peso (kg) del rodeo directamente en PostgreSQL
+   * mediante `aggregate({ _sum })` sin cargar registros individuales en memoria.
+   */
+  static async obtenerSumaPesoKg(establecimientoId) {
+    try {
+      const whereClause = establecimientoId ? { establecimientoId } : {};
+      const agg = await prisma.ganado.aggregate({
+        where: whereClause,
+        _sum: { pesoKg: true },
+      });
+      return Number(agg?._sum?.pesoKg) || 0;
+    } catch (e) {
+      console.warn("[GanadoModel.obtenerSumaPesoKg] Fallback a memoria:", e.message);
+      const fuente = Array.isArray(db.ganado) ? db.ganado : [];
+      const lista = establecimientoId
+        ? fuente.filter((g) => g.establecimientoId === establecimientoId)
+        : fuente;
+      return lista.reduce((acc, curr) => acc + (Number(curr.pesoKg) || 0), 0);
+    }
+  }
+
   static async registrar(animal, establecimientoId, establecimiento) {
     try {
       let potreroId = animal.potreroId;
