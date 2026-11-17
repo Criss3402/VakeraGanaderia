@@ -104,6 +104,85 @@ class SanidadModel {
       throw e;
     }
   }
+
+  static async eliminarEvento(id, establecimientoId) {
+    if (!id) throw new Error("ID de evento sanitario requerido.");
+
+    let existente = null;
+    try {
+      existente = await prisma.sanidadEvento.findUnique({ where: { id } });
+    } catch (err) {
+      console.warn("[SanidadModel] Fallo al consultar Prisma en eliminarEvento, usando fallback en memoria:", err.message);
+      existente = null;
+    }
+
+    if (existente) {
+      if (
+        establecimientoId &&
+        existente.establecimientoId &&
+        existente.establecimientoId !== establecimientoId
+      ) {
+        throw new Error("No tenés permisos para eliminar un evento sanitario de otro establecimiento.");
+      }
+
+      const eliminado = await prisma.sanidadEvento.delete({ where: { id } });
+      if (Array.isArray(db.sanidad)) {
+        db.sanidad = db.sanidad.filter((s) => s.id !== id);
+      }
+      return eliminado;
+    }
+
+    if (Array.isArray(db.sanidad)) {
+      const idx = db.sanidad.findIndex((s) => s.id === id);
+      if (idx !== -1) {
+        const candidato = db.sanidad[idx];
+        if (
+          establecimientoId &&
+          candidato.establecimientoId &&
+          candidato.establecimientoId !== establecimientoId
+        ) {
+          throw new Error("No tenés permisos para eliminar un evento sanitario de otro establecimiento.");
+        }
+        const [eliminadoMem] = db.sanidad.splice(idx, 1);
+        return eliminadoMem;
+      }
+    }
+
+    throw new Error("Evento sanitario no encontrado o ya eliminado.");
+  }
+
+  static async eliminarMasivo(ids = [], establecimientoId) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new Error("Debe seleccionar al menos un evento sanitario para eliminar.");
+    }
+    try {
+      const whereClause = { id: { in: ids } };
+      if (establecimientoId) whereClause.establecimientoId = establecimientoId;
+      const res = await prisma.sanidadEvento.deleteMany({
+        where: whereClause,
+      });
+      if (Array.isArray(db.sanidad)) {
+        db.sanidad = db.sanidad.filter(
+          (s) =>
+            !ids.includes(s.id) ||
+            (establecimientoId && s.establecimientoId && s.establecimientoId !== establecimientoId)
+        );
+      }
+      return { count: res.count, ids };
+    } catch (err) {
+      console.warn("[SanidadModel] Fallo en eliminarMasivo Prisma, usando memoria:", err.message);
+      if (Array.isArray(db.sanidad)) {
+        const antes = db.sanidad.length;
+        db.sanidad = db.sanidad.filter(
+          (s) =>
+            !ids.includes(s.id) ||
+            (establecimientoId && s.establecimientoId && s.establecimientoId !== establecimientoId)
+        );
+        return { count: antes - db.sanidad.length, ids };
+      }
+      return { count: 0, ids };
+    }
+  }
 }
 
 module.exports = SanidadModel;

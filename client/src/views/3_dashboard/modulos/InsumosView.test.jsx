@@ -318,4 +318,95 @@ describe("Vista de Inventario e Insumos (InsumosView.jsx)", () => {
       expect(screen.getAllByText("Galpón Manual Auxiliar").length).toBeGreaterThanOrEqual(1);
     });
   });
+
+  it("en Solicitudes de Reposición permite denegar, marcar todas y eliminar en lote", async () => {
+    let mockSolicitudes = [
+      {
+        id: "sol-1",
+        insumoNombre: "Rollo de Alambre Alta Resistencia 1000m",
+        cantidad: 2,
+        unidad: "Rollos",
+        solicitanteNombre: "Lucas Giménez",
+        solicitanteRol: "peon",
+        fecha: "2026-10-09",
+        sector: "Pertenencias de Peón",
+        motivo: "Reparación de alambrado",
+        estado: "Pendiente",
+      },
+      {
+        id: "sol-2",
+        insumoNombre: "Vacuna Antiaftosa Bivalente",
+        cantidad: 50,
+        unidad: "Dosis",
+        solicitanteNombre: "Dra. Sofía Navarro",
+        solicitanteRol: "veterinario",
+        fecha: "2026-10-08",
+        sector: "Botiquín Veterinario",
+        motivo: "Campaña oficial",
+        estado: "Aprobado",
+      },
+    ];
+    let estadoEnviado = null;
+    let idsMasivo = null;
+
+    server.use(
+      http.get("*/api/dashboard/insumos/solicitudes", () => {
+        return HttpResponse.json({ ok: true, data: mockSolicitudes });
+      }),
+      http.patch("*/api/dashboard/insumos/solicitudes/:id/estado", async ({ params, request }) => {
+        const body = await request.json();
+        estadoEnviado = body.estado;
+        mockSolicitudes = mockSolicitudes.map((s) =>
+          s.id === params.id ? { ...s, estado: body.estado } : s
+        );
+        return HttpResponse.json({ ok: true, data: { id: params.id, estado: body.estado } });
+      }),
+      http.post("*/api/dashboard/insumos/solicitudes/eliminar-masivo", async ({ request }) => {
+        const body = await request.json();
+        idsMasivo = body.ids;
+        mockSolicitudes = mockSolicitudes.filter((s) => !idsMasivo.includes(s.id));
+        return HttpResponse.json({ ok: true, data: { count: idsMasivo.length, ids: idsMasivo } });
+      })
+    );
+
+    render(<InsumosView />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Vacuna Antiaftosa")).toBeInTheDocument();
+    });
+
+    const tabSolicitudes = screen.getByRole("button", { name: /Solicitudes de Reposición/i });
+    await userEvent.click(tabSolicitudes);
+
+    await waitFor(() => {
+      expect(screen.getByText("Rollo de Alambre Alta Resistencia 1000m")).toBeInTheDocument();
+    });
+
+    // Denegar la primera solicitud
+    const botonesDenegar = screen.getAllByRole("button", { name: /^Denegar$/i });
+    await userEvent.click(botonesDenegar[0]);
+
+    await waitFor(() => {
+      expect(estadoEnviado).toBe("Denegado");
+      expect(screen.getByText(/✕ Denegado/i)).toBeInTheDocument();
+    });
+
+    // Marcar todas y eliminar en lote
+    const checkTodas = screen.getByLabelText(/Marcar todas/i);
+    await userEvent.click(checkTodas);
+
+    const btnEliminarMarcadas = await screen.findByRole("button", {
+      name: /Eliminar Marcadas \(2\)/i,
+    });
+    await userEvent.click(btnEliminarMarcadas);
+
+    expect(screen.getByText(/Eliminar 2 Solicitudes Marcadas/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Confirmar Eliminación/i }));
+
+    await waitFor(() => {
+      expect(idsMasivo).toEqual(["sol-1", "sol-2"]);
+      expect(screen.queryByText("Rollo de Alambre Alta Resistencia 1000m")).not.toBeInTheDocument();
+      expect(screen.queryByText("Vacuna Antiaftosa Bivalente")).not.toBeInTheDocument();
+    });
+  });
 });

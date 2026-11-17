@@ -81,7 +81,7 @@ export default function NavbarLanding({
               className="boton boton--relleno"
               onClick={alIrAlDashboard}
             >
-              💼 Panel de Control ({rol?.toUpperCase()})
+              Panel de Control ({usuario?.nombre || usuario?.email || rol?.toUpperCase()})
             </button>
           ) : (
             <>

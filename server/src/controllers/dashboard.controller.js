@@ -143,6 +143,30 @@ class DashboardController {
     }
   }
 
+  static async actualizarPotrero(req, res) {
+    try {
+      const { id } = req.params;
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const actualizado = await GanadoModel.actualizarPotrero(id, req.body || {}, estId);
+      const nombreAnterior = actualizado.nombreAnterior || req.body?.nombreAnterior;
+      if (nombreAnterior && actualizado.nombre && nombreAnterior !== actualizado.nombre) {
+        try {
+          await InsumoModel.gestionarLocacion({
+            nombreAnterior,
+            nuevoNombre: actualizado.nombre,
+            accion: "editar",
+            establecimientoId: estId,
+          });
+        } catch (errSync) {
+          console.warn("[DashboardController] Aviso sincronizando locación de insumo:", errSync.message);
+        }
+      }
+      return exito(res, actualizado, "Parcela actualizada exitosamente.");
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
   static async eliminarPotrero(req, res) {
     try {
       const { id } = req.params;
@@ -181,6 +205,32 @@ class DashboardController {
       const { estado } = req.body;
       const actualizado = await SanidadModel.actualizarEstado(id, estado);
       return exito(res, actualizado, `Evento sanitario actualizado a '${estado}'.`);
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
+  static async eliminarEventoSanitario(req, res) {
+    try {
+      const { id } = req.params;
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const eliminado = await SanidadModel.eliminarEvento(id, estId);
+      return exito(res, eliminado, "Evento sanitario eliminado exitosamente.");
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
+  static async eliminarEventosSanitariosMasivo(req, res) {
+    try {
+      const { ids } = req.body || {};
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const resultado = await SanidadModel.eliminarMasivo(ids, estId);
+      return exito(
+        res,
+        resultado,
+        `Se eliminaron ${resultado.count || (ids && ids.length) || 0} eventos sanitarios.`
+      );
     } catch (err) {
       return error(res, err.message, 400);
     }
@@ -316,7 +366,33 @@ class DashboardController {
       const revisadoPor = req.usuario ? `${req.usuario.nombre} (${req.usuario.rol})` : "Administración";
 
       const actualizada = await InsumoModel.actualizarEstadoSolicitud(id, estado, revisadoPor);
-      return exito(res, actualizada, `Solicitud marcada como ${estado}.`);
+      return exito(res, actualizada, `Solicitud marcada como ${actualizada.estado}.`);
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
+  static eliminarSolicitudInsumo(req, res) {
+    try {
+      const { id } = req.params;
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const eliminada = InsumoModel.eliminarSolicitud(id, estId);
+      return exito(res, eliminada, "Solicitud eliminada correctamente.");
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
+  static eliminarSolicitudesInsumoMasivo(req, res) {
+    try {
+      const { ids } = req.body || {};
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const resultado = InsumoModel.eliminarSolicitudesMasivo(ids, estId);
+      return exito(
+        res,
+        resultado,
+        `Se eliminaron ${resultado.count || (ids && ids.length) || 0} solicitudes seleccionadas.`
+      );
     } catch (err) {
       return error(res, err.message, 400);
     }
@@ -397,6 +473,32 @@ class DashboardController {
       return exito(res, parteActualizado, `Parte diario marcado como ${estadoNormalizado}.`);
     } catch (err) {
       return error(res, "Error al actualizar estado del parte diario: " + err.message, 500);
+    }
+  }
+
+  static async eliminarParteDiario(req, res) {
+    try {
+      const { id } = req.params;
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const eliminado = await ParteDiarioModel.eliminar(id, estId);
+      return exito(res, eliminado, "Parte diario eliminado exitosamente.");
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
+  static async eliminarPartesDiariosMasivo(req, res) {
+    try {
+      const { ids } = req.body || {};
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const resultado = await ParteDiarioModel.eliminarMasivo(ids, estId);
+      return exito(
+        res,
+        resultado,
+        `Se eliminaron ${resultado.count || (ids && ids.length) || 0} partes diarios.`
+      );
+    } catch (err) {
+      return error(res, err.message, 400);
     }
   }
 

@@ -24,6 +24,11 @@ router.post(
   rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ),
   DashboardController.registrarPotrero
 );
+router.patch(
+  "/potreros/:id",
+  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ),
+  DashboardController.actualizarPotrero
+);
 router.delete(
   "/potreros/:id",
   rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ),
@@ -68,6 +73,16 @@ router.patch(
   rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ, ROLES.VETERINARIO),
   DashboardController.actualizarEstadoSanitario
 );
+router.post(
+  "/sanidad/eliminar-masivo",
+  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ, ROLES.VETERINARIO),
+  DashboardController.eliminarEventosSanitariosMasivo
+);
+router.delete(
+  "/sanidad/:id",
+  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ, ROLES.VETERINARIO),
+  DashboardController.eliminarEventoSanitario
+);
 
 // 5. Módulo de Insumos y Stock
 router.get("/insumos", DashboardController.obtenerInsumosCriticos);
@@ -110,6 +125,16 @@ router.patch(
   rbacMiddleware(ROLES.OFICINA, ROLES.CAPATAZ, ROLES.DUENO),
   DashboardController.actualizarEstadoSolicitudInsumo
 );
+router.post(
+  "/insumos/solicitudes/eliminar-masivo",
+  rbacMiddleware(ROLES.OFICINA, ROLES.CAPATAZ, ROLES.DUENO),
+  DashboardController.eliminarSolicitudesInsumoMasivo
+);
+router.delete(
+  "/insumos/solicitudes/:id",
+  rbacMiddleware(ROLES.OFICINA, ROLES.CAPATAZ, ROLES.DUENO),
+  DashboardController.eliminarSolicitudInsumo
+);
 
 // Conteo físico de pertenencias y herramientas asignadas
 router.patch(
@@ -129,6 +154,16 @@ router.patch(
   "/partes/:id/estado",
   rbacMiddleware(ROLES.CAPATAZ, ROLES.DUENO),
   DashboardController.actualizarEstadoParte
+);
+router.post(
+  "/partes/eliminar-masivo",
+  rbacMiddleware(ROLES.CAPATAZ, ROLES.DUENO),
+  DashboardController.eliminarPartesDiariosMasivo
+);
+router.delete(
+  "/partes/:id",
+  rbacMiddleware(ROLES.CAPATAZ, ROLES.DUENO),
+  DashboardController.eliminarParteDiario
 );
 
 // 7. Reportes y Balances (Dueño y Oficina, Capataz y Veterinario en lectura)

@@ -456,6 +456,155 @@ class GanadoModel {
     }
   }
 
+  static async actualizarPotrero(id, datos = {}, establecimientoId) {
+    if (!id) throw new Error("ID de potrero requerido");
+
+    function parsearMeta(desc) {
+      try {
+        if (desc && typeof desc === "string" && desc.startsWith("{")) {
+          return JSON.parse(desc);
+        }
+      } catch (err) {
+        console.warn("[GanadoModel] No se pudo parsear metadata de potrero:", err.message);
+      }
+      return {};
+    }
+
+    let existentePrisma = null;
+    try {
+      existentePrisma = await prisma.potrero.findUnique({ where: { id } });
+    } catch (err) {
+      console.warn("[GanadoModel] Fallo al buscar potrero en Prisma, usando memoria:", err.message);
+      existentePrisma = null;
+    }
+
+    if (existentePrisma) {
+      if (
+        establecimientoId &&
+        existentePrisma.establecimientoId &&
+        existentePrisma.establecimientoId !== establecimientoId
+      ) {
+        throw new Error("No tenés permisos para editar una parcela de otro establecimiento.");
+      }
+
+      const prevMeta = parsearMeta(existentePrisma.descripcion);
+      const nuevoNombre =
+        typeof datos.nombre === "string" && datos.nombre.trim()
+          ? datos.nombre.trim()
+          : existentePrisma.nombre;
+      const metaGeo = {
+        nota:
+          datos.descripcion !== undefined
+            ? String(datos.descripcion || "")
+            : prevMeta.nota || "",
+        coordinates: Array.isArray(datos.coordinates)
+          ? datos.coordinates
+          : prevMeta.coordinates || [],
+        color: datos.color || prevMeta.color || "#2e7d32",
+        pastura: datos.pastura || prevMeta.pastura || "Campo Natural",
+        aguada: datos.aguada || prevMeta.aguada || "Aguada no especificada",
+        estadoPastura: datos.estadoPastura || prevMeta.estadoPastura || "Óptimo",
+      };
+
+      const actualizado = await prisma.potrero.update({
+        where: { id },
+        data: {
+          nombre: nuevoNombre,
+          descripcion: JSON.stringify(metaGeo),
+          ...(datos.superficieHas !== undefined
+            ? { superficieHas: parseFloat(datos.superficieHas) || 0 }
+            : {}),
+          ...(datos.capacidad !== undefined
+            ? { capacidad: parseInt(datos.capacidad, 10) || 100 }
+            : {}),
+        },
+        include: { animales: true },
+      });
+
+      const total = actualizado.animales ? actualizado.animales.length : 0;
+      return {
+        ...actualizado,
+        coordinates: metaGeo.coordinates,
+        color: metaGeo.color,
+        pastura: metaGeo.pastura,
+        aguada: metaGeo.aguada,
+        estadoPastura: metaGeo.estadoPastura,
+        descripcion: metaGeo.nota,
+        totalAnimales: total,
+        porcentajeCarga: actualizado.capacidad
+          ? Math.min(100, Math.round((total / actualizado.capacidad) * 100))
+          : 0,
+        nombreAnterior: existentePrisma.nombre,
+      };
+    }
+
+    if (Array.isArray(db.potreros)) {
+      const idx = db.potreros.findIndex((p) => p.id === id);
+      if (idx !== -1) {
+        const previo = db.potreros[idx];
+        if (
+          establecimientoId &&
+          previo.establecimientoId &&
+          previo.establecimientoId !== establecimientoId
+        ) {
+          throw new Error("No tenés permisos para editar una parcela de otro establecimiento.");
+        }
+
+        const nombreAnterior = previo.nombre;
+        const nuevoNombre =
+          typeof datos.nombre === "string" && datos.nombre.trim()
+            ? datos.nombre.trim()
+            : previo.nombre;
+
+        db.potreros[idx] = {
+          ...previo,
+          nombre: nuevoNombre,
+          superficieHas:
+            datos.superficieHas !== undefined
+              ? parseFloat(datos.superficieHas) || 0
+              : previo.superficieHas,
+          capacidad:
+            datos.capacidad !== undefined
+              ? parseInt(datos.capacidad, 10) || 100
+              : previo.capacidad,
+          coordinates: Array.isArray(datos.coordinates)
+            ? datos.coordinates
+            : previo.coordinates || [],
+          color: datos.color || previo.color || "#2e7d32",
+          pastura: datos.pastura || previo.pastura || "Campo Natural",
+          aguada: datos.aguada || previo.aguada || "Aguada no especificada",
+          estadoPastura: datos.estadoPastura || previo.estadoPastura || "Óptimo",
+          descripcion:
+            datos.descripcion !== undefined ? String(datos.descripcion || "") : previo.descripcion || "",
+        };
+
+        if (Array.isArray(db.ganado) && nombreAnterior !== nuevoNombre) {
+          db.ganado.forEach((g) => {
+            if (g.potreroId === id || g.potrero === nombreAnterior || g.potreroNombre === nombreAnterior) {
+              g.potrero = nuevoNombre;
+              g.potreroNombre = nuevoNombre;
+            }
+          });
+        }
+
+        const totalAnimales = (Array.isArray(db.ganado) ? db.ganado : []).filter(
+          (g) => g.potreroId === id || g.potrero === nuevoNombre || g.potreroNombre === nuevoNombre
+        ).length;
+
+        return {
+          ...db.potreros[idx],
+          totalAnimales,
+          porcentajeCarga: db.potreros[idx].capacidad
+            ? Math.min(100, Math.round((totalAnimales / db.potreros[idx].capacidad) * 100))
+            : 0,
+          nombreAnterior,
+        };
+      }
+    }
+
+    throw new Error("Parcela no encontrada o ya eliminada.");
+  }
+
   static async eliminarPotrero(id, establecimientoId) {
     if (!id) throw new Error("ID de potrero requerido");
     try {

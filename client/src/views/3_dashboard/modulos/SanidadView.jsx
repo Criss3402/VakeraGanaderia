@@ -3,6 +3,8 @@ import {
   obtenerSanidad,
   registrarEventoSanitario,
   actualizarEstadoSanitario,
+  eliminarEventoSanitario,
+  eliminarEventosSanitariosMasivo,
   obtenerGanado,
 } from "../../../api/dashboard.api";
 import { useAuth } from "../../../context/AuthContext";
@@ -14,6 +16,10 @@ export default function SanidadView() {
   const [filtroTipo, setFiltroTipo] = useState("TODOS");
   const [cargando, setCargando] = useState(true);
   const [modalAbierto, setModalAbierto] = useState(false);
+  const [seleccionadosEventos, setSeleccionadosEventos] = useState([]);
+  const [eventoAEliminar, setEventoAEliminar] = useState(null);
+  const [modalEliminarMasivo, setModalEliminarMasivo] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
   const [mensaje, setMensaje] = useState("");
 
   const [nuevoEvento, setNuevoEvento] = useState({
@@ -83,10 +89,54 @@ export default function SanidadView() {
     }
   }
 
+  async function manejarEliminarEvento() {
+    setEliminando(true);
+    try {
+      if (eventoAEliminar) {
+        const nombreEvento = eventoAEliminar.evento;
+        await eliminarEventoSanitario(eventoAEliminar.id);
+        setEventos((prev) => prev.filter((ev) => ev.id !== eventoAEliminar.id));
+        setSeleccionadosEventos((prev) => prev.filter((id) => id !== eventoAEliminar.id));
+        setEventoAEliminar(null);
+        setMensaje(`Acto sanitario "${nombreEvento}" eliminado correctamente.`);
+      } else if (seleccionadosEventos.length > 0) {
+        const cantidad = seleccionadosEventos.length;
+        await eliminarEventosSanitariosMasivo(seleccionadosEventos);
+        setEventos((prev) => prev.filter((ev) => !seleccionadosEventos.includes(ev.id)));
+        setSeleccionadosEventos([]);
+        setModalEliminarMasivo(false);
+        setMensaje(`Se eliminaron ${cantidad} actos sanitarios marcados.`);
+      }
+      await cargarDatos();
+      setTimeout(() => setMensaje(""), 4000);
+    } catch (err) {
+      alert("Error al eliminar evento sanitario: " + err.message);
+    } finally {
+      setEliminando(false);
+    }
+  }
+
   const eventosFiltrados = eventos.filter((e) => {
     if (filtroTipo === "TODOS") return true;
     return e.tipo === filtroTipo;
   });
+
+  function toggleSeleccionEvento(id) {
+    setSeleccionadosEventos((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  }
+
+  function seleccionarTodosEventos() {
+    if (
+      seleccionadosEventos.length === eventosFiltrados.length &&
+      eventosFiltrados.length > 0
+    ) {
+      setSeleccionadosEventos([]);
+    } else {
+      setSeleccionadosEventos(eventosFiltrados.map((e) => e.id));
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -125,9 +175,27 @@ export default function SanidadView() {
         </div>
       )}
 
-      {/* Filtros */}
+      {/* Filtros y Selección Múltiple */}
       <div className="bg-white rounded-2xl p-4 border border-[#ded7c4] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {puedeGestionarSanidad && eventosFiltrados.length > 0 && (
+            <label
+              className="flex items-center gap-1.5 text-xs font-bold text-[#182920] bg-[#f8f5eb] px-3 py-1.5 rounded-xl border border-[#ded7c4] cursor-pointer select-none hover:bg-[#e7dfcb] transition-colors"
+              title="Marcar o desmarcar todos los actos sanitarios visibles"
+            >
+              <input
+                type="checkbox"
+                checked={
+                  seleccionadosEventos.length === eventosFiltrados.length &&
+                  eventosFiltrados.length > 0
+                }
+                onChange={seleccionarTodosEventos}
+                className="rounded cursor-pointer"
+              />
+              <span>Marcar todos</span>
+            </label>
+          )}
+
           <span className="text-xs font-bold text-[#182920] uppercase">Tipo de Acto:</span>
           {["TODOS", "Vacunación", "Tratamiento", "Mantenimiento"].map((tipo) => (
             <button
@@ -145,62 +213,121 @@ export default function SanidadView() {
           ))}
         </div>
 
-        <span className="text-xs text-[#6b7c6d]">
-          Total: <strong className="text-[#182920]">{eventosFiltrados.length}</strong> eventos registrados
-        </span>
+        <div className="flex items-center gap-3 flex-wrap">
+          {puedeGestionarSanidad && seleccionadosEventos.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setEventoAEliminar(null);
+                setModalEliminarMasivo(true);
+              }}
+              className="bg-red-700 hover:bg-red-800 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5 animate-fade-in"
+            >
+              <i className="fa-solid fa-trash-can"></i>
+              <span>Eliminar Marcados ({seleccionadosEventos.length})</span>
+            </button>
+          )}
+          {puedeGestionarSanidad && (
+            <span className="text-xs text-[#6b7c6d]">
+              Marcados: <strong className="text-[#182920]">{seleccionadosEventos.length}</strong>
+            </span>
+          )}
+          <span className="text-xs text-[#6b7c6d]">
+            Total: <strong className="text-[#182920]">{eventosFiltrados.length}</strong> eventos registrados
+          </span>
+        </div>
       </div>
 
       {/* Lista de Eventos */}
       <div className="bg-white rounded-2xl p-6 border border-[#ded7c4] shadow-sm space-y-3.5">
-        {eventosFiltrados.map((ev) => {
-          const completado = ev.estado === "Completado";
-          return (
-            <div
-              key={ev.id}
-              className={`p-4 rounded-xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-colors ${
-                completado
-                  ? "bg-[#f8f5eb]/60 border-[#ded7c4] opacity-80"
-                  : "bg-[#f8f5eb] border-[#8fb56b]/40 shadow-sm"
-              }`}
-            >
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-bold text-[#182920]">{ev.evento}</span>
-                  <span className="text-[10px] bg-white text-[#4a5c4e] font-bold px-2 py-0.5 rounded border border-[#ded7c4]">
-                    {ev.tipo}
-                  </span>
-                  <span className="text-xs text-[#6b7c6d]">· 📍 Lote: {ev.lote || "Rodeo"}</span>
-                  <span className="text-xs text-[#6b7c6d]">· 📅 Programado: {ev.fecha}</span>
+        {eventosFiltrados.length === 0 ? (
+          <div className="py-12 text-center flex flex-col items-center justify-center gap-2">
+            <i className="fa-solid fa-syringe text-3xl text-[#8fb56b]/50 mb-1"></i>
+            <p className="text-sm font-semibold text-[#182920]">
+              No hay actos sanitarios registrados con este filtro.
+            </p>
+            <p className="text-xs text-[#526354]">
+              Podés programar una nueva vacunación, tratamiento o mantenimiento desde "+ Programar Acto Sanitario".
+            </p>
+          </div>
+        ) : (
+          eventosFiltrados.map((ev) => {
+            const completado = ev.estado === "Completado";
+            const isChecked = seleccionadosEventos.includes(ev.id);
+            return (
+              <div
+                key={ev.id}
+                className={`p-4 rounded-xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-colors ${
+                  isChecked
+                    ? "border-[#182920] ring-2 ring-[#8fb56b]/50 bg-[#f8f5eb]"
+                    : completado
+                    ? "bg-[#f8f5eb]/60 border-[#ded7c4] opacity-80"
+                    : "bg-[#f8f5eb] border-[#8fb56b]/40 shadow-sm"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  {puedeGestionarSanidad && (
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => toggleSeleccionEvento(ev.id)}
+                      className="rounded cursor-pointer w-4 h-4 mt-1 accent-[#182920] flex-shrink-0"
+                      aria-label={`Marcar evento ${ev.evento}`}
+                      title="Marcar este acto sanitario para eliminar"
+                    />
+                  )}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-bold text-[#182920]">{ev.evento}</span>
+                      <span className="text-[10px] bg-white text-[#4a5c4e] font-bold px-2 py-0.5 rounded border border-[#ded7c4]">
+                        {ev.tipo}
+                      </span>
+                      <span className="text-xs text-[#6b7c6d]">· 📍 Lote: {ev.lote || "Rodeo"}</span>
+                      <span className="text-xs text-[#6b7c6d]">· 📅 Programado: {ev.fecha}</span>
+                    </div>
+                    {ev.notas && <p className="text-xs text-[#555] italic">"{ev.notas}"</p>}
+                  </div>
                 </div>
-                {ev.notas && <p className="text-xs text-[#555] italic">"{ev.notas}"</p>}
-              </div>
 
-              <div className="flex items-center gap-2 self-end md:self-center">
-                <span
-                  className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase border ${
-                    completado
-                      ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-                      : ev.prioridad === "Urgente"
-                      ? "bg-red-100 text-red-800 border-red-300"
-                      : "bg-amber-100 text-amber-800 border-amber-300"
-                  }`}
-                >
-                  {completado ? "✓ Completado" : ev.estado || "Pendiente"}
-                </span>
-
-                {puedeGestionarSanidad && !completado && (
-                  <button
-                    type="button"
-                    onClick={() => cambiarEstado(ev.id, "Completado")}
-                    className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg transition-colors"
+                <div className="flex items-center gap-2 self-end md:self-center flex-wrap">
+                  <span
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase border ${
+                      completado
+                        ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                        : ev.prioridad === "Urgente"
+                        ? "bg-red-100 text-red-800 border-red-300"
+                        : "bg-amber-100 text-amber-800 border-amber-300"
+                    }`}
                   >
-                    Marcar Aplicado
-                  </button>
-                )}
+                    {completado ? "✓ Completado" : ev.estado || "Pendiente"}
+                  </span>
+
+                  {puedeGestionarSanidad && !completado && (
+                    <button
+                      type="button"
+                      onClick={() => cambiarEstado(ev.id, "Completado")}
+                      className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg transition-colors"
+                    >
+                      Marcar Aplicado
+                    </button>
+                  )}
+
+                  {puedeGestionarSanidad && (
+                    <button
+                      type="button"
+                      onClick={() => setEventoAEliminar(ev)}
+                      className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+                      title="Eliminar acto sanitario"
+                    >
+                      <i className="fa-solid fa-trash-can"></i>
+                      <span>Eliminar</span>
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
       {/* Modal Programar Evento */}
@@ -311,6 +438,51 @@ export default function SanidadView() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmar Eliminación (Individual o Marcados) */}
+      {(eventoAEliminar || modalEliminarMasivo) && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 border border-red-200 shadow-2xl max-w-sm w-full animate-fade-in text-xs space-y-3">
+            <h3 className="text-base font-bold text-red-800 font-['Fraunces',serif] flex items-center gap-2">
+              <i className="fa-solid fa-trash-can"></i>
+              {eventoAEliminar
+                ? "Eliminar Acto Sanitario"
+                : `Eliminar ${seleccionadosEventos.length} Actos Marcados`}
+            </h3>
+            <p className="text-[#555] leading-relaxed">
+              {eventoAEliminar ? (
+                <>
+                  ¿Confirmás que deseás eliminar <strong>"{eventoAEliminar.evento}"</strong> ({eventoAEliminar.tipo} · {eventoAEliminar.lote || "Rodeo"}) del calendario sanitario?
+                </>
+              ) : (
+                <>
+                  ¿Confirmás que deseás eliminar los <strong>{seleccionadosEventos.length}</strong> actos sanitarios marcados?
+                </>
+              )}
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setEventoAEliminar(null);
+                  setModalEliminarMasivo(false);
+                }}
+                className="px-4 py-2 rounded-xl border border-[#ded7c4] text-[#182920] font-bold"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={eliminando}
+                onClick={manejarEliminarEvento}
+                className="px-5 py-2 rounded-xl bg-red-700 hover:bg-red-800 text-white font-bold"
+              >
+                {eliminando ? "Eliminando..." : "Confirmar Eliminación"}
+              </button>
+            </div>
           </div>
         </div>
       )}

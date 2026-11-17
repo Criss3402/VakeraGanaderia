@@ -280,4 +280,242 @@ describe("Vista de Chat Compartimentado por Rol y Espacio (ChatView.jsx)", () =>
 
     expect(screen.getByText("Valeria Rossi")).toBeInTheDocument();
   });
+
+  it("permite deshacer el ocultamiento de un contacto con un clic", async () => {
+    let restaurarBody = null;
+    let ocultado = false;
+
+    server.use(
+      http.get("*/api/chat/contactos", () => {
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            usuarioActual: {
+              id: "usr-capataz",
+              nombre: "Martín Benítez",
+              rol: "capataz",
+              establecimientoId: "est-el-rancho",
+              establecimiento: "El Rancho, Goya, Corrientes",
+            },
+            rolesPermitidos: MATRIZ_CHAT_ROLES.capataz,
+            contactos: ocultado
+              ? [todosLosContactosCandidatos[1]]
+              : [todosLosContactosCandidatos[1], todosLosContactosCandidatos[4]],
+            ocultosCount: ocultado ? 1 : 0,
+          },
+        });
+      }),
+      http.delete("*/api/chat/contactos/:contactoId", ({ params }) => {
+        ocultado = true;
+        return HttpResponse.json({
+          ok: true,
+          mensaje: "El chat con Lucas Giménez ha sido ocultado de tu vista activa.",
+          data: { contactoId: params.contactoId, oculto: true },
+        });
+      }),
+      http.post("*/api/chat/contactos/restaurar", async ({ request }) => {
+        restaurarBody = await request.json();
+        ocultado = false;
+        return HttpResponse.json({
+          ok: true,
+          mensaje: "Contactos restaurados.",
+          data: { restaurados: 1 },
+        });
+      })
+    );
+
+    render(<ChatView abiertoInicial={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Lucas Giménez")).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: /Borrar contacto Lucas Giménez/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Deshacer/i })).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: /Deshacer/i }));
+
+    await waitFor(() => {
+      expect(restaurarBody).toEqual({ contactoId: "usr-peon" });
+      expect(screen.getByText("Lucas Giménez")).toBeInTheDocument();
+    });
+  });
+
+  it("muestra estado específico al buscar sin coincidencias y permite limpiar el filtro", async () => {
+    server.use(
+      http.get("*/api/chat/contactos", () => {
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            usuarioActual: {
+              id: "usr-capataz",
+              nombre: "Martín Benítez",
+              rol: "capataz",
+              establecimientoId: "est-el-rancho",
+              establecimiento: "El Rancho, Goya, Corrientes",
+            },
+            rolesPermitidos: MATRIZ_CHAT_ROLES.capataz,
+            contactos: [todosLosContactosCandidatos[1]],
+            ocultosCount: 0,
+          },
+        });
+      })
+    );
+
+    render(<ChatView abiertoInicial={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Valeria Rossi")).toBeInTheDocument();
+    });
+
+    const buscador = screen.getByLabelText("Filtrar contactos permitidos");
+    await userEvent.type(buscador, "Inexistente");
+
+    expect(screen.getByText("Sin resultados")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Ver todos los contactos" }));
+
+    expect(screen.getByText("Valeria Rossi")).toBeInTheDocument();
+  });
+
+  it("ofrece sugerencias iniciales en chats vacíos y envía al presionar Enter", async () => {
+    let mensajeEnviado = null;
+
+    server.use(
+      http.get("*/api/chat/contactos", () => {
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            usuarioActual: {
+              id: "usr-capataz",
+              nombre: "Martín Benítez",
+              rol: "capataz",
+              establecimientoId: "est-el-rancho",
+              establecimiento: "El Rancho, Goya, Corrientes",
+            },
+            rolesPermitidos: MATRIZ_CHAT_ROLES.capataz,
+            contactos: [todosLosContactosCandidatos[1]],
+            ocultosCount: 0,
+          },
+        });
+      }),
+      http.get("*/api/chat/mensajes/usr-admin", () => {
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            contacto: todosLosContactosCandidatos[1],
+            mensajes: [],
+          },
+        });
+      }),
+      http.post("*/api/chat/mensajes", async ({ request }) => {
+        mensajeEnviado = await request.json();
+        return HttpResponse.json(
+          {
+            ok: true,
+            data: {
+              id: "msg-nuevo",
+              remitenteId: "usr-capataz",
+              destinatarioId: mensajeEnviado.destinatarioId,
+              contenido: mensajeEnviado.contenido,
+              esMio: true,
+              leido: false,
+              fechaEnvio: new Date().toISOString(),
+            },
+          },
+          { status: 201 }
+        );
+      })
+    );
+
+    render(<ChatView abiertoInicial={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Valeria Rossi")).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByText("Valeria Rossi"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Buen día, ¿cómo viene la jornada?")).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByText("Buen día, ¿cómo viene la jornada?"));
+
+    const compositor = screen.getByLabelText("Escribir mensaje");
+    expect(compositor).toHaveValue("Buen día, ¿cómo viene la jornada?");
+
+    await userEvent.type(compositor, "{Enter}");
+
+    await waitFor(() => {
+      expect(mensajeEnviado).toEqual({
+        destinatarioId: "usr-admin",
+        contenido: "Buen día, ¿cómo viene la jornada?",
+      });
+      expect(screen.getByText("Hoy")).toBeInTheDocument();
+    });
+  });
+
+  it("permite colapsar el panel de contactos para mostrar solo el ícono del usuario y volver a expandirlo", async () => {
+    server.use(
+      http.get("*/api/chat/contactos", () => {
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            usuarioActual: {
+              id: "usr-capataz",
+              nombre: "Martín Benítez",
+              rol: "capataz",
+              establecimientoId: "est-el-rancho",
+              establecimiento: "El Rancho, Goya, Corrientes",
+            },
+            rolesPermitidos: MATRIZ_CHAT_ROLES.capataz,
+            contactos: [todosLosContactosCandidatos[1]],
+            ocultosCount: 0,
+          },
+        });
+      }),
+      http.get("*/api/chat/mensajes/usr-admin", () => {
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            contacto: todosLosContactosCandidatos[1],
+            mensajes: [],
+          },
+        });
+      })
+    );
+
+    render(<ChatView abiertoInicial={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Valeria Rossi")).toBeInTheDocument();
+    });
+
+    const btnColapsar = screen.getByRole("button", { name: "Colapsar lista de contactos" });
+    await userEvent.click(btnColapsar);
+
+    expect(screen.queryByLabelText("Filtrar contactos permitidos")).not.toBeInTheDocument();
+    expect(screen.queryByText("Valeria Rossi")).not.toBeInTheDocument();
+    expect(screen.getByText("VR")).toBeInTheDocument();
+
+    // Seleccionar contacto usando solo el ícono colapsado
+    await userEvent.click(
+      screen.getByRole("button", { name: /Abrir chat con Valeria Rossi/i })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Escribir mensaje")).toBeInTheDocument();
+    });
+
+    // Expandir nuevamente el panel
+    const btnExpandir = screen.getByRole("button", { name: "Expandir lista de contactos" });
+    await userEvent.click(btnExpandir);
+
+    expect(screen.getByLabelText("Filtrar contactos permitidos")).toBeInTheDocument();
+    expect(screen.getAllByText("Valeria Rossi").length).toBeGreaterThanOrEqual(2);
+  });
 });

@@ -66,6 +66,13 @@ export async function registrarPotrero(datos) {
   });
 }
 
+export async function actualizarPotrero(id, datos) {
+  return request(`/dashboard/potreros/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(datos),
+  });
+}
+
 export async function eliminarPotrero(id) {
   return request(`/dashboard/potreros/${id}`, {
     method: "DELETE",
@@ -92,6 +99,19 @@ export async function actualizarEstadoSanitario(id, estado) {
   return request(`/dashboard/sanidad/${id}/estado`, {
     method: "PATCH",
     body: JSON.stringify({ estado }),
+  });
+}
+
+export async function eliminarEventoSanitario(id) {
+  return request(`/dashboard/sanidad/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function eliminarEventosSanitariosMasivo(ids) {
+  return request("/dashboard/sanidad/eliminar-masivo", {
+    method: "POST",
+    body: JSON.stringify({ ids }),
   });
 }
 
@@ -157,6 +177,19 @@ export async function actualizarEstadoSolicitudInsumo(id, estado) {
   });
 }
 
+export async function eliminarSolicitudInsumo(id) {
+  return request(`/dashboard/insumos/solicitudes/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function eliminarSolicitudesInsumoMasivo(ids) {
+  return request("/dashboard/insumos/solicitudes/eliminar-masivo", {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
+}
+
 // Conteo Físico de Pertenencias
 export async function registrarConteoPertenencias(id, stockContado) {
   return request(`/dashboard/insumos/${id}/conteo`, {
@@ -181,6 +214,19 @@ export async function actualizarEstadoParte(id, estado) {
   return request(`/dashboard/partes/${id}/estado`, {
     method: "PATCH",
     body: JSON.stringify({ estado }),
+  });
+}
+
+export async function eliminarParteDiario(id) {
+  return request(`/dashboard/partes/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function eliminarPartesDiariosMasivo(ids) {
+  return request("/dashboard/partes/eliminar-masivo", {
+    method: "POST",
+    body: JSON.stringify({ ids }),
   });
 }
 

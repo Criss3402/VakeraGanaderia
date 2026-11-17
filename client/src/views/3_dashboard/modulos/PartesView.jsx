@@ -3,6 +3,8 @@ import {
   obtenerPartesDiarios,
   registrarParteDiario,
   actualizarEstadoParte,
+  eliminarParteDiario,
+  eliminarPartesDiariosMasivo,
   obtenerPotreros,
 } from "../../../api/dashboard.api";
 import { useAuth } from "../../../context/AuthContext";
@@ -14,6 +16,9 @@ export default function PartesView() {
   const [filtroEstado, setFiltroEstado] = useState("TODOS");
   const [cargando, setCargando] = useState(true);
   const [modalAbierto, setModalAbierto] = useState(false);
+  const [seleccionadosPartes, setSeleccionadosPartes] = useState([]);
+  const [parteAEliminar, setParteAEliminar] = useState(null);
+  const [modalEliminarMasivo, setModalEliminarMasivo] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [procesandoId, setProcesandoId] = useState(null);
 
@@ -27,6 +32,7 @@ export default function PartesView() {
   const [guardando, setGuardando] = useState(false);
 
   const puedeAprobar = rol === "capataz" || rol === "dueno";
+  const puedeEliminar = rol === "capataz" || rol === "dueno";
   const puedeCargar = rol === "peon" || rol === "capataz" || rol === "dueno";
 
   async function cargarDatos() {
@@ -98,10 +104,66 @@ export default function PartesView() {
     }
   }
 
+  async function manejarEliminarParte() {
+    if (parteAEliminar) {
+      const idObjetivo = parteAEliminar.id;
+      setProcesandoId(idObjetivo);
+      try {
+        await eliminarParteDiario(idObjetivo);
+        setPartes((prev) => prev.filter((item) => item.id !== idObjetivo));
+        setSeleccionadosPartes((prev) => prev.filter((id) => id !== idObjetivo));
+        setParteAEliminar(null);
+        setMensaje("Parte diario eliminado correctamente.");
+        await cargarDatos();
+        setTimeout(() => setMensaje(""), 4000);
+      } catch (err) {
+        alert("Error al eliminar parte diario: " + err.message);
+      } finally {
+        setProcesandoId(null);
+      }
+      return;
+    }
+
+    if (seleccionadosPartes.length > 0) {
+      const cantidad = seleccionadosPartes.length;
+      setProcesandoId("__MASIVO__");
+      try {
+        await eliminarPartesDiariosMasivo(seleccionadosPartes);
+        setPartes((prev) => prev.filter((item) => !seleccionadosPartes.includes(item.id)));
+        setSeleccionadosPartes([]);
+        setModalEliminarMasivo(false);
+        setMensaje(`Se eliminaron ${cantidad} partes diarios marcados.`);
+        await cargarDatos();
+        setTimeout(() => setMensaje(""), 4000);
+      } catch (err) {
+        alert("Error al eliminar partes diarios: " + err.message);
+      } finally {
+        setProcesandoId(null);
+      }
+    }
+  }
+
   const partesFiltrados = partes.filter((p) => {
     if (filtroEstado === "TODOS") return true;
     return String(p.estado).toUpperCase() === filtroEstado;
   });
+
+  function toggleSeleccionParte(id) {
+    setSeleccionadosPartes((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  }
+
+  function seleccionarTodosPartes() {
+    if (
+      seleccionadosPartes.length === partesFiltrados.length &&
+      partesFiltrados.length > 0
+    ) {
+      setSeleccionadosPartes([]);
+    } else {
+      setSeleccionadosPartes(partesFiltrados.map((p) => p.id));
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -140,9 +202,27 @@ export default function PartesView() {
         </div>
       )}
 
-      {/* Filtros */}
+      {/* Filtros y Selección Múltiple */}
       <div className="bg-white rounded-2xl p-4 border border-[#ded7c4] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {puedeEliminar && partesFiltrados.length > 0 && (
+            <label
+              className="flex items-center gap-1.5 text-xs font-bold text-[#182920] bg-[#f8f5eb] px-3 py-1.5 rounded-xl border border-[#ded7c4] cursor-pointer select-none hover:bg-[#e7dfcb] transition-colors"
+              title="Marcar o desmarcar todos los partes visibles"
+            >
+              <input
+                type="checkbox"
+                checked={
+                  seleccionadosPartes.length === partesFiltrados.length &&
+                  partesFiltrados.length > 0
+                }
+                onChange={seleccionarTodosPartes}
+                className="rounded cursor-pointer"
+              />
+              <span>Marcar todos</span>
+            </label>
+          )}
+
           <span className="text-xs font-bold text-[#182920] uppercase">Filtrar Estado:</span>
           {["TODOS", "PENDIENTE", "APROBADO", "RECHAZADO"].map((est) => (
             <button
@@ -160,9 +240,29 @@ export default function PartesView() {
           ))}
         </div>
 
-        <span className="text-xs text-[#6b7c6d]">
-          Total: <strong className="text-[#182920]">{partesFiltrados.length}</strong> partes en bandeja
-        </span>
+        <div className="flex items-center gap-3 flex-wrap">
+          {puedeEliminar && seleccionadosPartes.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setParteAEliminar(null);
+                setModalEliminarMasivo(true);
+              }}
+              className="bg-red-700 hover:bg-red-800 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5 animate-fade-in"
+            >
+              <i className="fa-solid fa-trash-can"></i>
+              <span>Eliminar Marcados ({seleccionadosPartes.length})</span>
+            </button>
+          )}
+          {puedeEliminar && (
+            <span className="text-xs text-[#6b7c6d]">
+              Marcados: <strong className="text-[#182920]">{seleccionadosPartes.length}</strong>
+            </span>
+          )}
+          <span className="text-xs text-[#6b7c6d]">
+            Total: <strong className="text-[#182920]">{partesFiltrados.length}</strong> partes en bandeja
+          </span>
+        </div>
       </div>
 
       {/* Lista de Partes */}
@@ -178,47 +278,62 @@ export default function PartesView() {
             const estadoMayus = String(p.estado).toUpperCase();
             const esPendiente = estadoMayus === "PENDIENTE";
             const esAprobado = estadoMayus === "APROBADO";
+            const isChecked = seleccionadosPartes.includes(p.id);
 
             return (
               <div
                 key={p.id}
                 className={`p-4 rounded-xl border transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
-                  esPendiente
+                  isChecked
+                    ? "border-[#182920] ring-2 ring-[#8fb56b]/50 bg-[#f8f5eb]"
+                    : esPendiente
                     ? "bg-[#f8f5eb] border-amber-200"
                     : "bg-white border-[#ded7c4]"
                 }`}
               >
-                <div className="space-y-1.5 max-w-3xl">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-[#182920] bg-[#f8f5eb] px-2.5 py-0.5 rounded-md border border-[#ded7c4]">
-                      📍 {p.potreroNombre || p.potrero || "Potrero"}
-                    </span>
-                    <span className="text-xs font-semibold text-[#33512f]">
-                      👤 {p.peonNombre || "Operario"}
-                    </span>
-                    <span className="text-xs text-[#6b7c6d]">· 📅 {p.fecha}</span>
-                    <span className="text-xs text-[#6b7c6d]">
-                      · {p.animalesRevisados} cabezas inspeccionadas
-                    </span>
-                    {p.revisadoPorNombre && (
-                      <span className="text-[10px] text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-medium">
-                        Revisado por {p.revisadoPorNombre}
+                <div className="flex items-start gap-3 max-w-3xl">
+                  {puedeEliminar && (
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => toggleSeleccionParte(p.id)}
+                      className="rounded cursor-pointer w-4 h-4 mt-1 accent-[#182920] flex-shrink-0"
+                      aria-label={`Marcar parte ${p.potreroNombre || p.potrero || p.id}`}
+                      title="Marcar este parte diario para eliminar"
+                    />
+                  )}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-[#182920] bg-[#f8f5eb] px-2.5 py-0.5 rounded-md border border-[#ded7c4]">
+                        📍 {p.potreroNombre || p.potrero || "Potrero"}
                       </span>
+                      <span className="text-xs font-semibold text-[#33512f]">
+                        👤 {p.peonNombre || "Operario"}
+                      </span>
+                      <span className="text-xs text-[#6b7c6d]">· 📅 {p.fecha}</span>
+                      <span className="text-xs text-[#6b7c6d]">
+                        · {p.animalesRevisados} cabezas inspeccionadas
+                      </span>
+                      {p.revisadoPorNombre && (
+                        <span className="text-[10px] text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-medium">
+                          Revisado por {p.revisadoPorNombre}
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-[#182920] font-medium leading-relaxed">
+                      {p.novedades}
+                    </p>
+
+                    {p.solicitudInsumos && (
+                      <div className="text-xs text-amber-900 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200 inline-block font-medium">
+                        📦 Solicitud: {p.solicitudInsumos}
+                      </div>
                     )}
                   </div>
-
-                  <p className="text-xs text-[#182920] font-medium leading-relaxed">
-                    {p.novedades}
-                  </p>
-
-                  {p.solicitudInsumos && (
-                    <div className="text-xs text-amber-900 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200 inline-block font-medium">
-                      📦 Solicitud: {p.solicitudInsumos}
-                    </div>
-                  )}
                 </div>
 
-                <div className="flex items-center gap-2 self-end md:self-center">
+                <div className="flex items-center gap-2 self-end md:self-center flex-wrap">
                   <span
                     className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase border ${
                       esAprobado
@@ -250,6 +365,19 @@ export default function PartesView() {
                         Rechazar
                       </button>
                     </div>
+                  )}
+
+                  {puedeEliminar && (
+                    <button
+                      type="button"
+                      disabled={procesandoId === p.id}
+                      onClick={() => setParteAEliminar(p)}
+                      className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+                      title="Eliminar parte diario"
+                    >
+                      <i className="fa-solid fa-trash-can"></i>
+                      <span>Eliminar</span>
+                    </button>
                   )}
                 </div>
               </div>
@@ -344,6 +472,57 @@ export default function PartesView() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmar Eliminación de Parte Diario (Individual o Marcados) */}
+      {(parteAEliminar || modalEliminarMasivo) && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 border border-red-200 shadow-2xl max-w-sm w-full animate-fade-in text-xs space-y-3">
+            <h3 className="text-base font-bold text-red-800 font-['Fraunces',serif] flex items-center gap-2">
+              <i className="fa-solid fa-trash-can"></i>
+              {parteAEliminar
+                ? "Eliminar Parte Diario"
+                : `Eliminar ${seleccionadosPartes.length} Partes Marcados`}
+            </h3>
+            <p className="text-[#555] leading-relaxed">
+              {parteAEliminar ? (
+                <>
+                  ¿Confirmás que deseás eliminar el parte diario de{" "}
+                  <strong>{parteAEliminar.potreroNombre || parteAEliminar.potrero || "Potrero"}</strong>{" "}
+                  ({parteAEliminar.fecha} · {parteAEliminar.peonNombre || "Operario"})?
+                </>
+              ) : (
+                <>
+                  ¿Confirmás que deseás eliminar los <strong>{seleccionadosPartes.length}</strong> partes diarios seleccionados?
+                </>
+              )}
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setParteAEliminar(null);
+                  setModalEliminarMasivo(false);
+                }}
+                className="px-4 py-2 rounded-xl border border-[#ded7c4] text-[#182920] font-bold"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={
+                  parteAEliminar
+                    ? procesandoId === parteAEliminar.id
+                    : procesandoId === "__MASIVO__"
+                }
+                onClick={manejarEliminarParte}
+                className="px-5 py-2 rounded-xl bg-red-700 hover:bg-red-800 text-white font-bold"
+              >
+                {procesandoId ? "Eliminando..." : "Confirmar Eliminación"}
+              </button>
+            </div>
           </div>
         </div>
       )}

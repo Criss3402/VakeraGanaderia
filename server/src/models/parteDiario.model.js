@@ -173,6 +173,85 @@ class ParteDiarioModel {
     parte.fechaRevision = new Date().toISOString();
     return this.formatearParte(parte);
   }
+
+  static async eliminar(id, establecimientoId) {
+    if (!id) throw new Error("ID de parte diario requerido.");
+
+    let existente = null;
+    try {
+      existente = await prisma.parteDiario.findUnique({ where: { id } });
+    } catch (err) {
+      console.warn("[ParteDiarioModel] Fallo al consultar Prisma en eliminar, usando fallback en memoria:", err.message);
+      existente = null;
+    }
+
+    if (existente) {
+      if (
+        establecimientoId &&
+        existente.establecimientoId &&
+        existente.establecimientoId !== establecimientoId
+      ) {
+        throw new Error("No tenés permisos para eliminar un parte diario de otro establecimiento.");
+      }
+
+      const eliminado = await prisma.parteDiario.delete({ where: { id } });
+      if (Array.isArray(db.partesDiarios)) {
+        db.partesDiarios = db.partesDiarios.filter((p) => p.id !== id);
+      }
+      return eliminado;
+    }
+
+    if (Array.isArray(db.partesDiarios)) {
+      const idx = db.partesDiarios.findIndex((p) => p.id === id);
+      if (idx !== -1) {
+        const candidato = db.partesDiarios[idx];
+        if (
+          establecimientoId &&
+          candidato.establecimientoId &&
+          candidato.establecimientoId !== establecimientoId
+        ) {
+          throw new Error("No tenés permisos para eliminar un parte diario de otro establecimiento.");
+        }
+        const [eliminadoMem] = db.partesDiarios.splice(idx, 1);
+        return this.formatearParte(eliminadoMem);
+      }
+    }
+
+    throw new Error("Parte diario no encontrado o ya eliminado.");
+  }
+
+  static async eliminarMasivo(ids = [], establecimientoId) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new Error("Debe seleccionar al menos un parte diario para eliminar.");
+    }
+    try {
+      const whereClause = { id: { in: ids } };
+      if (establecimientoId) whereClause.establecimientoId = establecimientoId;
+      const res = await prisma.parteDiario.deleteMany({
+        where: whereClause,
+      });
+      if (Array.isArray(db.partesDiarios)) {
+        db.partesDiarios = db.partesDiarios.filter(
+          (p) =>
+            !ids.includes(p.id) ||
+            (establecimientoId && p.establecimientoId && p.establecimientoId !== establecimientoId)
+        );
+      }
+      return { count: res.count, ids };
+    } catch (err) {
+      console.warn("[ParteDiarioModel] Fallo en eliminarMasivo Prisma, usando memoria:", err.message);
+      if (Array.isArray(db.partesDiarios)) {
+        const antes = db.partesDiarios.length;
+        db.partesDiarios = db.partesDiarios.filter(
+          (p) =>
+            !ids.includes(p.id) ||
+            (establecimientoId && p.establecimientoId && p.establecimientoId !== establecimientoId)
+        );
+        return { count: antes - db.partesDiarios.length, ids };
+      }
+      return { count: 0, ids };
+    }
+  }
 }
 
 module.exports = ParteDiarioModel;

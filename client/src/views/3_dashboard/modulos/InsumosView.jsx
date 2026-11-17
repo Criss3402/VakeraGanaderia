@@ -10,6 +10,8 @@ import {
   obtenerSolicitudesInsumos,
   crearSolicitudInsumo,
   actualizarEstadoSolicitudInsumo,
+  eliminarSolicitudInsumo,
+  eliminarSolicitudesInsumoMasivo,
   registrarConteoPertenencias,
 } from "../../../api/dashboard.api";
 import { useAuth } from "../../../context/AuthContext";
@@ -164,6 +166,11 @@ export default function InsumosView() {
 
   // Selección múltiple para eliminar insumos en Stock y Conteo
   const [seleccionadosInsumos, setSeleccionadosInsumos] = useState([]);
+
+  // Selección múltiple y eliminación de solicitudes de reposición
+  const [seleccionadosSolicitudes, setSeleccionadosSolicitudes] = useState([]);
+  const [solicitudAEliminar, setSolicitudAEliminar] = useState(null);
+  const [modalEliminarSolicitudes, setModalEliminarSolicitudes] = useState(false);
 
   // Modales de Stock e Insumos
   const [modalNuevoProducto, setModalNuevoProducto] = useState(false);
@@ -572,8 +579,48 @@ export default function InsumosView() {
     if (filtroSolicitudes === "MIS_SOLICITUDES") return sol.solicitanteRol === rol;
     if (filtroSolicitudes === "PENDIENTES") return sol.estado === "Pendiente";
     if (filtroSolicitudes === "ENTREGADAS") return sol.estado === "Entregado";
+    if (filtroSolicitudes === "DENEGADAS") return sol.estado === "Denegado";
     return true;
   });
+
+  function toggleSeleccionSolicitud(id) {
+    setSeleccionadosSolicitudes((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  }
+
+  function seleccionarTodasSolicitudes() {
+    if (
+      seleccionadosSolicitudes.length === solicitudesFiltradas.length &&
+      solicitudesFiltradas.length > 0
+    ) {
+      setSeleccionadosSolicitudes([]);
+    } else {
+      setSeleccionadosSolicitudes(solicitudesFiltradas.map((s) => s.id));
+    }
+  }
+
+  async function manejarConfirmarEliminarSolicitudes() {
+    setProcesando(true);
+    try {
+      if (solicitudAEliminar) {
+        await eliminarSolicitudInsumo(solicitudAEliminar.id);
+        setSeleccionadosSolicitudes((prev) => prev.filter((id) => id !== solicitudAEliminar.id));
+        mostrarNotificacion(`Solicitud "${solicitudAEliminar.insumoNombre}" eliminada correctamente.`);
+      } else if (seleccionadosSolicitudes.length > 0) {
+        await eliminarSolicitudesInsumoMasivo(seleccionadosSolicitudes);
+        mostrarNotificacion(`Se eliminaron ${seleccionadosSolicitudes.length} solicitudes marcadas.`);
+        setSeleccionadosSolicitudes([]);
+      }
+      setModalEliminarSolicitudes(false);
+      setSolicitudAEliminar(null);
+      await cargarDatos();
+    } catch (err) {
+      alert("Error al eliminar solicitudes: " + err.message);
+    } finally {
+      setProcesando(false);
+    }
+  }
 
   const solicitudesPendientesCount = solicitudes.filter((s) => s.estado === "Pendiente").length;
 
@@ -1192,29 +1239,72 @@ export default function InsumosView() {
               </div>
             </div>
 
-            {/* Filtros de Solicitudes */}
-            <div className="flex items-center gap-2 mb-4 flex-wrap">
-              <span className="text-xs font-bold text-[#182920] uppercase">Filtrar:</span>
-              {["TODAS", "MIS_SOLICITUDES", "PENDIENTES", "ENTREGADAS"].map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  onClick={() => setFiltroSolicitudes(f)}
-                  className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-colors ${
-                    filtroSolicitudes === f
-                      ? "bg-[#182920] text-[#f1ecdd] border-[#182920]"
-                      : "bg-[#f8f5eb] text-[#4a5c4e] border-[#ded7c4] hover:bg-[#e7dfcb]"
-                  }`}
-                >
-                  {f === "TODAS"
-                    ? "Todas"
-                    : f === "MIS_SOLICITUDES"
-                    ? "Mis Solicitudes"
-                    : f === "PENDIENTES"
-                    ? "Pendientes"
-                    : "Entregadas"}
-                </button>
-              ))}
+            {/* Filtros y Marcado Masivo de Solicitudes */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                {puedeAprobarSolicitud && solicitudesFiltradas.length > 0 && (
+                  <label
+                    className="flex items-center gap-1.5 text-xs font-bold text-[#182920] bg-[#f8f5eb] px-3 py-1.5 rounded-xl border border-[#ded7c4] cursor-pointer select-none hover:bg-[#e7dfcb] transition-colors"
+                    title="Marcar o desmarcar todas las solicitudes visibles"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={
+                        seleccionadosSolicitudes.length === solicitudesFiltradas.length &&
+                        solicitudesFiltradas.length > 0
+                      }
+                      onChange={seleccionarTodasSolicitudes}
+                      className="rounded cursor-pointer"
+                    />
+                    <span>Marcar todas</span>
+                  </label>
+                )}
+
+                <span className="text-xs font-bold text-[#182920] uppercase">Filtrar:</span>
+                {["TODAS", "MIS_SOLICITUDES", "PENDIENTES", "ENTREGADAS", "DENEGADAS"].map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setFiltroSolicitudes(f)}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-colors ${
+                      filtroSolicitudes === f
+                        ? "bg-[#182920] text-[#f1ecdd] border-[#182920]"
+                        : "bg-[#f8f5eb] text-[#4a5c4e] border-[#ded7c4] hover:bg-[#e7dfcb]"
+                    }`}
+                  >
+                    {f === "TODAS"
+                      ? "Todas"
+                      : f === "MIS_SOLICITUDES"
+                      ? "Mis Solicitudes"
+                      : f === "PENDIENTES"
+                      ? "Pendientes"
+                      : f === "ENTREGADAS"
+                      ? "Entregadas"
+                      : "Denegadas"}
+                  </button>
+                ))}
+              </div>
+
+              {puedeAprobarSolicitud && (
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className="text-xs text-[#6b7c6d]">
+                    Marcadas: <strong className="text-[#182920]">{seleccionadosSolicitudes.length}</strong>
+                  </span>
+                  {seleccionadosSolicitudes.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSolicitudAEliminar(null);
+                        setModalEliminarSolicitudes(true);
+                      }}
+                      className="bg-red-700 hover:bg-red-800 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5 animate-fade-in"
+                    >
+                      <i className="fa-solid fa-trash-can"></i>
+                      <span>Eliminar Marcadas ({seleccionadosSolicitudes.length})</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Lista de Solicitudes */}
@@ -1225,51 +1315,79 @@ export default function InsumosView() {
                 solicitudesFiltradas.map((s) => {
                   const esPendiente = s.estado === "Pendiente";
                   const esEntregado = s.estado === "Entregado";
+                  const esDenegado = s.estado === "Denegado";
+                  const isChecked = seleccionadosSolicitudes.includes(s.id);
 
                   return (
                     <div
                       key={s.id}
                       className={`p-4 rounded-xl border transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
-                        esPendiente ? "bg-[#f8f5eb] border-amber-300" : "bg-white border-[#ded7c4]"
+                        isChecked
+                          ? "border-[#182920] ring-2 ring-[#8fb56b]/50 bg-[#f8f5eb]/60"
+                          : esPendiente
+                          ? "bg-[#f8f5eb] border-amber-300"
+                          : esDenegado
+                          ? "bg-red-50/40 border-red-200"
+                          : "bg-white border-[#ded7c4]"
                       }`}
                     >
-                      <div className="space-y-1 max-w-2xl">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-bold text-[#182920]">
-                            {s.insumoNombre}
-                          </span>
-                          <span className="text-xs font-extrabold text-[#33512f] bg-white px-2 py-0.5 rounded border border-[#ded7c4]">
-                            Cant: {s.cantidad} {s.unidad}
-                          </span>
-                          <span className="text-xs text-[#6b7c6d]">
-                            · Solicitado por: <strong>{s.solicitanteNombre}</strong> ({s.solicitanteRol})
-                          </span>
-                          <span className="text-xs text-[#6b7c6d]">· 📅 {s.fecha}</span>
-                          <span className="text-[10px] bg-[#f8f5eb] text-[#6b4a32] font-bold px-2 py-0.5 rounded border border-[#ded7c4]">
-                            Sector: {s.sector}
-                          </span>
-                        </div>
+                      <div className="flex items-start gap-3 max-w-2xl">
+                        {puedeAprobarSolicitud && (
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleSeleccionSolicitud(s.id)}
+                            className="rounded cursor-pointer w-4 h-4 mt-0.5 accent-[#182920] flex-shrink-0"
+                            aria-label={`Marcar solicitud ${s.insumoNombre}`}
+                            title="Marcar esta solicitud para eliminar"
+                          />
+                        )}
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-[#182920]">
+                              {s.insumoNombre}
+                            </span>
+                            <span className="text-xs font-extrabold text-[#33512f] bg-white px-2 py-0.5 rounded border border-[#ded7c4]">
+                              Cant: {s.cantidad} {s.unidad}
+                            </span>
+                            <span className="text-xs text-[#6b7c6d]">
+                              · Solicitado por: <strong>{s.solicitanteNombre}</strong> ({s.solicitanteRol})
+                            </span>
+                            <span className="text-xs text-[#6b7c6d]">· 📅 {s.fecha}</span>
+                            <span className="text-[10px] bg-[#f8f5eb] text-[#6b4a32] font-bold px-2 py-0.5 rounded border border-[#ded7c4]">
+                              Sector: {s.sector}
+                            </span>
+                          </div>
 
-                        <p className="text-xs text-[#333] leading-relaxed">
-                          <strong>Motivo:</strong> {s.motivo}
-                        </p>
+                          <p className="text-xs text-[#333] leading-relaxed">
+                            <strong>Motivo:</strong> {s.motivo}
+                          </p>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-2 self-end md:self-center">
+                      <div className="flex items-center gap-2 self-end md:self-center flex-wrap">
                         <span
                           className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase border ${
                             esEntregado
                               ? "bg-emerald-100 text-emerald-800 border-emerald-300"
                               : s.estado === "Aprobado"
                               ? "bg-blue-100 text-blue-800 border-blue-300"
+                              : esDenegado
+                              ? "bg-red-100 text-red-800 border-red-300"
                               : "bg-amber-100 text-amber-800 border-amber-300"
                           }`}
                         >
-                          {esEntregado ? "✓ Entregado" : s.estado === "Aprobado" ? "✓ Aprobado" : "⏳ Pendiente"}
+                          {esEntregado
+                            ? "✓ Entregado"
+                            : s.estado === "Aprobado"
+                            ? "✓ Aprobado"
+                            : esDenegado
+                            ? "✕ Denegado"
+                            : "⏳ Pendiente"}
                         </span>
 
                         {puedeAprobarSolicitud && (
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             {esPendiente && (
                               <button
                                 type="button"
@@ -1280,7 +1398,18 @@ export default function InsumosView() {
                                 Aprobar
                               </button>
                             )}
-                            {s.estado !== "Entregado" && (
+                            {!esEntregado && !esDenegado && (
+                              <button
+                                type="button"
+                                disabled={procesando}
+                                onClick={() => cambiarEstadoSolicitud(s.id, "Denegado")}
+                                className="bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs px-3 py-1.5 rounded-lg"
+                                title="Denegar solicitud"
+                              >
+                                Denegar
+                              </button>
+                            )}
+                            {!esEntregado && !esDenegado && (
                               <button
                                 type="button"
                                 disabled={procesando}
@@ -1291,6 +1420,19 @@ export default function InsumosView() {
                                 <i className="fa-solid fa-box"></i> Entregar
                               </button>
                             )}
+                            <button
+                              type="button"
+                              disabled={procesando}
+                              onClick={() => {
+                                setSolicitudAEliminar(s);
+                                setModalEliminarSolicitudes(true);
+                              }}
+                              className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+                              title="Eliminar solicitud"
+                            >
+                              <i className="fa-solid fa-trash-can"></i>
+                              <span>Eliminar</span>
+                            </button>
                           </div>
                         )}
                       </div>
@@ -1786,6 +1928,48 @@ export default function InsumosView() {
                 type="button"
                 disabled={procesando}
                 onClick={manejarConfirmarEliminarInsumos}
+                className="px-5 py-2 rounded-xl bg-red-700 hover:bg-red-800 text-white font-bold"
+              >
+                {procesando ? "Eliminando..." : "Confirmar Eliminación"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 5B: CONFIRMAR ELIMINACIÓN DE SOLICITUDES            */}
+      {/* ========================================================= */}
+      {modalEliminarSolicitudes && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 border border-red-200 shadow-2xl max-w-sm w-full animate-fade-in text-xs space-y-3">
+            <h3 className="text-base font-bold text-red-800 font-['Fraunces',serif] flex items-center gap-2">
+              <i className="fa-solid fa-trash-can"></i>
+              {solicitudAEliminar
+                ? `Eliminar Solicitud "${solicitudAEliminar.insumoNombre}"`
+                : `Eliminar ${seleccionadosSolicitudes.length} Solicitudes Marcadas`}
+            </h3>
+            <p className="text-[#555] leading-relaxed">
+              {solicitudAEliminar
+                ? `¿Confirmás que deseás eliminar la solicitud de "${solicitudAEliminar.insumoNombre}" (${solicitudAEliminar.cantidad} ${solicitudAEliminar.unidad})?`
+                : `¿Confirmás que deseás eliminar las ${seleccionadosSolicitudes.length} solicitudes de reposición seleccionadas?`}
+            </p>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setModalEliminarSolicitudes(false);
+                  setSolicitudAEliminar(null);
+                }}
+                className="px-4 py-2 rounded-xl border border-[#ded7c4] text-[#182920] font-bold"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={procesando}
+                onClick={manejarConfirmarEliminarSolicitudes}
                 className="px-5 py-2 rounded-xl bg-red-700 hover:bg-red-800 text-white font-bold"
               >
                 {procesando ? "Eliminando..." : "Confirmar Eliminación"}

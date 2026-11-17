@@ -14,6 +14,7 @@ const prisma = require("../src/config/prisma");
 const UsuarioModel = require("../src/models/usuario.model");
 const GanadoModel = require("../src/models/ganado.model");
 const InsumoModel = require("../src/models/insumo.model");
+const SanidadModel = require("../src/models/sanidad.model");
 const ParteDiarioModel = require("../src/models/parteDiario.model");
 const PermisosController = require("../src/controllers/permisos.controller");
 const DashboardController = require("../src/controllers/dashboard.controller");
@@ -565,5 +566,240 @@ describe("6. Módulo de Chat Compartimentado (Matriz Estricta por Rol y Espacio/
     assert.equal(listaDespues.ocultosCount, 1);
   });
 });
+
+describe("7. Eliminación de Actos Sanitarios y Partes Diarios de Campo", () => {
+  it("SanidadModel.eliminarEvento elimina evento en fallback en memoria y bloquea otro establecimiento", async () => {
+    const origFindUnique = prisma.sanidadEvento.findUnique;
+    prisma.sanidadEvento.findUnique = async () => {
+      throw new Error("Usar fallback en memoria en test unitario");
+    };
+
+    db.sanidad.push(
+      {
+        id: "san-unit-del-1",
+        evento: "Vacuna Test",
+        tipo: "Vacunación",
+        lote: "Rodeo Test",
+        fechaProgramada: "2026-11-16",
+        estado: "Pendiente",
+        establecimientoId: "est-unit-a",
+      },
+      {
+        id: "san-unit-del-2",
+        evento: "Vacuna Otro Campo",
+        tipo: "Vacunación",
+        lote: "Lote B",
+        fechaProgramada: "2026-11-16",
+        estado: "Pendiente",
+        establecimientoId: "est-unit-b",
+      }
+    );
+
+    try {
+      await assert.rejects(
+        async () => {
+          await SanidadModel.eliminarEvento("san-unit-del-2", "est-unit-a");
+        },
+        /No tenés permisos/
+      );
+
+      const reqDel = {
+        params: { id: "san-unit-del-1" },
+        usuario: { id: "usr-1", establecimientoId: "est-unit-a", email: "test@unit.com" },
+      };
+      const resDel = crearMockRes();
+      await DashboardController.eliminarEventoSanitario(reqDel, resDel);
+
+      assert.equal(resDel.statusCode, 200);
+      assert.equal(resDel.body.ok, true);
+      assert.equal(db.sanidad.some((s) => s.id === "san-unit-del-1"), false);
+    } finally {
+      prisma.sanidadEvento.findUnique = origFindUnique;
+      db.sanidad = db.sanidad.filter((s) => s.id !== "san-unit-del-1" && s.id !== "san-unit-del-2");
+    }
+  });
+
+  it("ParteDiarioModel.eliminar elimina parte diario en fallback en memoria y bloquea otro establecimiento", async () => {
+    const origFindUnique = prisma.parteDiario.findUnique;
+    prisma.parteDiario.findUnique = async () => {
+      throw new Error("Usar fallback en memoria en test unitario");
+    };
+
+    db.partesDiarios.push(
+      {
+        id: "pd-unit-del-1",
+        fecha: "2026-11-16",
+        peonNombre: "Lucas Giménez",
+        potrero: "Potrero Test",
+        novedades: "Sin novedades",
+        animalesRevisados: 10,
+        estado: "APROBADO",
+        establecimientoId: "est-unit-a",
+      },
+      {
+        id: "pd-unit-del-2",
+        fecha: "2026-11-16",
+        peonNombre: "Otro Peón",
+        potrero: "Otro Potrero",
+        novedades: "Otro campo",
+        animalesRevisados: 5,
+        estado: "PENDIENTE",
+        establecimientoId: "est-unit-b",
+      }
+    );
+
+    try {
+      await assert.rejects(
+        async () => {
+          await ParteDiarioModel.eliminar("pd-unit-del-2", "est-unit-a");
+        },
+        /No tenés permisos/
+      );
+
+      const reqDel = {
+        params: { id: "pd-unit-del-1" },
+        usuario: { id: "usr-1", establecimientoId: "est-unit-a", email: "test@unit.com" },
+      };
+      const resDel = crearMockRes();
+      await DashboardController.eliminarParteDiario(reqDel, resDel);
+
+      assert.equal(resDel.statusCode, 200);
+      assert.equal(resDel.body.ok, true);
+      assert.equal(db.partesDiarios.some((p) => p.id === "pd-unit-del-1"), false);
+    } finally {
+      prisma.parteDiario.findUnique = origFindUnique;
+      db.partesDiarios = db.partesDiarios.filter(
+        (p) => p.id !== "pd-unit-del-1" && p.id !== "pd-unit-del-2"
+      );
+    }
+  });
+
+  it("SanidadModel.eliminarMasivo y ParteDiarioModel.eliminarMasivo eliminan los IDs marcados del establecimiento", async () => {
+    const origSanDelMany = prisma.sanidadEvento.deleteMany;
+    const origPdDelMany = prisma.parteDiario.deleteMany;
+    prisma.sanidadEvento.deleteMany = async () => {
+      throw new Error("Usar memoria");
+    };
+    prisma.parteDiario.deleteMany = async () => {
+      throw new Error("Usar memoria");
+    };
+
+    db.sanidad.push(
+      { id: "san-mas-1", evento: "E1", establecimientoId: "est-mas" },
+      { id: "san-mas-2", evento: "E2", establecimientoId: "est-mas" }
+    );
+    db.partesDiarios.push(
+      { id: "pd-mas-1", novedades: "N1", establecimientoId: "est-mas" },
+      { id: "pd-mas-2", novedades: "N2", establecimientoId: "est-mas" }
+    );
+
+    try {
+      const resSan = await SanidadModel.eliminarMasivo(["san-mas-1", "san-mas-2"], "est-mas");
+      const resPd = await ParteDiarioModel.eliminarMasivo(["pd-mas-1", "pd-mas-2"], "est-mas");
+      assert.equal(resSan.count, 2);
+      assert.equal(resPd.count, 2);
+      assert.equal(db.sanidad.some((s) => s.id === "san-mas-1" || s.id === "san-mas-2"), false);
+      assert.equal(db.partesDiarios.some((p) => p.id === "pd-mas-1" || p.id === "pd-mas-2"), false);
+    } finally {
+      prisma.sanidadEvento.deleteMany = origSanDelMany;
+      prisma.parteDiario.deleteMany = origPdDelMany;
+      db.sanidad = db.sanidad.filter((s) => s.id !== "san-mas-1" && s.id !== "san-mas-2");
+      db.partesDiarios = db.partesDiarios.filter((p) => p.id !== "pd-mas-1" && p.id !== "pd-mas-2");
+    }
+  });
+
+  it("InsumoModel permite denegar, eliminar individualmente y eliminar masivamente solicitudes de reposición", async () => {
+    const s1 = InsumoModel.registrarSolicitud({
+      insumoNombre: "Alambre Test 1",
+      cantidad: 2,
+      unidad: "Rollos",
+      establecimientoId: "est-sol-test",
+    });
+    const s2 = InsumoModel.registrarSolicitud({
+      insumoNombre: "Vacuna Test 2",
+      cantidad: 10,
+      unidad: "Dosis",
+      establecimientoId: "est-sol-test",
+    });
+    const s3 = InsumoModel.registrarSolicitud({
+      insumoNombre: "Boyero Test 3",
+      cantidad: 1,
+      unidad: "Unidades",
+      establecimientoId: "est-sol-test",
+    });
+
+    const denegada = await InsumoModel.actualizarEstadoSolicitud(s1.id, "Denegado", "Dueño");
+    assert.equal(denegada.estado, "Denegado");
+
+    const eliminada = InsumoModel.eliminarSolicitud(s1.id, "est-sol-test");
+    assert.equal(eliminada.id, s1.id);
+
+    const resMasivo = InsumoModel.eliminarSolicitudesMasivo([s2.id, s3.id], "est-sol-test");
+    assert.equal(resMasivo.count, 2);
+    const restantes = InsumoModel.listarSolicitudes("est-sol-test");
+    assert.equal(restantes.some((s) => s.id === s1.id || s.id === s2.id || s.id === s3.id), false);
+  });
+
+  it("GanadoModel.actualizarPotrero actualiza datos de parcela en memoria y sincroniza nombre", async () => {
+    const origFindUnique = prisma.potrero.findUnique;
+    prisma.potrero.findUnique = async () => {
+      throw new Error("Usar memoria en test unitario");
+    };
+
+    db.potreros.push(
+      {
+        id: "pot-edit-1",
+        nombre: "Parcela Original",
+        superficieHas: 5.7,
+        capacidad: 10,
+        pastura: "Campo Natural",
+        aguada: "Bebedero",
+        estadoPastura: "Óptimo",
+        color: "#ea580c",
+        coordinates: [[-59.25, -29.14], [-59.24, -29.14], [-59.24, -29.15]],
+        establecimientoId: "est-pot-edit",
+      },
+      {
+        id: "pot-edit-2",
+        nombre: "Parcela Ajena",
+        superficieHas: 3,
+        establecimientoId: "est-otro-pot",
+      }
+    );
+
+    try {
+      await assert.rejects(
+        async () => {
+          await GanadoModel.actualizarPotrero("pot-edit-2", { nombre: "Intruso" }, "est-pot-edit");
+        },
+        /No tenés permisos/
+      );
+
+      const reqEdit = {
+        params: { id: "pot-edit-1" },
+        body: {
+          nombre: "Potrero Norte Renovado",
+          superficieHas: 8.2,
+          pastura: "Gatton Panic",
+          aguada: "Molino Solar",
+          color: "#0284c7",
+        },
+        usuario: { id: "usr-1", establecimientoId: "est-pot-edit", email: "test@unit.com" },
+      };
+      const resEdit = crearMockRes();
+      await DashboardController.actualizarPotrero(reqEdit, resEdit);
+
+      assert.equal(resEdit.statusCode, 200);
+      assert.equal(resEdit.body.ok, true);
+      assert.equal(resEdit.body.data.nombre, "Potrero Norte Renovado");
+      assert.equal(resEdit.body.data.superficieHas, 8.2);
+      assert.equal(resEdit.body.data.pastura, "Gatton Panic");
+    } finally {
+      prisma.potrero.findUnique = origFindUnique;
+      db.potreros = db.potreros.filter((p) => p.id !== "pot-edit-1" && p.id !== "pot-edit-2");
+    }
+  });
+});
+
 
 

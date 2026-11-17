@@ -403,12 +403,24 @@ class InsumoModel {
     const sol = solicitudesInsumos.find((s) => s.id === id);
     if (!sol) throw new Error("Solicitud no encontrada.");
 
-    sol.estado = nuevoEstado;
+    const ESTADOS_SOLICITUD = {
+      pendiente: "Pendiente",
+      aprobado: "Aprobado",
+      entregado: "Entregado",
+      denegado: "Denegado",
+      rechazado: "Denegado",
+    };
+    const estadoNormalizado = ESTADOS_SOLICITUD[String(nuevoEstado || "").trim().toLowerCase()];
+    if (!estadoNormalizado) {
+      throw new Error("Estado de solicitud inválido. Debe ser Pendiente, Aprobado, Entregado o Denegado.");
+    }
+
+    sol.estado = estadoNormalizado;
     sol.revisadoPor = revisadoPor;
     sol.fechaRevision = new Date().toISOString().split("T")[0];
 
     // Si se entrega, y tiene un insumoId asociado, sumar al stock de pertenencias
-    if (nuevoEstado === "Entregado" && sol.insumoId) {
+    if (estadoNormalizado === "Entregado" && sol.insumoId) {
       try {
         await this.actualizarStock(sol.insumoId, sol.cantidad, "sumar");
       } catch (e) {
@@ -417,6 +429,41 @@ class InsumoModel {
     }
 
     return sol;
+  }
+
+  static eliminarSolicitud(id, establecimientoId) {
+    if (!id) throw new Error("ID de solicitud requerido.");
+    const idx = solicitudesInsumos.findIndex((s) => s.id === id);
+    if (idx === -1) {
+      throw new Error("Solicitud no encontrada o ya eliminada.");
+    }
+    const candidata = solicitudesInsumos[idx];
+    if (
+      establecimientoId &&
+      candidata.establecimientoId &&
+      candidata.establecimientoId !== establecimientoId
+    ) {
+      throw new Error("No tenés permisos para eliminar una solicitud de otro establecimiento.");
+    }
+    const [eliminada] = solicitudesInsumos.splice(idx, 1);
+    return eliminada;
+  }
+
+  static eliminarSolicitudesMasivo(ids = [], establecimientoId) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new Error("Debe seleccionar al menos una solicitud para eliminar.");
+    }
+    let count = 0;
+    for (let i = solicitudesInsumos.length - 1; i >= 0; i--) {
+      const s = solicitudesInsumos[i];
+      if (!ids.includes(s.id)) continue;
+      if (establecimientoId && s.establecimientoId && s.establecimientoId !== establecimientoId) {
+        continue;
+      }
+      solicitudesInsumos.splice(i, 1);
+      count++;
+    }
+    return { count, ids };
   }
 }
 

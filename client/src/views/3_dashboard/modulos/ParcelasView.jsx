@@ -5,6 +5,7 @@ import {
   obtenerPotreros,
   obtenerGanado,
   registrarPotrero,
+  actualizarPotrero,
   eliminarPotrero,
   trasladoMasivoGanado,
 } from "../../../api/dashboard.api";
@@ -15,6 +16,54 @@ const CENTRO_BASE_DEFECTO = [-59.2550, -29.1420];
 
 // Clave de almacenamiento local para persistencia resiliente de geometrías
 const STORAGE_KEY_PARCELAS = "vakera_potreros_geometrias_v2";
+
+// Unidades de superficie soportadas (por defecto m²)
+const UNIDADES_SUPERFICIE = {
+  m2: {
+    clave: "m2",
+    etiqueta: "Metros cuadrados",
+    sufijo: "m²",
+    factorDesdeHas: 10000,
+    decimales: 0,
+  },
+  has: {
+    clave: "has",
+    etiqueta: "Hectáreas",
+    sufijo: "Has",
+    factorDesdeHas: 1,
+    decimales: 1,
+  },
+  km2: {
+    clave: "km2",
+    etiqueta: "Kilómetros cuadrados",
+    sufijo: "km²",
+    factorDesdeHas: 0.01,
+    decimales: 3,
+  },
+  acres: {
+    clave: "acres",
+    etiqueta: "Acres",
+    sufijo: "Acres",
+    factorDesdeHas: 2.47105,
+    decimales: 2,
+  },
+};
+
+function convertirDesdeHas(superficieHas, unidad = "m2") {
+  const meta = UNIDADES_SUPERFICIE[unidad] || UNIDADES_SUPERFICIE.m2;
+  const base = Number(superficieHas) || 0;
+  return base * meta.factorDesdeHas;
+}
+
+function formatearSuperficie(superficieHas, unidad = "m2") {
+  const meta = UNIDADES_SUPERFICIE[unidad] || UNIDADES_SUPERFICIE.m2;
+  const valor = convertirDesdeHas(superficieHas, unidad);
+  const textoNum = valor.toLocaleString("es-AR", {
+    minimumFractionDigits: meta.decimales > 0 && valor > 0 && valor < 1 ? 1 : 0,
+    maximumFractionDigits: meta.decimales,
+  });
+  return `${textoNum} ${meta.sufijo}`;
+}
 
 // Paleta de colores predefinida con alto contraste y visibilidad agronómica sobre satélite
 const PALETA_COLORES = [
@@ -46,6 +95,7 @@ const ESTILOS_MAPA = {
             "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
           ],
           tileSize: 256,
+          maxzoom: 18,
           attribution: "Esri World Imagery",
         },
         "esri-roads": {
@@ -54,6 +104,7 @@ const ESTILOS_MAPA = {
             "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
           ],
           tileSize: 256,
+          maxzoom: 18,
         },
         "esri-places": {
           type: "raster",
@@ -61,6 +112,7 @@ const ESTILOS_MAPA = {
             "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
           ],
           tileSize: 256,
+          maxzoom: 18,
         },
       },
       layers: [
@@ -69,21 +121,21 @@ const ESTILOS_MAPA = {
           type: "raster",
           source: "esri-sat",
           minzoom: 0,
-          maxzoom: 19,
+          maxzoom: 22,
         },
         {
           id: "roads-ref-layer",
           type: "raster",
           source: "esri-roads",
           minzoom: 0,
-          maxzoom: 19,
+          maxzoom: 22,
         },
         {
           id: "places-ref-layer",
           type: "raster",
           source: "esri-places",
           minzoom: 0,
-          maxzoom: 19,
+          maxzoom: 22,
         },
       ],
     },
@@ -99,6 +151,7 @@ const ESTILOS_MAPA = {
           type: "raster",
           tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
           tileSize: 256,
+          maxzoom: 19,
           attribution: "OpenStreetMap contributors",
         },
       },
@@ -108,7 +161,7 @@ const ESTILOS_MAPA = {
           type: "raster",
           source: "osm",
           minzoom: 0,
-          maxzoom: 19,
+          maxzoom: 22,
         },
       ],
     },
@@ -124,6 +177,7 @@ const ESTILOS_MAPA = {
           type: "raster",
           tiles: ["https://tile.opentopomap.org/{z}/{x}/{y}.png"],
           tileSize: 256,
+          maxzoom: 17,
           attribution: "OpenTopoMap",
         },
       },
@@ -133,7 +187,7 @@ const ESTILOS_MAPA = {
           type: "raster",
           source: "opentopo",
           minzoom: 0,
-          maxzoom: 17,
+          maxzoom: 22,
         },
       ],
     },
@@ -336,6 +390,16 @@ export default function ParcelasView() {
   const [parcelaSeleccionada, setParcelaSeleccionada] = useState(null);
   const [procesando, setProcesando] = useState(false);
   const [mensaje, setMensaje] = useState("");
+  const [unidadSuperficie, setUnidadSuperficie] = useState(() => {
+    try {
+      const saved = localStorage.getItem("vakera_unidad_superficie");
+      return saved && UNIDADES_SUPERFICIE[saved] ? saved : "m2";
+    } catch {
+      return "m2";
+    }
+  });
+  const [menuMetricaAbierto, setMenuMetricaAbierto] = useState(false);
+  const [menuAccionesAbierto, setMenuAccionesAbierto] = useState(false);
 
   // Estados del Modo Trazado
   const [modoTrazado, setModoTrazado] = useState(false);
@@ -346,8 +410,10 @@ export default function ParcelasView() {
   const [svgPotreros, setSvgPotreros] = useState([]);
   const [svgMouse, setSvgMouse] = useState(null);
 
-  // Modal para guardar zona delimitada
+  // Modal para guardar o editar zona delimitada
   const [modalGuardarZona, setModalGuardarZona] = useState(false);
+  const [parcelaEditandoId, setParcelaEditandoId] = useState(null);
+  const [nombreOriginalEditando, setNombreOriginalEditando] = useState("");
   const [formularioZona, setFormularioZona] = useState({
     nombre: "",
     superficieHas: 0,
@@ -589,7 +655,9 @@ export default function ParcelasView() {
     puntos.forEach((pt, idx) => {
       const esPrimero = idx === 0;
       const el = document.createElement("div");
-      el.className = "flex flex-col items-center cursor-pointer select-none -translate-y-1/2 -translate-x-1/2 z-20";
+      el.className = esPrimero
+        ? "flex flex-col items-center cursor-pointer select-none -translate-y-1/2 -translate-x-1/2 z-20"
+        : "flex flex-col items-center pointer-events-none select-none -translate-y-1/2 -translate-x-1/2 z-10";
 
       if (esPrimero) {
         if (puntos.length >= 3) {
@@ -657,6 +725,7 @@ export default function ParcelasView() {
       style: ESTILOS_MAPA[estiloActivo].spec,
       center: centroInicial,
       zoom: 13.5,
+      maxZoom: 21,
       pitch: 20,
       bearing: 0,
       attributionControl: false,
@@ -753,16 +822,16 @@ export default function ParcelasView() {
 
       // 2. LISTENERS DE RATÓN DEL MAPA
       mapa.on("click", (e) => {
-        // A) MODO TRAZADO
+        // A) MODO TRAZADO (sin límite de vértices; solo cierra por cercanía en píxeles al Vértice 1)
         if (modoTrazadoRef.current) {
-          const pt = [Number(e.lngLat.lng.toFixed(5)), Number(e.lngLat.lat.toFixed(5))];
+          const pt = [Number(e.lngLat.lng.toFixed(6)), Number(e.lngLat.lat.toFixed(6))];
           const puntosActuales = puntosTrazadoRef.current;
 
-          // Si hay 3 o más puntos y hace clic cerca del primer punto, cerramos la zona
-          if (puntosActuales.length >= 3) {
-            const primero = puntosActuales[0];
-            const dist = Math.hypot(pt[0] - primero[0], pt[1] - primero[1]);
-            if (dist < 0.0018) {
+          // Solo cerrar automáticamente si el clic cae exactamente sobre el Vértice 1 (< 10px en pantalla)
+          if (puntosActuales.length >= 3 && e.point) {
+            const pixPrimero = mapa.project(puntosActuales[0]);
+            const distPx = Math.hypot(e.point.x - pixPrimero.x, e.point.y - pixPrimero.y);
+            if (distPx < 10) {
               finalizarTrazado();
               return;
             }
@@ -778,9 +847,15 @@ export default function ParcelasView() {
         // B) MODO INSPECCIÓN NORMAL
         const features = mapa.queryRenderedFeatures(e.point, { layers: ["parcelas-fill"] });
         if (features.length > 0) {
-          setParcelaSeleccionada(features[0].properties);
+          const props = features[0].properties;
+          const completa = potrerosRef.current.find((item) => item.id === props.id) || props;
+          setParcelaSeleccionada(completa);
+          setMenuMetricaAbierto(false);
+          setMenuAccionesAbierto(false);
         } else {
           setParcelaSeleccionada(null);
+          setMenuMetricaAbierto(false);
+          setMenuAccionesAbierto(false);
         }
       });
 
@@ -805,14 +880,6 @@ export default function ParcelasView() {
 
       // Renderizar inmediatamente las parcelas en SVG
       actualizarSvgOverlay();
-
-      // Doble clic para cerrar la zona rápidamente
-      mapa.on("dblclick", (e) => {
-        if (modoTrazadoRef.current && puntosTrazadoRef.current.length >= 3) {
-          e.preventDefault();
-          finalizarTrazado();
-        }
-      });
     });
 
     mapaInstanciaRef.current = mapa;
@@ -850,8 +917,22 @@ export default function ParcelasView() {
     }
   }, [modoTrazado, modalGuardarZona]);
 
-  // Activar modo delimitación de zona en el mapa
+  // Cambiar métrica de superficie (m², Has, km², Acres)
+  function cambiarUnidadSuperficie(nuevaUnidad) {
+    if (!UNIDADES_SUPERFICIE[nuevaUnidad]) return;
+    setUnidadSuperficie(nuevaUnidad);
+    setMenuMetricaAbierto(false);
+    try {
+      localStorage.setItem("vakera_unidad_superficie", nuevaUnidad);
+    } catch (err) {
+      console.warn("No se pudo guardar preferencia de unidad:", err);
+    }
+  }
+
+  // Activar modo delimitación de zona en el mapa (nueva parcela)
   function activarModoTrazado() {
+    setParcelaEditandoId(null);
+    setNombreOriginalEditando("");
     puntosTrazadoRef.current = [];
     setPuntosTrazado([]);
     setSvgPuntos([]);
@@ -863,9 +944,45 @@ export default function ParcelasView() {
     mostrarNotificacion("Modo Delimitación activado: Haz clic en el mapa para marcar los vértices de la zona.");
   }
 
+  // Abrir modal para editar una parcela existente
+  function abrirModalEditarParcela(parcela) {
+    if (!parcela) return;
+    setMenuMetricaAbierto(false);
+    setMenuAccionesAbierto(false);
+    setParcelaEditandoId(parcela.id);
+    setNombreOriginalEditando(parcela.nombre || "");
+    setFormularioZona({
+      nombre: parcela.nombre || "",
+      superficieHas: parseFloat(parcela.superficieHas) || 0,
+      capacidad: parseInt(parcela.capacidad, 10) || 100,
+      pastura: parcela.pastura || "Campo Natural y Gramíneas",
+      estadoPastura: parcela.estadoPastura || "Óptimo",
+      aguada: parcela.aguada || "Bebedero / Tanque",
+      color: parcela.color || "#ea580c",
+      descripcion: parcela.descripcion || "",
+      coordinates: Array.isArray(parcela.coordinates) ? parcela.coordinates : [],
+    });
+    setModalGuardarZona(true);
+  }
+
+  // Permitir re-trazar los vértices de una parcela en edición
+  function iniciarRetrazadoParcela() {
+    setModalGuardarZona(false);
+    puntosTrazadoRef.current = [];
+    setPuntosTrazado([]);
+    setSvgPuntos([]);
+    setSvgMouse(null);
+    setModoTrazado(true);
+    marcadoresVerticesRef.current.forEach((m) => m.remove());
+    marcadoresVerticesRef.current = [];
+    mostrarNotificacion(`Re-trazando límites de "${formularioZona.nombre}": marca los nuevos vértices en el mapa.`);
+  }
+
   // Cancelar trazado
   function cancelarTrazado() {
     setModoTrazado(false);
+    setParcelaEditandoId(null);
+    setNombreOriginalEditando("");
     puntosTrazadoRef.current = [];
     setPuntosTrazado([]);
     setSvgPuntos([]);
@@ -882,7 +999,7 @@ export default function ParcelasView() {
     sincronizarMarcadoresDom(actualizados);
   }
 
-  // Finalizar trazado y abrir formulario para guardar la parcela con nombre y color
+  // Finalizar trazado y abrir formulario para guardar o actualizar la parcela
   function finalizarTrazado() {
     const puntos = puntosTrazadoRef.current;
     if (puntos.length < 3) {
@@ -900,26 +1017,33 @@ export default function ParcelasView() {
       coordenadasCerradas.push(primero);
     }
 
-    const colorSugerido = PALETA_COLORES[potreros.length % PALETA_COLORES.length].hex;
-
-    setFormularioZona({
-      nombre: `Parcela ${potreros.length + 1}`,
-      superficieHas: superficieCalculada,
-      capacidad: capacidadSugerida,
-      pastura: "Campo Natural y Gramíneas",
-      estadoPastura: "Óptimo",
-      aguada: "Bebedero / Tanque",
-      color: colorSugerido,
-      descripcion: "",
-      coordinates: coordenadasCerradas,
-    });
+    if (parcelaEditandoId) {
+      setFormularioZona((prev) => ({
+        ...prev,
+        superficieHas: superficieCalculada,
+        coordinates: coordenadasCerradas,
+      }));
+    } else {
+      const colorSugerido = PALETA_COLORES[potreros.length % PALETA_COLORES.length].hex;
+      setFormularioZona({
+        nombre: `Parcela ${potreros.length + 1}`,
+        superficieHas: superficieCalculada,
+        capacidad: capacidadSugerida,
+        pastura: "Campo Natural y Gramíneas",
+        estadoPastura: "Óptimo",
+        aguada: "Bebedero / Tanque",
+        color: colorSugerido,
+        descripcion: "",
+        coordinates: coordenadasCerradas,
+      });
+    }
 
     setModoTrazado(false);
     setSvgMouse(null);
     setModalGuardarZona(true);
   }
 
-  // Guardar la parcela delimitada
+  // Guardar la parcela delimitada (nueva o edición existente)
   async function manejarGuardarZona(e) {
     e.preventDefault();
     if (!formularioZona.nombre.trim()) {
@@ -927,10 +1051,87 @@ export default function ParcelasView() {
       return;
     }
 
+    const nombreLimpio = formularioZona.nombre.trim();
     setProcesando(true);
     try {
+      if (parcelaEditandoId) {
+        const res = await actualizarPotrero(parcelaEditandoId, {
+          nombre: nombreLimpio,
+          nombreAnterior: nombreOriginalEditando,
+          superficieHas: parseFloat(formularioZona.superficieHas) || 0,
+          coordinates: formularioZona.coordinates,
+          color: formularioZona.color,
+          pastura: formularioZona.pastura,
+          aguada: formularioZona.aguada,
+          estadoPastura: formularioZona.estadoPastura,
+          descripcion: formularioZona.descripcion,
+        });
+
+        const previoEnLista = potreros.find((p) => p.id === parcelaEditandoId) || {};
+        const parcelaActualizada = {
+          ...previoEnLista,
+          ...(res?.data || {}),
+          id: parcelaEditandoId,
+          nombre: nombreLimpio,
+          nombrePersonalizado: nombreLimpio,
+          superficieHas: parseFloat(formularioZona.superficieHas) || 0,
+          coordinates:
+            Array.isArray(formularioZona.coordinates) && formularioZona.coordinates.length >= 3
+              ? formularioZona.coordinates
+              : previoEnLista.coordinates || [],
+          color: formularioZona.color,
+          pastura: formularioZona.pastura,
+          aguada: formularioZona.aguada,
+          estadoPastura: formularioZona.estadoPastura,
+          descripcion: formularioZona.descripcion,
+        };
+
+        const listaActualizada = potreros.map((p) =>
+          p.id === parcelaEditandoId ? parcelaActualizada : p
+        );
+        potrerosRef.current = listaActualizada;
+        setPotreros(listaActualizada);
+
+        // Sincronizar renombre con locaciones de Insumos sin dejar el nombre anterior duplicado
+        try {
+          const cuentaScope = obtenerCuentaScope(usuario);
+          const renombres = leerRenombresParcelas(usuario);
+          if (
+            nombreOriginalEditando &&
+            nombreOriginalEditando.trim().toLowerCase() !== nombreLimpio.toLowerCase()
+          ) {
+            renombres[nombreOriginalEditando.trim().toLowerCase()] = nombreLimpio;
+            renombres[parcelaEditandoId] = nombreLimpio;
+            localStorage.setItem(`vakera_parcelas_renombres_${cuentaScope}`, JSON.stringify(renombres));
+            eliminarParcelaDeLocacionesLocales(usuario, nombreOriginalEditando);
+          }
+        } catch (err) {
+          console.warn("Aviso al sincronizar renombre editado:", err.message);
+        }
+
+        guardarParcelasLocales(storageKeyCuenta, listaActualizada, usuario, {
+          desbloquearNombre: nombreLimpio,
+        });
+        actualizarFuenteParcelas(listaActualizada);
+        actualizarSvgOverlay();
+
+        setModalGuardarZona(false);
+        setParcelaEditandoId(null);
+        setNombreOriginalEditando("");
+        puntosTrazadoRef.current = [];
+        setPuntosTrazado([]);
+        setSvgPuntos([]);
+        setSvgMouse(null);
+        marcadoresVerticesRef.current.forEach((m) => m.remove());
+        marcadoresVerticesRef.current = [];
+
+        setParcelaSeleccionada(parcelaActualizada);
+        mostrarNotificacion(`¡Parcela "${nombreLimpio}" actualizada correctamente!`);
+        return;
+      }
+
       const res = await registrarPotrero({
-        nombre: formularioZona.nombre.trim(),
+        nombre: nombreLimpio,
         superficieHas: parseFloat(formularioZona.superficieHas) || 0,
         capacidad: parseInt(formularioZona.capacidad, 10) || 100,
         coordinates: formularioZona.coordinates,
@@ -943,7 +1144,7 @@ export default function ParcelasView() {
 
       const nuevaParcelaGuardada = res?.data || {
         id: `pot-${Date.now()}`,
-        nombre: formularioZona.nombre.trim(),
+        nombre: nombreLimpio,
         superficieHas: parseFloat(formularioZona.superficieHas) || 0,
         capacidad: parseInt(formularioZona.capacidad, 10) || 100,
         coordinates: formularioZona.coordinates,
@@ -992,7 +1193,7 @@ export default function ParcelasView() {
       marcadoresVerticesRef.current.forEach((m) => m.remove());
       marcadoresVerticesRef.current = [];
 
-      mostrarNotificacion(`¡Parcela "${formularioZona.nombre}" delimitada y sincronizada con las locaciones del campo!`);
+      mostrarNotificacion(`¡Parcela "${nombreLimpio}" delimitada y sincronizada con las locaciones del campo!`);
 
       // Seleccionar y enfocar en la nueva parcela
       setParcelaSeleccionada(nuevaParcelaGuardada);
@@ -1168,33 +1369,17 @@ export default function ParcelasView() {
         </div>
       )}
 
-      {/* KPI Cards Reales */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl p-4 border border-[#ded7c4] shadow-sm">
+      {/* KPI Principal de Superficie Mapeada */}
+      <div className="bg-white rounded-2xl p-4 border border-[#ded7c4] shadow-sm flex items-center justify-between gap-4 flex-wrap">
+        <div>
           <p className="text-[10px] font-bold text-[#6b7c6d] uppercase">Superficie Total Mapeada</p>
-          <p className="text-2xl font-extrabold text-[#182920] mt-0.5">{superficieTotal} Hectáreas</p>
-          <span className="text-[11px] text-[#33512f] font-medium">
-            {potreros.length} {potreros.length === 1 ? "Parcela delimitada" : "Parcelas delimitadas"}
-          </span>
+          <p className="text-2xl font-extrabold text-[#182920] mt-0.5">
+            {formatearSuperficie(superficieTotal, unidadSuperficie)}
+          </p>
         </div>
-
-        <div className="bg-white rounded-2xl p-4 border border-[#ded7c4] shadow-sm">
-          <p className="text-[10px] font-bold text-[#6b7c6d] uppercase">Carga Animal en Campo</p>
-          <p className="text-2xl font-extrabold text-[#33512f] mt-0.5">{totalAnimalesCampo} Cabezas</p>
-          <span className="text-[11px] text-[#6b7c6d]">Rodeo asignado a parcelas</span>
-        </div>
-
-        <div className="bg-white rounded-2xl p-4 border border-[#ded7c4] shadow-sm">
-          <p className="text-[10px] font-bold text-[#6b7c6d] uppercase">Receptividad Máxima</p>
-          <p className="text-2xl font-extrabold text-[#182920] mt-0.5">{capacidadTotal} Cabezas</p>
-          <span className="text-[11px] text-[#6b7c6d]">Capacidad de diseño forrajero</span>
-        </div>
-
-        <div className="bg-white rounded-2xl p-4 border border-[#ded7c4] shadow-sm">
-          <p className="text-[10px] font-bold text-[#6b7c6d] uppercase">Carga Media Global</p>
-          <p className="text-2xl font-extrabold text-[#182920] mt-0.5">{cargaMediaEvHa} EV/Ha</p>
-          <span className="text-[11px] text-emerald-700 font-semibold">Equilibrio forrajero sustentable</span>
-        </div>
+        <span className="text-xs text-[#33512f] font-bold bg-[#f6f4ee] px-3 py-1.5 rounded-xl border border-[#ded7c4]">
+          {potreros.length} {potreros.length === 1 ? "Parcela delimitada" : "Parcelas delimitadas"}
+        </span>
       </div>
 
       {/* Visor Principal del Mapa y Panel Lateral de Parcela */}
@@ -1239,7 +1424,7 @@ export default function ParcelasView() {
                   <p className="text-[11px] text-[#ded7c4]">
                     {puntosTrazado.length === 0
                       ? "Haz clic en el mapa para fijar el primer punto"
-                      : `${puntosTrazado.length} vértices colocados • ${superficieTrazadoEnVivo} Has calculadas`}
+                      : `${puntosTrazado.length} vértices colocados (sin límite) • ${formatearSuperficie(superficieTrazadoEnVivo, unidadSuperficie)} calculados`}
                   </p>
                 </div>
               </div>
@@ -1322,31 +1507,37 @@ export default function ParcelasView() {
                       strokeWidth={esSeleccionada ? 4 : 2.5}
                       strokeLinejoin="round"
                     />
-                    {/* Badge central con Nombre y Hectáreas */}
-                    <g transform={`translate(${p.centro.x}, ${p.centro.y})`}>
-                      <rect
-                        x="-60"
-                        y="-13"
-                        width="120"
-                        height="26"
-                        rx="13"
-                        fill="#182920"
-                        fillOpacity="0.94"
-                        stroke={p.color}
-                        strokeWidth="2.5"
-                      />
-                      <text
-                        x="0"
-                        y="4"
-                        fill="#ffffff"
-                        fontSize="11"
-                        fontWeight="bold"
-                        textAnchor="middle"
-                        fontFamily="system-ui, sans-serif"
-                      >
-                        {p.nombre} ({p.superficieHas} Has)
-                      </text>
-                    </g>
+                    {/* Badge central con Nombre y Superficie */}
+                    {(() => {
+                      const textoBadge = `${p.nombre} (${formatearSuperficie(p.superficieHas, unidadSuperficie)})`;
+                      const rectW = Math.max(130, textoBadge.length * 6.8 + 24);
+                      return (
+                        <g transform={`translate(${p.centro.x}, ${p.centro.y})`}>
+                          <rect
+                            x={-rectW / 2}
+                            y="-13"
+                            width={rectW}
+                            height="26"
+                            rx="13"
+                            fill="#182920"
+                            fillOpacity="0.94"
+                            stroke={p.color}
+                            strokeWidth="2.5"
+                          />
+                          <text
+                            x="0"
+                            y="4"
+                            fill="#ffffff"
+                            fontSize="11"
+                            fontWeight="bold"
+                            textAnchor="middle"
+                            fontFamily="system-ui, sans-serif"
+                          >
+                            {textoBadge}
+                          </text>
+                        </g>
+                      );
+                    })()}
                   </g>
                 );
               })}
@@ -1474,52 +1665,129 @@ export default function ParcelasView() {
                     {parcelaSeleccionada.nombre}
                   </h3>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setParcelaSeleccionada(null)}
-                  className="text-stone-400 hover:text-stone-700 p-1 rounded-lg cursor-pointer"
-                  title="Cerrar ficha"
-                >
-                  <i className="fa-solid fa-xmark text-sm"></i>
-                </button>
+                <div className="flex items-center gap-1.5 relative">
+                  {puedeGestionar && (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMenuMetricaAbierto(false);
+                          setMenuAccionesAbierto((prev) => !prev);
+                        }}
+                        className="w-7 h-7 rounded-lg bg-[#f6f4ee] hover:bg-[#e7dfcb] border border-[#ded7c4] text-[#182920] flex items-center justify-center transition-colors cursor-pointer"
+                        aria-label="Opciones de parcela"
+                        title="Opciones de parcela"
+                      >
+                        <i className="fa-solid fa-bars text-xs"></i>
+                      </button>
+
+                      {menuAccionesAbierto && (
+                        <div className="absolute right-0 top-8 z-30 w-44 bg-white rounded-xl border border-[#ded7c4] shadow-xl p-1.5 space-y-1 animate-fade-in">
+                          <span className="block px-2 py-1 text-[10px] font-bold uppercase text-[#6b7c6d]">
+                            Acciones de Parcela
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => abrirModalEditarParcela(parcelaSeleccionada)}
+                            disabled={procesando}
+                            className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold text-[#182920] hover:bg-[#f6f4ee] flex items-center gap-2 transition-colors cursor-pointer"
+                          >
+                            <i className="fa-solid fa-pen text-amber-700 w-3.5 text-center"></i>
+                            <span>Editar Parcela</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMenuAccionesAbierto(false);
+                              manejarEliminarParcela(parcelaSeleccionada.id, parcelaSeleccionada.nombre);
+                            }}
+                            disabled={procesando}
+                            className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors cursor-pointer"
+                          >
+                            <i className="fa-solid fa-trash-can w-3.5 text-center"></i>
+                            <span>Eliminar Parcela</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuAccionesAbierto(false);
+                      setMenuMetricaAbierto(false);
+                      setParcelaSeleccionada(null);
+                    }}
+                    className="text-stone-400 hover:text-stone-700 p-1 rounded-lg cursor-pointer"
+                    title="Cerrar ficha"
+                  >
+                    <i className="fa-solid fa-xmark text-sm"></i>
+                  </button>
+                </div>
               </div>
 
-              {/* Indicadores Clave de la Parcela */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-[#f6f4ee] p-3 rounded-2xl border border-[#ded7c4]">
-                  <p className="text-[10px] font-bold text-[#6b7c6d] uppercase">Superficie</p>
-                  <p className="text-lg font-black text-[#182920] mt-0.5">
-                    {parcelaSeleccionada.superficieHas} Has
-                  </p>
-                </div>
-                <div className="bg-[#f6f4ee] p-3 rounded-2xl border border-[#ded7c4]">
-                  <p className="text-[10px] font-bold text-[#6b7c6d] uppercase">Capacidad Máx.</p>
-                  <p className="text-lg font-black text-[#182920] mt-0.5">
-                    {parcelaSeleccionada.capacidad} Cab.
+              {/* Indicador Clave de Superficie con Selector de Métrica (3 rayitas) */}
+              <div className="grid grid-cols-1">
+                <div className="bg-[#f6f4ee] p-3.5 rounded-2xl border border-[#ded7c4] relative">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-[10px] font-bold text-[#6b7c6d] uppercase">
+                      Superficie ({UNIDADES_SUPERFICIE[unidadSuperficie].etiqueta})
+                    </p>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setMenuMetricaAbierto((prev) => !prev)}
+                        className="w-7 h-7 rounded-lg bg-white hover:bg-[#e7dfcb] border border-[#ded7c4] text-[#182920] flex items-center justify-center transition-colors cursor-pointer"
+                        aria-label="Cambiar métrica de superficie"
+                        title="Cambiar unidad de medida"
+                      >
+                        <i className="fa-solid fa-bars text-xs"></i>
+                      </button>
+
+                      {menuMetricaAbierto && (
+                        <div className="absolute right-0 top-8 z-30 w-48 bg-white rounded-xl border border-[#ded7c4] shadow-xl p-1.5 space-y-1 animate-fade-in">
+                          <span className="block px-2 py-1 text-[10px] font-bold uppercase text-[#6b7c6d]">
+                            Métrica de Superficie
+                          </span>
+                          {Object.values(UNIDADES_SUPERFICIE).map((u) => {
+                            const activa = unidadSuperficie === u.clave;
+                            return (
+                              <button
+                                key={u.clave}
+                                type="button"
+                                onClick={() => cambiarUnidadSuperficie(u.clave)}
+                                className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
+                                  activa
+                                    ? "bg-[#182920] text-[#f1ecdd]"
+                                    : "text-[#182920] hover:bg-[#f6f4ee]"
+                                }`}
+                              >
+                                <span>
+                                  {u.sufijo} — {u.etiqueta}
+                                </span>
+                                {activa && <i className="fa-solid fa-check text-[#8fb56b] text-[10px]"></i>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-xl font-black text-[#182920] mt-0.5">
+                    {formatearSuperficie(parcelaSeleccionada.superficieHas, unidadSuperficie)}
                   </p>
                 </div>
               </div>
 
-              {/* Estado y Pastura */}
+              {/* Característica y Observaciones */}
               <div className="space-y-2.5 text-xs">
                 <div className="p-3 rounded-2xl bg-[#f9f8f5] border border-[#ded7c4] space-y-1">
                   <p className="text-[10px] font-bold uppercase text-[#6b7c6d] flex items-center gap-1.5">
-                    <i className="fa-solid fa-wheat-awn text-emerald-600"></i> Pastura / Cobertura
+                    <i className="fa-solid fa-list-check text-emerald-700"></i> Característica
                   </p>
                   <p className="font-semibold text-[#182920]">
-                    {parcelaSeleccionada.pastura || "Campo Natural"}
-                  </p>
-                  <span className="inline-block mt-1 text-[11px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800">
-                    Estado: {parcelaSeleccionada.estadoPastura || "Óptimo"}
-                  </span>
-                </div>
-
-                <div className="p-3 rounded-2xl bg-[#f9f8f5] border border-[#ded7c4] space-y-1">
-                  <p className="text-[10px] font-bold uppercase text-[#6b7c6d] flex items-center gap-1.5">
-                    <i className="fa-solid fa-faucet-drip text-blue-600"></i> Aguada / Infraestructura
-                  </p>
-                  <p className="font-semibold text-[#182920]">
-                    {parcelaSeleccionada.aguada || "Aguada no especificada"}
+                    {parcelaSeleccionada.aguada || "Sin característica especificada"}
                   </p>
                 </div>
 
@@ -1582,20 +1850,6 @@ export default function ParcelasView() {
                   )}
                 </div>
               </div>
-
-              {/* Botón de Eliminar Parcela */}
-              {puedeGestionar && (
-                <div className="border-t border-[#ded7c4] pt-3 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => manejarEliminarParcela(parcelaSeleccionada.id, parcelaSeleccionada.nombre)}
-                    disabled={procesando}
-                    className="text-xs text-red-600 hover:text-red-800 font-bold px-3 py-1.5 rounded-xl border border-red-200 hover:bg-red-50 transition-all flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <i className="fa-solid fa-trash-can"></i> Eliminar Parcela
-                  </button>
-                </div>
-              )}
             </div>
           ) : (
             <div className="space-y-4">
@@ -1639,7 +1893,8 @@ export default function ParcelasView() {
                             </p>
                           </div>
                           <p className="text-[11px] text-[#6b7c6d]">
-                            {p.superficieHas} Has • {p.pastura || "Campo Natural"}
+                            {formatearSuperficie(p.superficieHas, unidadSuperficie)}
+                            {p.aguada ? ` • ${p.aguada}` : ""}
                           </p>
                         </div>
 
@@ -1647,9 +1902,6 @@ export default function ParcelasView() {
                           <p className="text-sm font-extrabold text-[#182920]">
                             {totalAnimales} Cab.
                           </p>
-                          <span className="text-[10px] text-[#2e7d32] font-semibold">
-                            Máx {p.capacidad || 100}
-                          </span>
                         </div>
                       </div>
                     );
@@ -1696,16 +1948,22 @@ export default function ParcelasView() {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold font-['Fraunces',serif] text-[#182920]">
-                    Guardar Parcela Delimitada
+                    {parcelaEditandoId ? "Editar Parcela Delimitada" : "Guardar Parcela Delimitada"}
                   </h3>
                   <p className="text-xs text-[#6b7c6d]">
-                    Asigna un nombre y elige el color con el que quedará pintada en el mapa.
+                    {parcelaEditandoId
+                      ? "Modificá nombre, color, superficie, pastura, aguada o re-trazá sus límites."
+                      : "Asigna un nombre y elige el color con el que quedará pintada en el mapa."}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setModalGuardarZona(false)}
+                onClick={() => {
+                  setModalGuardarZona(false);
+                  setParcelaEditandoId(null);
+                  setNombreOriginalEditando("");
+                }}
                 className="text-stone-400 hover:text-stone-700 cursor-pointer"
               >
                 <i className="fa-solid fa-xmark text-lg"></i>
@@ -1769,97 +2027,54 @@ export default function ParcelasView() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#182920] uppercase mb-1">
-                    Superficie (Has)
-                  </label>
+              <div>
+                <label className="block text-xs font-bold text-[#182920] uppercase mb-1">
+                  Superficie ({UNIDADES_SUPERFICIE[unidadSuperficie].sufijo})
+                </label>
+                <div className="flex items-center gap-2">
                   <input
                     type="number"
-                    step="0.1"
-                    min="0.1"
+                    step={unidadSuperficie === "m2" ? "1" : "0.01"}
+                    min={unidadSuperficie === "m2" ? "1" : "0.01"}
                     required
-                    value={formularioZona.superficieHas}
-                    onChange={(e) =>
+                    value={Number(
+                      convertirDesdeHas(formularioZona.superficieHas, unidadSuperficie).toFixed(
+                        UNIDADES_SUPERFICIE[unidadSuperficie].decimales
+                      )
+                    )}
+                    onChange={(e) => {
+                      const valorIngresado = parseFloat(e.target.value) || 0;
+                      const factor = UNIDADES_SUPERFICIE[unidadSuperficie].factorDesdeHas;
                       setFormularioZona({
                         ...formularioZona,
-                        superficieHas: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-3 py-2 rounded-xl border border-[#ded7c4] text-sm focus:outline-none focus:ring-2 focus:ring-[#8fb56b]"
+                        superficieHas: Number((valorIngresado / factor).toFixed(4)),
+                      });
+                    }}
+                    className="flex-1 px-3 py-2 rounded-xl border border-[#ded7c4] text-sm focus:outline-none focus:ring-2 focus:ring-[#8fb56b]"
                   />
-                  <span className="text-[10px] text-emerald-700 font-semibold mt-0.5 block">
-                    Calculada geodésicamente
-                  </span>
+                  {parcelaEditandoId && (
+                    <button
+                      type="button"
+                      onClick={iniciarRetrazadoParcela}
+                      className="px-3 py-2 rounded-xl bg-[#f6f4ee] hover:bg-[#e7dfcb] border border-[#ded7c4] text-xs font-bold text-[#182920] flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+                      title="Volver al mapa para re-trazar los límites de esta parcela"
+                    >
+                      <i className="fa-solid fa-draw-polygon text-[#2e7d32]"></i> Re-trazar Límites
+                    </button>
+                  )}
                 </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#182920] uppercase mb-1">
-                    Capacidad (Cabezas)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={formularioZona.capacidad}
-                    onChange={(e) =>
-                      setFormularioZona({
-                        ...formularioZona,
-                        capacidad: parseInt(e.target.value, 10) || 1,
-                      })
-                    }
-                    className="w-full px-3 py-2 rounded-xl border border-[#ded7c4] text-sm focus:outline-none focus:ring-2 focus:ring-[#8fb56b]"
-                  />
-                  <span className="text-[10px] text-[#6b7c6d] mt-0.5 block">Carga recomendada</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#182920] uppercase mb-1">
-                    Pastura / Cobertura
-                  </label>
-                  <select
-                    value={formularioZona.pastura}
-                    onChange={(e) => setFormularioZona({ ...formularioZona, pastura: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-[#ded7c4] text-xs focus:outline-none focus:ring-2 focus:ring-[#8fb56b]"
-                  >
-                    <option value="Campo Natural y Gramíneas">Campo Natural y Gramíneas</option>
-                    <option value="Brachiaria Brizantha">Brachiaria Brizantha</option>
-                    <option value="Gatton Panic">Gatton Panic</option>
-                    <option value="Grama Rhodes">Grama Rhodes</option>
-                    <option value="Alfalfa Consociada">Alfalfa Consociada</option>
-                    <option value="Pasto Estrella">Pasto Estrella</option>
-                    <option value="Setaria Sphacelata">Setaria Sphacelata</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#182920] uppercase mb-1">
-                    Estado de la Pastura
-                  </label>
-                  <select
-                    value={formularioZona.estadoPastura}
-                    onChange={(e) =>
-                      setFormularioZona({ ...formularioZona, estadoPastura: e.target.value })
-                    }
-                    className="w-full px-3 py-2 rounded-xl border border-[#ded7c4] text-xs focus:outline-none focus:ring-2 focus:ring-[#8fb56b]"
-                  >
-                    <option value="Óptimo">Óptimo (Listo para pastoreo)</option>
-                    <option value="En Pastoreo">En Pastoreo activo</option>
-                    <option value="Descanso">Descanso / Clausura</option>
-                    <option value="Rebrote">Rebrote / Implantación</option>
-                  </select>
-                </div>
+                <span className="text-[10px] text-emerald-700 font-semibold mt-0.5 block">
+                  Calculada geodésicamente ({formatearSuperficie(formularioZona.superficieHas, "m2")} / {formatearSuperficie(formularioZona.superficieHas, "has")})
+                </span>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-[#182920] uppercase mb-1">
-                  Aguada / Bebedero
+                  Característica
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej: Molino central con tanque australiano, boyero solar..."
+                  placeholder="Ej: Aguada central, sombra natural, acceso camino norte..."
                   value={formularioZona.aguada}
                   onChange={(e) => setFormularioZona({ ...formularioZona, aguada: e.target.value })}
                   className="w-full px-3.5 py-2 rounded-xl border border-[#ded7c4] text-sm focus:outline-none focus:ring-2 focus:ring-[#8fb56b]"
@@ -1884,7 +2099,11 @@ export default function ParcelasView() {
               <div className="flex justify-end gap-2 pt-2 border-t border-[#ded7c4]">
                 <button
                   type="button"
-                  onClick={() => setModalGuardarZona(false)}
+                  onClick={() => {
+                    setModalGuardarZona(false);
+                    setParcelaEditandoId(null);
+                    setNombreOriginalEditando("");
+                  }}
                   className="px-4 py-2 rounded-xl border border-[#ded7c4] text-xs font-bold text-[#6b7c6d] hover:bg-stone-50 cursor-pointer"
                 >
                   Cancelar
@@ -1894,7 +2113,8 @@ export default function ParcelasView() {
                   disabled={procesando}
                   className="px-5 py-2.5 rounded-xl bg-[#8fb56b] hover:bg-[#a1c97c] text-[#182920] text-xs font-black uppercase shadow-md flex items-center gap-2 cursor-pointer"
                 >
-                  <i className="fa-solid fa-floppy-disk"></i> Guardar Parcela
+                  <i className="fa-solid fa-floppy-disk"></i>{" "}
+                  {parcelaEditandoId ? "Guardar Cambios" : "Guardar Parcela"}
                 </button>
               </div>
             </form>
