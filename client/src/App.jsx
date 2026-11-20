@@ -33,11 +33,15 @@ function VistaCargando() {
 }
 
 function AppContenido() {
-  const { estaAutenticado } = useAuth();
+  const { estaAutenticado, cargando, iniciarSesionConToken } = useAuth();
   // Vistas principales: 'landing' | 'login' | 'registro' | 'recuperar' | 'verificar' | 'app'
   const [ruta, setRuta] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     const r = params.get("ruta");
+    const googleNoReg = params.get("googleNoRegistrado") === "1";
+    if (r === "login" && googleNoReg) {
+      return "landing";
+    }
     if (r === "verificar" || r === "recuperar" || r === "login" || r === "registro") {
       return r;
     }
@@ -49,18 +53,81 @@ function AppContenido() {
     return {
       token: params.get("token") || "",
       email: params.get("email") || "",
+      googleError: params.get("googleError") || "",
+      googleNoRegistrado: params.get("googleNoRegistrado") === "1",
+      googleEmail: params.get("googleEmail") || "",
     };
   });
+
+  const [googleSetup, setGoogleSetup] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const rutaUrl = params.get("ruta");
+    const setupToken = params.get("setupToken");
+    if (rutaUrl === "google-completar" && setupToken) {
+      try {
+        const base64 = setupToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+        const decoded = JSON.parse(atob(base64));
+        return {
+          setupToken,
+          email: decoded?.email || "",
+          nombre: decoded?.nombre || "",
+        };
+      } catch {
+        return { setupToken, email: "", nombre: "" };
+      }
+    }
+    return null;
+  });
+
+  // Procesar retorno desde Google OAuth 2.0 (?ruta=google-callback&token=... o ?ruta=google-completar&setupToken=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const rutaUrl = params.get("ruta");
+    const tokenUrl = params.get("token");
+    const setupToken = params.get("setupToken");
+    const googleError = params.get("googleError");
+
+    if (rutaUrl === "google-callback" && tokenUrl) {
+      iniciarSesionConToken(tokenUrl)
+        .then(() => {
+          window.history.replaceState({}, "", "/");
+          setRuta("app");
+        })
+        .catch((err) => {
+          window.history.replaceState({}, "", "/");
+          setParamsUrl((prev) => ({
+            ...prev,
+            googleError: err.message || "No se pudo completar el acceso con Google.",
+          }));
+          setRuta("login");
+        });
+    } else if (rutaUrl === "google-completar" && setupToken) {
+      window.history.replaceState({}, "", "/");
+    } else if (googleError) {
+      window.history.replaceState({}, "", "/");
+    }
+  }, [iniciarSesionConToken]);
 
   // Sub-vista dentro de la app privada: 'metricas' | 'ganado' | 'partes' | 'sanidad' | 'insumos' | 'reportes' | 'permisos'
   const [subVistaApp, setSubVistaApp] = useState("metricas");
 
-  // Si el usuario se autentica mientras está en login/registro, enviarlo al dashboard
+  // Si el usuario se autentica mientras está en login/registro, enviarlo al dashboard.
+  // Si cierra sesión mientras está en la app privada, volver automáticamente a la portada.
   useEffect(() => {
-    if (estaAutenticado && (ruta === "login" || ruta === "registro" || ruta === "verificar")) {
-      setRuta("app");
+    if (estaAutenticado) {
+      setParamsUrl((prev) =>
+        prev.googleNoRegistrado || prev.googleError
+          ? { ...prev, googleNoRegistrado: false, googleError: "" }
+          : prev
+      );
+      if (ruta === "login" || ruta === "registro" || ruta === "verificar") {
+        setRuta("app");
+      }
+    } else if (!cargando && ruta === "app") {
+      setSubVistaApp("metricas");
+      setRuta("landing");
     }
-  }, [estaAutenticado, ruta]);
+  }, [estaAutenticado, cargando, ruta]);
 
   const titulosVistas = {
     metricas: "Panel de Control Ganadero",
@@ -77,6 +144,9 @@ function AppContenido() {
   if (ruta === "landing") {
     return (
       <LandingView
+        googleSetup={googleSetup}
+        googleNoRegistrado={paramsUrl.googleNoRegistrado}
+        googleError={paramsUrl.googleError}
         alIniciarSesion={() => setRuta("login")}
         alRegistrarse={() => setRuta("registro")}
         alIrARecuperar={() => setRuta("recuperar")}
@@ -93,10 +163,12 @@ function AppContenido() {
     return (
       <Suspense fallback={<VistaCargando />}>
         <LoginView
+          errorInicial={paramsUrl.googleError}
+          googleNoRegistrado={paramsUrl.googleNoRegistrado}
           alIrARegistro={() => setRuta("registro")}
           alIrARecuperar={() => setRuta("recuperar")}
           alIrAVerificar={(tok, em) => {
-            setParamsUrl({ token: tok || "", email: em || "" });
+            setParamsUrl({ token: tok || "", email: em || "", googleError: "", googleNoRegistrado: false });
             setRuta("verificar");
           }}
           alIrALanding={() => setRuta("landing")}
@@ -110,9 +182,10 @@ function AppContenido() {
     return (
       <Suspense fallback={<VistaCargando />}>
         <RegistroView
+          errorInicial={paramsUrl.googleError}
           alIrALogin={() => setRuta("login")}
           alIrAVerificar={(tok, em) => {
-            setParamsUrl({ token: tok || "", email: em || "" });
+            setParamsUrl({ token: tok || "", email: em || "", googleError: "" });
             setRuta("verificar");
           }}
           alIrALanding={() => setRuta("landing")}

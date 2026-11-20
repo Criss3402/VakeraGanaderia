@@ -85,44 +85,18 @@ export default function NavbarLanding({
             </button>
           ) : (
             <>
-              <div className="navbar__login-wrapper" ref={loginRef}>
-                <button
-                  type="button"
-                  className={`boton ${esLoginAbierto ? "boton--relleno" : "boton--fantasma"}`}
-                  onClick={() => cambiarLoginAbierto(!esLoginAbierto)}
-                  aria-expanded={esLoginAbierto}
-                  aria-haspopup="dialog"
-                >
-                  Iniciar sesión
-                </button>
-
-                {esLoginAbierto && (
-                  <LoginDropdown
-                    alIrARegistro={() => {
-                      cambiarLoginAbierto(false);
-                      alRegistrarse();
-                    }}
-                    alIrARecuperar={() => {
-                      cambiarLoginAbierto(false);
-                      if (alIrARecuperar) alIrARecuperar();
-                    }}
-                    alIrAVerificar={(t, em) => {
-                      cambiarLoginAbierto(false);
-                      if (alIrAVerificar) alIrAVerificar(t, em);
-                    }}
-                    alIniciarExito={alIrAlDashboard}
-                    alCerrar={() => cambiarLoginAbierto(false)}
-                  />
-                )}
-              </div>
+              <button
+                type="button"
+                className="boton boton--fantasma"
+                onClick={alIniciarSesion}
+              >
+                Iniciar sesión
+              </button>
 
               <button
                 type="button"
                 className="boton boton--relleno"
-                onClick={() => {
-                  cambiarLoginAbierto(false);
-                  alRegistrarse();
-                }}
+                onClick={alRegistrarse}
               >
                 Registrarse
               </button>

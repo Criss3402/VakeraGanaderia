@@ -1091,5 +1091,173 @@ describe("8. Permisos de Modificación de Parcelas (Administrador -> Dueño) y N
   });
 });
 
+describe("9. Login y Registro con Google (OAuth 2.0 / OpenID Connect)", () => {
+  it("estadoGoogle informa configuración, iniciarGoogle valida state y callbackGoogle autentica o registra usuarios nuevos", async () => {
+    const AuthController = require("../src/controllers/auth.controller");
+    const origClientId = process.env.GOOGLE_CLIENT_ID;
+    const origClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const origFetch = global.fetch;
+    const emailNuevoGoogle = `google.nuevo.${Date.now()}@gmail.com`;
+
+    try {
+      // 1. Sin credenciales, estadoGoogle devuelve configurado: false
+      delete process.env.GOOGLE_CLIENT_ID;
+      delete process.env.GOOGLE_CLIENT_SECRET;
+      const resSinConf = crearMockRes();
+      AuthController.estadoGoogle({ get: () => "localhost:4000", protocol: "http" }, resSinConf);
+      assert.equal(resSinConf.statusCode, 200);
+      assert.equal(resSinConf.body.data.configurado, false);
+
+      // 2. Con credenciales, iniciarGoogle redirige a Google con state CSRF válido (modo registro)
+      process.env.GOOGLE_CLIENT_ID = "test-google-client-id";
+      process.env.GOOGLE_CLIENT_SECRET = "test-google-secret";
+      let redirectedUrl = "";
+      AuthController.iniciarGoogle(
+        {
+          query: { modo: "registro", rol: "capataz", establecimiento: "Estancia El Sol" },
+          headers: { origin: "http://localhost:5173" },
+          get: () => "localhost:4000",
+          protocol: "http",
+        },
+        {
+          redirect(url) {
+            redirectedUrl = url;
+            return this;
+          },
+        }
+      );
+      assert.equal(redirectedUrl.startsWith("https://accounts.google.com/o/oauth2/v2/auth?"), true);
+      const stateGenerado = new URL(redirectedUrl).searchParams.get("state");
+      assert.ok(stateGenerado && stateGenerado.length >= 32);
+
+      // 3. callbackGoogle con state inválido rechaza redirigiendo con googleError
+      let urlErrorState = "";
+      await AuthController.callbackGoogle(
+        { query: { code: "abc", state: "state-invalido" }, headers: {} },
+        {
+          redirect(url) {
+            urlErrorState = url;
+            return this;
+          },
+        }
+      );
+      assert.equal(urlErrorState.includes("googleError="), true);
+
+      // 4. callbackGoogle válido registra usuario nuevo en fallback en memoria y emite JWT
+      global.fetch = async (url) => {
+        if (String(url).includes("oauth2.googleapis.com/token")) {
+          return {
+            ok: true,
+            json: async () => ({ access_token: "mock-google-access-token" }),
+          };
+        }
+        return {
+          ok: true,
+          json: async () => ({
+            email: emailNuevoGoogle,
+            email_verified: true,
+            name: "Lucía Google",
+          }),
+        };
+      };
+
+      let urlExito = "";
+      await AuthController.callbackGoogle(
+        { query: { code: "valid-code-123", state: stateGenerado }, headers: {} },
+        {
+          redirect(url) {
+            urlExito = url;
+            return this;
+          },
+        }
+      );
+
+      const parsedExito = new URL(urlExito);
+      assert.equal(parsedExito.searchParams.get("ruta"), "google-completar");
+      const setupToken = parsedExito.searchParams.get("setupToken");
+      assert.ok(setupToken && setupToken.split(".").length === 3);
+
+      // 5. Completar registro con establecimiento y rol elegidos por el usuario
+      const resCompletar = crearMockRes();
+      await AuthController.completarRegistroGoogle(
+        {
+          body: {
+            setupToken,
+            nombre: "Lucía Google",
+            establecimiento: "Estancia El Sol",
+            rol: "capataz",
+          },
+        },
+        resCompletar
+      );
+      assert.equal(resCompletar.statusCode, 201);
+      assert.equal(resCompletar.body.ok, true);
+      assert.ok(resCompletar.body.data.token);
+
+      const usuarioCreado = db.usuarios.find((u) => u.email === emailNuevoGoogle);
+      assert.ok(usuarioCreado);
+      assert.equal(usuarioCreado.rol, "capataz");
+      assert.equal(usuarioCreado.establecimiento, "Estancia El Sol");
+      assert.equal(usuarioCreado.emailVerificado, true);
+
+      // 6. callbackGoogle con modo=login y correo no registrado redirige a ruta=login con googleNoRegistrado=1 y googleError
+      let urlIniciarLogin = "";
+      await AuthController.iniciarGoogle(
+        { query: { modo: "login" }, headers: {} },
+        {
+          redirect(url) {
+            urlIniciarLogin = url;
+            return this;
+          },
+        }
+      );
+      const stateLogin = new URL(urlIniciarLogin).searchParams.get("state");
+      const emailNoRegistrado = `no.registrado.${Date.now()}@gmail.com`;
+      global.fetch = async (url) => {
+        if (String(url).includes("oauth2.googleapis.com/token")) {
+          return {
+            ok: true,
+            json: async () => ({ access_token: "mock-google-access-token-login" }),
+          };
+        }
+        return {
+          ok: true,
+          json: async () => ({
+            email: emailNoRegistrado,
+            email_verified: true,
+            name: "Usuario Nuevo",
+          }),
+        };
+      };
+
+      let urlLoginNoReg = "";
+      await AuthController.callbackGoogle(
+        { query: { code: "valid-code-login", state: stateLogin }, headers: {} },
+        {
+          redirect(url) {
+            urlLoginNoReg = url;
+            return this;
+          },
+        }
+      );
+      const parsedLoginNoReg = new URL(urlLoginNoReg);
+      assert.equal(parsedLoginNoReg.searchParams.get("ruta"), "login");
+      assert.equal(parsedLoginNoReg.searchParams.get("googleNoRegistrado"), "1");
+      assert.equal(parsedLoginNoReg.searchParams.get("googleEmail"), emailNoRegistrado);
+      assert.ok(
+        (parsedLoginNoReg.searchParams.get("googleError") || "").includes("No se encontró ninguna cuenta")
+      );
+    } finally {
+      global.fetch = origFetch;
+      db.usuarios = db.usuarios.filter((u) => u.email !== emailNuevoGoogle);
+      if (origClientId !== undefined) process.env.GOOGLE_CLIENT_ID = origClientId;
+      else delete process.env.GOOGLE_CLIENT_ID;
+      if (origClientSecret !== undefined) process.env.GOOGLE_CLIENT_SECRET = origClientSecret;
+      else delete process.env.GOOGLE_CLIENT_SECRET;
+      AuthController._estadosOAuthGoogle.clear();
+    }
+  });
+});
+
 
 

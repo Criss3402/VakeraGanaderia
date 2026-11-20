@@ -3,8 +3,11 @@ import { useAuth } from "../../context/AuthContext";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import Alert from "../../components/ui/Alert";
+import GoogleAuthButton from "../../components/ui/GoogleAuthButton";
 
 export default function LoginView({
+  errorInicial = "",
+  googleNoRegistrado = false,
   alIrARegistro,
   alIrARecuperar,
   alIrAVerificar,
@@ -15,7 +18,7 @@ export default function LoginView({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [cargando, setCargando] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(errorInicial || "");
   const [necesitaVerificacion, setNecesitaVerificacion] = useState(false);
 
   async function manejarSubmit(e) {
@@ -61,6 +64,18 @@ export default function LoginView({
           <Alert tipo="error" alCerrar={() => setError("")}>
             {error}
           </Alert>
+        )}
+
+        {googleNoRegistrado && (
+          <div style={{ marginBottom: "16px", textAlign: "center" }}>
+            <Button
+              variante="relleno"
+              className="boton--bloque"
+              onClick={alIrARegistro}
+            >
+              Registrarse
+            </Button>
+          </div>
         )}
 
         {necesitaVerificacion && (
@@ -115,6 +130,12 @@ export default function LoginView({
             Iniciar Sesión
           </Button>
         </form>
+
+        <GoogleAuthButton
+          modo="login"
+          etiqueta="Continuar con Google"
+          alError={(msg) => setError(msg)}
+        />
 
         <div className="auth-caja__pie">
           <p>

@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "../../context/AuthContext";
+import Button from "../ui/Button";
 
 // Mapa de pre-carga bajo demanda al pasar el cursor (Hover Prefetching)
 const PREFETCH_MODULOS = {
@@ -31,6 +33,53 @@ export default function Sidebar({
 }) {
   const { usuario, rol, cerrarSesion } = useAuth();
   const [mostrarOpcionesPerfil, setMostrarOpcionesPerfil] = useState(false);
+  const [confirmarCerrarSesion, setConfirmarCerrarSesion] = useState(false);
+  const [cerrandoModal, setCerrandoModal] = useState(false);
+  const timerCierreRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerCierreRef.current) clearTimeout(timerCierreRef.current);
+    };
+  }, []);
+
+  const abrirConfirmacionCerrarSesion = useCallback(() => {
+    if (timerCierreRef.current) {
+      clearTimeout(timerCierreRef.current);
+      timerCierreRef.current = null;
+    }
+    setCerrandoModal(false);
+    setConfirmarCerrarSesion(true);
+  }, []);
+
+  const cancelarConfirmacionCerrarSesion = useCallback(() => {
+    if (!confirmarCerrarSesion || cerrandoModal) return;
+    setCerrandoModal(true);
+    timerCierreRef.current = setTimeout(() => {
+      setCerrandoModal(false);
+      setConfirmarCerrarSesion(false);
+      timerCierreRef.current = null;
+    }, 280);
+  }, [confirmarCerrarSesion, cerrandoModal]);
+
+  useEffect(() => {
+    if (!confirmarCerrarSesion || cerrandoModal) return;
+    function manejarEscape(e) {
+      if (e.key === "Escape") cancelarConfirmacionCerrarSesion();
+    }
+    window.addEventListener("keydown", manejarEscape);
+    return () => window.removeEventListener("keydown", manejarEscape);
+  }, [confirmarCerrarSesion, cerrandoModal, cancelarConfirmacionCerrarSesion]);
+
+  function confirmarSalida() {
+    if (timerCierreRef.current) {
+      clearTimeout(timerCierreRef.current);
+      timerCierreRef.current = null;
+    }
+    setCerrandoModal(false);
+    setConfirmarCerrarSesion(false);
+    cerrarSesion();
+  }
 
   const esDueno = rol === "dueno";
 
@@ -194,7 +243,7 @@ export default function Sidebar({
                 </button>
                 <button
                   type="button"
-                  onClick={cerrarSesion}
+                  onClick={abrirConfirmacionCerrarSesion}
                   className="w-full text-left px-2 py-1.5 hover:bg-red-950/40 text-red-300 rounded-lg flex items-center gap-2 transition-colors"
                 >
                   <i className="fa-solid fa-right-from-bracket text-red-400"></i> Cerrar Sesión
@@ -213,7 +262,7 @@ export default function Sidebar({
             </div>
             <button
               type="button"
-              onClick={cerrarSesion}
+              onClick={abrirConfirmacionCerrarSesion}
               className="text-gray-400 hover:text-red-400 p-1.5 rounded-lg hover:bg-[#1a3023] transition-colors"
               title="Cerrar Sesión"
             >
@@ -222,6 +271,74 @@ export default function Sidebar({
           </div>
         )}
       </div>
+
+      {confirmarCerrarSesion &&
+        createPortal(
+          <div
+            className={`auth-modal-backdrop ${cerrandoModal ? "auth-modal-backdrop--cerrando" : ""}`}
+            role="presentation"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) cancelarConfirmacionCerrarSesion();
+            }}
+          >
+            <div
+              className={`auth-modal-card ${cerrandoModal ? "auth-modal-card--cerrando" : ""}`}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="modal-cerrar-sesion-titulo"
+              style={{ maxWidth: "380px", padding: "28px 24px", textAlign: "center" }}
+            >
+              <div className="auth-modal-cabecera" style={{ marginBottom: "18px" }}>
+                <div
+                  style={{
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "9999px",
+                    background: "#fef2f2",
+                    color: "#dc2626",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: "12px",
+                    fontSize: "20px",
+                  }}
+                >
+                  <i className="fa-solid fa-right-from-bracket" aria-hidden="true" />
+                </div>
+                <h3
+                  id="modal-cerrar-sesion-titulo"
+                  className="auth-modal-titulo"
+                  style={{ marginBottom: "6px" }}
+                >
+                  ¿Seguro?
+                </h3>
+                <p className="auth-modal-subtitulo">
+                  ¿Querés cerrar sesión de tu cuenta?
+                </p>
+              </div>
+
+              <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
+                <Button
+                  tipo="button"
+                  variante="contorno"
+                  className="boton--bloque"
+                  onClick={cancelarConfirmacionCerrarSesion}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  tipo="button"
+                  variante="peligro"
+                  className="boton--bloque"
+                  onClick={confirmarSalida}
+                >
+                  Cerrar Sesión
+                </Button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </aside>
   );
 }

@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { http, HttpResponse } from "msw";
+import { server } from "../../test/msw/server.js";
 import LoginView from "./LoginView.jsx";
 import * as AuthContextModule from "../../context/AuthContext.jsx";
 
@@ -92,6 +94,55 @@ describe("Vista de Inicio de Sesión (LoginView.jsx)", () => {
     render(<LoginView alIrARegistro={alIrARegistro} />);
     await userEvent.click(screen.getByText(/Registrar nuevo establecimiento/i));
 
+    expect(alIrARegistro).toHaveBeenCalledTimes(1);
+  });
+
+  it("renderiza el botón 'Continuar con Google' y muestra aviso si faltan credenciales OAuth en el servidor", async () => {
+    vi.spyOn(AuthContextModule, "useAuth").mockReturnValue({
+      iniciarSesion: vi.fn(),
+    });
+    server.use(
+      http.get("*/api/auth/google/estado", () => {
+        return HttpResponse.json({
+          ok: true,
+          data: { configurado: false },
+        });
+      })
+    );
+
+    render(<LoginView />);
+
+    const btnGoogle = screen.getByRole("button", { name: /Continuar con Google/i });
+    expect(btnGoogle).toBeInTheDocument();
+
+    await userEvent.click(btnGoogle);
+
+    expect(
+      await screen.findByText(/requiere configurar GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET/i)
+    ).toBeInTheDocument();
+  });
+
+  it("muestra mensaje de cuenta no vinculada y botón 'Registrarse' cuando googleNoRegistrado es true", async () => {
+    vi.spyOn(AuthContextModule, "useAuth").mockReturnValue({
+      iniciarSesion: vi.fn(),
+    });
+    const alIrARegistro = vi.fn();
+    const mensajeError =
+      "No se encontró ninguna cuenta vinculada a esta plataforma con este correo. Por favor registrá una cuenta válida.";
+
+    render(
+      <LoginView
+        errorInicial={mensajeError}
+        googleNoRegistrado={true}
+        alIrARegistro={alIrARegistro}
+      />
+    );
+
+    expect(screen.getByText(mensajeError)).toBeInTheDocument();
+    const btnRegistrarse = screen.getByRole("button", { name: /^Registrarse$/i });
+    expect(btnRegistrarse).toBeInTheDocument();
+
+    await userEvent.click(btnRegistrarse);
     expect(alIrARegistro).toHaveBeenCalledTimes(1);
   });
 });

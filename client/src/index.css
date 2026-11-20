@@ -3852,3 +3852,214 @@ ul {
 .chat-solicitud-form__input:focus {
   border-color: var(--verde-musgo);
 }
+
+.auth-separador {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  color: #6b7c6d;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.auth-separador::before,
+.auth-separador::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #ded7c4;
+}
+
+.auth-btn-google {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 11px 16px;
+  border-radius: 12px;
+  border: 1px solid #d2c8b0;
+  background: #ffffff;
+  color: #182920;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.auth-btn-google:hover:not(:disabled) {
+  background: #f8f5eb;
+  border-color: #8fb56b;
+  box-shadow: 0 2px 8px rgba(24, 41, 32, 0.08);
+}
+
+.auth-btn-google:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.auth-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(16, 28, 21, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: authBackdropBlurIn 280ms ease-out forwards;
+}
+
+.auth-modal-backdrop--cerrando {
+  pointer-events: none;
+  animation: authBackdropBlurOut 280ms ease-in-out forwards;
+}
+
+@keyframes authBackdropBlurIn {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+}
+
+@keyframes authBackdropBlurOut {
+  from {
+    opacity: 1;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  to {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
+  }
+}
+
+.auth-modal-card {
+  width: 100%;
+  max-width: 440px;
+  max-height: 92vh;
+  overflow-y: auto;
+  background: #fbfaf6;
+  color: #182920;
+  border-radius: 22px;
+  border: 1px solid #ded7c4;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  padding: 20px 26px 26px;
+  animation: authModalCardIn 280ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.auth-modal-card--cerrando {
+  animation: authModalCardOut 280ms ease-in-out forwards;
+}
+
+@keyframes authModalCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes authModalCardOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+}
+
+.auth-modal-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.auth-modal-icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid #e2dac6;
+  background: #f1ecdd;
+  color: #182920;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.auth-modal-icon-btn:hover {
+  background: #e2dac6;
+}
+
+.auth-modal-cabecera {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.auth-modal-titulo {
+  margin: 8px 0 4px;
+  font-family: "Fraunces", serif;
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: #182920;
+}
+
+.auth-modal-subtitulo {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #526354;
+  line-height: 1.4;
+}
+
+.auth-modal-pie {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #e6dfd0;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #526354;
+}
+
+.auth-input-password-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.auth-input-password-wrap .campo-formulario__input {
+  padding-right: 40px;
+}
+
+.auth-input-eye-btn {
+  position: absolute;
+  right: 10px;
+  background: transparent;
+  border: none;
+  color: #6b7c6d;
+  cursor: pointer;
+  padding: 4px 6px;
+  font-size: 0.9rem;
+}
+
+.auth-input-eye-btn:hover {
+  color: #182920;
+}
