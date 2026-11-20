@@ -20,6 +20,12 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      // Reenvía WebSockets /ws al servidor ASGI (Daphne / Django Channels)
+      "/ws": {
+        target: "http://localhost:8000",
+        ws: true,
+        changeOrigin: true,
+      },
       // Reenvía llamadas analíticas /api/py al backend de Python (Django)
       "/api/py": {
         target: "http://localhost:8000",

@@ -4,6 +4,7 @@ import {
   responderPermisoParcelas,
   obtenerClimaActual,
 } from "../../api/dashboard.api";
+import { conectarRealtime } from "../../api/realtime";
 
 function obtenerIconoNotificacion(tipo) {
   switch (tipo) {
@@ -107,9 +108,23 @@ export default function PrivateHeader({
       cargarNotificaciones(true);
     }
     window.addEventListener("vakera:notificaciones-actualizar", manejarEventoActualizar);
+
+    const cerrarWs = conectarRealtime({
+      alRecibir: (datos) => {
+        if (datos?.event === "notification_updated" || datos?.event === "chat_message") {
+          cargarNotificaciones(true);
+        }
+        window.dispatchEvent(new CustomEvent("vakera:realtime-evento", { detail: datos }));
+      },
+      alReconectar: () => {
+        cargarNotificaciones(true);
+      },
+    });
+
     return () => {
       clearInterval(timer);
       window.removeEventListener("vakera:notificaciones-actualizar", manejarEventoActualizar);
+      cerrarWs();
     };
   }, [cargarNotificaciones]);
 

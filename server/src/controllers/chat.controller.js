@@ -5,6 +5,7 @@ const {
   ETIQUETAS_ROL_CHAT,
 } = require("../models/chat.model");
 const { exito, error } = require("../utils/apiResponse");
+const { emitirEventoRealtime } = require("../services/realtime.service");
 
 class ChatController {
   /**
@@ -72,6 +73,16 @@ class ChatController {
         remitenteId,
         destinatarioId,
         contenido,
+      });
+
+      emitirEventoRealtime({
+        targetUserIds: [remitenteId, destinatarioId],
+        payload: {
+          event: "chat_message",
+          remitenteId,
+          destinatarioId,
+          mensajeId: nuevoMensaje?.id,
+        },
       });
 
       return exito(res, nuevoMensaje, "Mensaje enviado correctamente.", 201);

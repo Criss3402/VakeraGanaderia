@@ -7,6 +7,7 @@ const { ChatModel } = require("../models/chat.model");
 const WeatherService = require("../services/weather.service");
 const { ROLES } = require("../utils/roles.constants");
 const { exito, error } = require("../utils/apiResponse");
+const { emitirEventoRealtime } = require("../services/realtime.service");
 
 function obtenerEstablecimientoContexto(req) {
   const estId =
@@ -632,6 +633,10 @@ class DashboardController {
         parcelaNombre,
         motivo,
       });
+      emitirEventoRealtime({
+        broadcast: true,
+        payload: { event: "notification_updated", tipo: "permiso_parcela" },
+      });
       return exito(
         res,
         solicitud,
@@ -655,6 +660,10 @@ class DashboardController {
         revisorId: req.usuario?.id,
         establecimientoId: estId,
         estado,
+      });
+      emitirEventoRealtime({
+        broadcast: true,
+        payload: { event: "notification_updated", tipo: "estado_permiso_parcela" },
       });
       return exito(
         res,

@@ -384,12 +384,9 @@ export default function ChatView({ abiertoInicial = false }) {
     cargarContactos(!abierto);
   }, [abierto, cargarContactos]);
 
-  // Polling ligero pausado cuando la pestaña está oculta y evitando llamadas solapadas
+  // Polling ligero de respaldo + refresco inmediato por WebSocket (Django Channels)
   useEffect(() => {
-    const timer = setInterval(async () => {
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
-        return;
-      }
+    async function sincronizarChat() {
       if (pollingEnCursoRef.current) return;
       pollingEnCursoRef.current = true;
       try {
@@ -400,8 +397,26 @@ export default function ChatView({ abiertoInicial = false }) {
       } finally {
         pollingEnCursoRef.current = false;
       }
+    }
+
+    function manejarEventoRealtime(e) {
+      if (e?.detail?.event === "chat_message") {
+        sincronizarChat();
+      }
+    }
+    window.addEventListener("vakera:realtime-evento", manejarEventoRealtime);
+
+    const timer = setInterval(async () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+      await sincronizarChat();
     }, 6000);
-    return () => clearInterval(timer);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("vakera:realtime-evento", manejarEventoRealtime);
+    };
   }, [abierto, cargarContactos, cargarConversacion, contactoActivo?.id]);
 
   const desplazarAlFinal = useCallback((comportamiento = "smooth") => {
