@@ -157,7 +157,7 @@ export default function PanelOficina({ alCambiarVista }) {
               Stock de Insumos & Reposición Directa
             </h3>
             <p className="text-xs text-[#6b7c6d]">
-              Sincronizado con PostgreSQL: reponé o sumá stock al instante
+              Sincronización en tiempo real: reponé o sumá stock al instante
             </p>
           </div>
           <button

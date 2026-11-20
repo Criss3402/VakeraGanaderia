@@ -131,8 +131,8 @@ function AppContenido() {
 
   const titulosVistas = {
     metricas: "Panel de Control Ganadero",
-    ganado: "Gestión de Rodeo y Potreros",
-    parcelas: "Mapeo Geoespacial de Parcelas y Potreros",
+    ganado: "Gestión de Rodeo y Ganado",
+    parcelas: "Mapeo Geoespacial de Parcelas y Ganado",
     partes: "Partes Diarios de Novedades de Campo",
     sanidad: "Calendario y Tratamientos Sanitarios",
     insumos: "Control de Insumos y Stock Crítico",

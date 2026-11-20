@@ -484,7 +484,7 @@ export default function PartesView() {
 
             <form onSubmit={manejarCrearParte} className="space-y-3">
               <div>
-                <label className="block font-bold text-[#182920] mb-1">Potrero Inspeccionado</label>
+                <label className="block font-bold text-[#182920] mb-1">Sector de Ganado Inspeccionado</label>
                 <select
                   value={nuevoParte.potreroId}
                   onChange={(e) => setNuevoParte({ ...nuevoParte, potreroId: e.target.value })}

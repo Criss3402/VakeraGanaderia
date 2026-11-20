@@ -6,7 +6,7 @@ const PREGUNTAS_FRECUENTES = [
     categoria: "Conectividad",
     pregunta: "¿Puedo utilizar Vakera en el campo si no tengo señal de celular ni internet?",
     respuesta:
-      "Sí, totalmente. La aplicación cuenta con modo offline automático. Puedes cargar pesajes, caravanas, tratamientos sanitarios y movimientos de lote directamente en la manga o en el potrero. En cuanto el dispositivo recupera señal de red o Wi-Fi, todos los datos se sincronizan automáticamente con la nube sin pérdida de información.",
+      "Sí, totalmente. La aplicación cuenta con modo offline automático. Puedes cargar pesajes, caravanas, tratamientos sanitarios y movimientos de lote directamente en la manga o en el campo con el ganado. En cuanto el dispositivo recupera señal de red o Wi-Fi, todos los datos se sincronizan automáticamente con la nube sin pérdida de información.",
   },
   {
     id: 2,

@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { obtenerNotificaciones, responderPermisoParcelas } from "../../api/dashboard.api";
+import {
+  obtenerNotificaciones,
+  responderPermisoParcelas,
+  obtenerClimaActual,
+} from "../../api/dashboard.api";
 
 function obtenerIconoNotificacion(tipo) {
   switch (tipo) {
@@ -28,6 +32,7 @@ export default function PrivateHeader({
 }) {
   const [hora, setHora] = useState("");
   const [fecha, setFecha] = useState("");
+  const [clima, setClima] = useState(null);
   const [abiertoNotif, setAbiertoNotif] = useState(false);
   const [notificaciones, setNotificaciones] = useState([]);
   const [cargandoNotif, setCargandoNotif] = useState(false);
@@ -69,6 +74,26 @@ export default function PrivateHeader({
     actualizarFechaHora();
     const intervalo = setInterval(actualizarFechaHora, 1000 * 30);
     return () => clearInterval(intervalo);
+  }, []);
+
+  useEffect(() => {
+    let cancelado = false;
+    async function cargarClima() {
+      try {
+        const res = await obtenerClimaActual();
+        if (!cancelado && res?.data) {
+          setClima(res.data);
+        }
+      } catch (err) {
+        console.warn("[PrivateHeader] No se pudo cargar el clima:", err.message);
+      }
+    }
+    cargarClima();
+    const timerClima = setInterval(cargarClima, 1000 * 60 * 15);
+    return () => {
+      cancelado = true;
+      clearInterval(timerClima);
+    };
   }, []);
 
   useEffect(() => {
@@ -331,6 +356,19 @@ export default function PrivateHeader({
         </div>
 
         <div className="hidden lg:block h-7 w-px bg-[#ded7c4]"></div>
+
+        {/* Clima actual */}
+        {clima && (
+          <div
+            className="hidden sm:flex items-center gap-2 text-xs text-[#182920] bg-[#e7dfcb] px-3 py-1.5 rounded-xl border border-[#d2c8b0] shadow-sm font-medium"
+            title={`${clima.ubicacion || "Establecimiento"} · Humedad: ${clima.humedad ?? "--"}% · Viento: ${clima.vientoKmH ?? "--"} km/h`}
+            aria-label={`Clima actual: ${clima.temperatura}°C, ${clima.descripcion}`}
+          >
+            <i className={`${clima.iconoFontAwesome || "fa-solid fa-cloud-sun text-amber-500"} text-sm`} aria-hidden="true"></i>
+            <span className="font-bold text-[#182920]">{clima.temperatura}°C</span>
+            <span className="hidden xl:inline text-[#33512f]">{clima.descripcion}</span>
+          </div>
+        )}
 
         {/* Fecha y Hora */}
         <div className="hidden lg:flex items-center gap-2 text-xs text-[#182920] bg-[#e7dfcb] px-3 py-1.5 rounded-xl border border-[#d2c8b0] shadow-sm font-medium">

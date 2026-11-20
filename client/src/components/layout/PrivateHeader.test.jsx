@@ -77,4 +77,30 @@ describe("Cabecera Privada y Centro de Notificaciones (PrivateHeader.jsx)", () =
     await userEvent.click(screen.getByText("Stock crítico: Vacuna"));
     expect(alCambiarVista).toHaveBeenCalledWith("insumos");
   });
+
+  it("muestra el clima actual en la barra superior junto a la fecha y hora", async () => {
+    server.use(
+      http.get("*/api/dashboard/notificaciones", () =>
+        HttpResponse.json({ ok: true, data: { totalNoLeidas: 0, notificaciones: [] } })
+      ),
+      http.get("*/api/dashboard/clima", () =>
+        HttpResponse.json({
+          ok: true,
+          data: {
+            ubicacion: "El Rancho, Goya, Corrientes",
+            temperatura: 23,
+            descripcion: "Cielo despejado",
+            iconoFontAwesome: "fa-solid fa-sun text-amber-500",
+            humedad: 58,
+            vientoKmH: 14,
+          },
+        })
+      )
+    );
+
+    render(<PrivateHeader />);
+
+    expect(await screen.findByText("23°C")).toBeInTheDocument();
+    expect(screen.getByText("Cielo despejado")).toBeInTheDocument();
+  });
 });

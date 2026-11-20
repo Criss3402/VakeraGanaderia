@@ -65,7 +65,7 @@ export default function QuienesSomos() {
             </div>
             <div className="cuentas-card__rol">
               <span className="cuentas-card__rol-tag">Personal de Campo</span>
-              <p>Registro ágil de pesajes, rotación entre potreros y novedades operativas directas.</p>
+              <p>Registro ágil de pesajes, rotación de ganado y novedades operativas directas.</p>
             </div>
           </div>
         </div>

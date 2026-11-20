@@ -633,7 +633,7 @@ export default function InsumosView() {
             <span className="bg-[#8fb56b] text-[#182920] text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full">
               Inventario, Stock & Conteo de Pertenencias
             </span>
-            <span className="text-xs text-[#8fb56b]">Sincronizado con PostgreSQL</span>
+            <span className="text-xs text-[#8fb56b]">Sincronización Activa</span>
           </div>
           <h2 className="text-2xl font-bold font-['Fraunces',serif] text-[#f1ecdd]">
             Control de Insumos, Herramientas y Botiquín
@@ -1470,7 +1470,7 @@ export default function InsumosView() {
             </div>
 
             <p className="text-[#555] leading-relaxed">
-              Ingresa la cantidad física exacta que tienes en mano / en tu sector (<strong>{insumoActivo.ubicacion}</strong>). Se actualizará el registro en PostgreSQL:
+              Ingresa la cantidad física exacta que tienes en mano / en tu sector (<strong>{insumoActivo.ubicacion}</strong>). Se actualizará el registro inmediatamente:
             </p>
 
             <form onSubmit={manejarConteoFisico} className="space-y-3">
@@ -1887,7 +1887,7 @@ export default function InsumosView() {
                   disabled={procesando}
                   className="px-5 py-2 rounded-xl bg-[#182920] text-[#f1ecdd] font-bold hover:bg-[#284835]"
                 >
-                  {procesando ? "Guardando..." : "Guardar Producto en PostgreSQL"}
+                  {procesando ? "Guardando..." : "Guardar Producto"}
                 </button>
               </div>
             </form>
@@ -1910,7 +1910,7 @@ export default function InsumosView() {
             <p className="text-[#555] leading-relaxed">
               {insumoAEliminar
                 ? `¿Confirmás que deseás eliminar el insumo "${insumoAEliminar.nombre}" (${insumoAEliminar.stockActual} ${insumoAEliminar.unidad}) del stock?`
-                : `¿Confirmás que deseás eliminar del inventario los ${seleccionadosInsumos.length} artículos seleccionados? Esta acción actualizará PostgreSQL inmediatamente.`}
+                : `¿Confirmás que deseás eliminar del inventario los ${seleccionadosInsumos.length} artículos seleccionados? Esta acción actualizará el inventario inmediatamente.`}
             </p>
 
             <div className="flex justify-end gap-2 pt-2">

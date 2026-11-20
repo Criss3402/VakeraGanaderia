@@ -106,7 +106,7 @@ export default function GanadoView() {
     setProcesando(true);
     try {
       await registrarGanado(nuevoAnimal);
-      mostrarNotificacion(`¡Animal caravana ${nuevoAnimal.caravana.toUpperCase()} registrado con éxito en PostgreSQL!`);
+      mostrarNotificacion(`¡Animal caravana ${nuevoAnimal.caravana.toUpperCase()} registrado con éxito!`);
       setModalAlta(false);
       setNuevoAnimal({
         caravana: "",
@@ -210,7 +210,7 @@ export default function GanadoView() {
         potreroDestinoId: potreroDestinoLote,
       });
       const dest = potreros.find((p) => p.id === potreroDestinoLote);
-      mostrarNotificacion(`Lote de ${seleccionados.length} cabezas trasladado con éxito a ${dest ? dest.nombre : "nuevo potrero"}.`);
+      mostrarNotificacion(`Lote de ${seleccionados.length} cabezas trasladado con éxito a ${dest ? dest.nombre : "nuevo sector de ganado"}.`);
       setModalTrasladoLote(false);
       setSeleccionados([]);
       await cargarDatos();
@@ -228,7 +228,7 @@ export default function GanadoView() {
     setProcesando(true);
     try {
       await registrarPotrero(nuevoPotrero);
-      mostrarNotificacion(`Potrero "${nuevoPotrero.nombre}" creado exitosamente.`);
+      mostrarNotificacion(`Sector de ganado "${nuevoPotrero.nombre}" creado exitosamente.`);
       setModalCrearPotrero(false);
       setNuevoPotrero({
         nombre: "",
@@ -238,7 +238,7 @@ export default function GanadoView() {
       });
       await cargarDatos();
     } catch (err) {
-      alert("Error al crear potrero: " + err.message);
+      alert("Error al crear sector de ganado: " + err.message);
     } finally {
       setProcesando(false);
     }
@@ -284,15 +284,15 @@ export default function GanadoView() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="bg-[#8fb56b] text-[#182920] text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full">
-              Fase 4: Gestión Integral de Ganado y Potreros
+              Fase 4: Gestión Integral de Ganado y Animal
             </span>
-            <span className="text-xs text-[#8fb56b]">PostgreSQL & Prisma Sincronizados</span>
+            <span className="text-xs text-[#8fb56b]">Sistema Sincronizado</span>
           </div>
           <h2 className="text-2xl font-bold font-['Fraunces',serif] text-[#f1ecdd]">
-            Control de Rodeo, Potreros y Trazabilidad
+            Control de Rodeo, Ganado y Trazabilidad
           </h2>
           <p className="text-xs text-[#ded7c4] mt-1 max-w-xl">
-            Fichas clínicas individuales, altas por nacimiento/compra, bajas por venta o faena, y movimientos de lotes entre potreros.
+            Fichas clínicas individuales, altas por nacimiento/compra, bajas por venta o faena, y movimientos de lotes de ganado.
           </p>
         </div>
 
@@ -315,7 +315,7 @@ export default function GanadoView() {
               onClick={() => setModalCrearPotrero(true)}
               className="bg-[#1f3729] hover:bg-[#284835] text-[#f1ecdd] border border-[#8fb56b]/40 font-bold text-xs uppercase px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-2"
             >
-              <i className="fa-solid fa-map-location-dot text-[#8fb56b]"></i> + Nuevo Potrero
+              <i className="fa-solid fa-map-location-dot text-[#8fb56b]"></i> + Nuevo Sector de Ganado
             </button>
           </div>
         )}
@@ -371,7 +371,7 @@ export default function GanadoView() {
           }`}
         >
           <i className="fa-solid fa-map"></i>
-          <span>Zonificación de Potreros ({potreros.length})</span>
+          <span>Zonificación de Ganado ({potreros.length})</span>
         </button>
       </div>
 
@@ -380,7 +380,7 @@ export default function GanadoView() {
         <div className="bg-white rounded-2xl p-4 border border-[#ded7c4] shadow-sm">
           <p className="text-[10px] font-bold text-[#6b7c6d] uppercase">Total Rodeo</p>
           <p className="text-2xl font-extrabold text-[#182920] mt-0.5">{ganado.length} Cabezas</p>
-          <span className="text-[11px] text-[#33512f] font-medium">Distribuido en {potreros.length} potreros</span>
+          <span className="text-[11px] text-[#33512f] font-medium">Distribuido en {potreros.length} sectores de ganado</span>
         </div>
 
         <div className="bg-white rounded-2xl p-4 border border-[#ded7c4] shadow-sm">
@@ -430,7 +430,7 @@ export default function GanadoView() {
                 onChange={(e) => setFiltroPotrero(e.target.value)}
                 className="text-xs font-semibold bg-[#f8f5eb] border border-[#ded7c4] rounded-xl px-2.5 py-2 text-[#182920] outline-none"
               >
-                <option value="todos">Todos los Potreros</option>
+                <option value="todos">Todos los Sectores</option>
                 {potreros.map((p) => (
                   <option key={p.id} value={p.id}>{p.nombre}</option>
                 ))}
@@ -504,7 +504,7 @@ export default function GanadoView() {
                     <th className="py-2.5 px-3">Categoría & Raza</th>
                     <th className="py-2.5 px-3">Sexo</th>
                     <th className="py-2.5 px-3">Peso Vivo</th>
-                    <th className="py-2.5 px-3">Potrero Actual</th>
+                    <th className="py-2.5 px-3">Sector de Ganado</th>
                     <th className="py-2.5 px-3">Estado Clínico</th>
                     <th className="py-2.5 px-3 text-right">Acciones</th>
                   </tr>
@@ -574,7 +574,7 @@ export default function GanadoView() {
                                   setModalEditar(true);
                                 }}
                                 className="bg-[#f8f5eb] hover:bg-[#e7dfcb] text-[#182920] border border-[#ded7c4] font-bold text-[10px] px-2 py-1 rounded-lg transition-colors"
-                                title="Editar pesaje o potrero"
+                                title="Editar pesaje o ubicación del animal"
                               >
                                 <i className="fa-solid fa-pen text-amber-700"></i>
                               </button>
@@ -629,7 +629,7 @@ export default function GanadoView() {
                   Manejo Masivo de Rodeo por Lotes
                 </h3>
                 <p className="text-xs text-[#6b7c6d]">
-                  Marca grupos enteros de animales para trasladarlos de potrero o darlos de baja en bloque.
+                  Marca grupos enteros de animales para trasladar el ganado o darlos de baja en bloque.
                 </p>
               </div>
 
@@ -768,7 +768,7 @@ export default function GanadoView() {
                     <div className="space-y-1 text-xs max-h-36 overflow-y-auto pr-1">
                       <span className="text-[10px] font-bold uppercase text-[#6b7c6d] block mb-1">Animales en pastoreo:</span>
                       {animalesEnPotrero.length === 0 ? (
-                        <p className="text-[11px] text-[#888] italic">Potrero vacío / En descanso de pastura.</p>
+                        <p className="text-[11px] text-[#888] italic">Sin animales asignados actualmente.</p>
                       ) : (
                         animalesEnPotrero.map((an) => (
                           <div key={an.id} className="p-1.5 rounded-lg bg-[#f8f5eb] flex justify-between items-center text-[11px]">
@@ -842,7 +842,7 @@ export default function GanadoView() {
                 <p className="font-bold text-[#33512f] text-sm">{fichaDetalle.pesoKg} kg</p>
               </div>
               <div>
-                <span className="text-[10px] font-bold text-[#6b7c6d] uppercase">Potrero Asignado</span>
+                <span className="text-[10px] font-bold text-[#6b7c6d] uppercase">Sector de Ganado</span>
                 <p className="font-bold text-[#182920] text-sm">{fichaDetalle.potreroNombre || fichaDetalle.potrero?.nombre || "Sin asignar"}</p>
               </div>
               <div>
@@ -996,13 +996,13 @@ export default function GanadoView() {
               </div>
 
               <div>
-                <label className="block font-bold text-[#182920] mb-1">Potrero de Destino</label>
+                <label className="block font-bold text-[#182920] mb-1">Sector de Ganado / Destino</label>
                 <select
                   value={nuevoAnimal.potreroId}
                   onChange={(e) => setNuevoAnimal({ ...nuevoAnimal, potreroId: e.target.value })}
                   className="w-full bg-[#f8f5eb] border border-[#ded7c4] rounded-xl px-3 py-2 text-[#182920] outline-none"
                 >
-                  <option value="">Sin potrero asignado</option>
+                  <option value="">Sin ubicación asignada</option>
                   {potreros.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.nombre} ({p.totalAnimales ?? 0} cabezas)
@@ -1024,7 +1024,7 @@ export default function GanadoView() {
                   disabled={procesando}
                   className="px-5 py-2 rounded-xl bg-[#182920] text-[#f1ecdd] font-bold hover:bg-[#284835]"
                 >
-                  {procesando ? "Guardando..." : "Registrar Alta en PostgreSQL"}
+                  {procesando ? "Guardando..." : "Registrar Alta"}
                 </button>
               </div>
             </form>
@@ -1057,13 +1057,13 @@ export default function GanadoView() {
               </div>
 
               <div>
-                <label className="block font-bold text-[#182920] mb-1">Potrero Actual</label>
+                <label className="block font-bold text-[#182920] mb-1">Sector de Ganado Actual</label>
                 <select
                   value={animalActivo.potreroId || ""}
                   onChange={(e) => setAnimalActivo({ ...animalActivo, potreroId: e.target.value })}
                   className="w-full bg-[#f8f5eb] border border-[#ded7c4] rounded-xl px-3 py-2 text-[#182920] outline-none"
                 >
-                  <option value="">Sin potrero asignado</option>
+                  <option value="">Sin ubicación asignada</option>
                   {potreros.map((p) => (
                     <option key={p.id} value={p.id}>{p.nombre}</option>
                   ))}
@@ -1114,7 +1114,7 @@ export default function GanadoView() {
               Confirmar Baja de Animal {animalActivo.caravana}
             </h3>
             <p className="text-[#555]">
-              Esta acción registrará la salida del animal del rodeo y lo removerá de la hacienda activa en PostgreSQL:
+              Esta acción registrará la salida del animal del rodeo y lo removerá de la hacienda activa:
             </p>
 
             <div>
@@ -1213,11 +1213,11 @@ export default function GanadoView() {
               Traslado de Lote ({seleccionados.length} Animales)
             </h3>
             <p className="text-[#555]">
-              Selecciona el potrero al cual deseas mover el lote completo de animales seleccionados:
+              Selecciona el sector de ganado al cual deseas mover el lote completo de animales seleccionados:
             </p>
 
             <div>
-              <label className="block font-bold text-[#182920] mb-1">Potrero Destino</label>
+              <label className="block font-bold text-[#182920] mb-1">Sector de Ganado Destino</label>
               <select
                 value={potreroDestinoLote}
                 onChange={(e) => setPotreroDestinoLote(e.target.value)}
@@ -1260,7 +1260,7 @@ export default function GanadoView() {
           <div className="bg-white rounded-2xl p-6 border border-[#ded7c4] shadow-2xl max-w-md w-full animate-fade-in text-xs">
             <div className="flex justify-between items-center mb-4 pb-2 border-b border-[#ded7c4]">
               <h3 className="text-base font-bold text-[#182920] font-['Fraunces',serif]">
-                Crear Nueva División / Potrero
+                Crear Nueva División / Sector de Ganado
               </h3>
               <button
                 type="button"
@@ -1273,12 +1273,12 @@ export default function GanadoView() {
 
             <form onSubmit={manejarCrearPotrero} className="space-y-3">
               <div>
-                <label className="block font-bold text-[#182920] mb-1">Nombre del Potrero</label>
+                <label className="block font-bold text-[#182920] mb-1">Nombre del Sector / Ganado</label>
                 <input
                   type="text"
                   value={nuevoPotrero.nombre}
                   onChange={(e) => setNuevoPotrero({ ...nuevoPotrero, nombre: e.target.value })}
-                  placeholder="Ej: Potrero 6 - Los Sauces"
+                  placeholder="Ej: Lote 6 - Los Sauces"
                   className="w-full bg-[#f8f5eb] border border-[#ded7c4] rounded-xl px-3 py-2 text-[#182920] outline-none font-bold"
                   required
                 />
@@ -1333,7 +1333,7 @@ export default function GanadoView() {
                   disabled={procesando}
                   className="px-5 py-2 rounded-xl bg-[#182920] text-[#f1ecdd] font-bold hover:bg-[#284835]"
                 >
-                  {procesando ? "Creando..." : "Crear Potrero en PostgreSQL"}
+                  {procesando ? "Creando..." : "Crear Sector de Ganado"}
                 </button>
               </div>
             </form>

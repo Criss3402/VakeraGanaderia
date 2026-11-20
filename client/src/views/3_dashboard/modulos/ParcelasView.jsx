@@ -1460,10 +1460,10 @@ export default function ParcelasView() {
             <span className="text-xs text-[#8fb56b]">Delimitación y Receptividad Satelital</span>
           </div>
           <h2 className="text-2xl font-bold font-['Fraunces',serif] text-[#f1ecdd]">
-            Mapeo de Parcelas & Potreros
+            Mapeo de Parcelas & Ganado
           </h2>
           <p className="text-xs text-[#ded7c4] mt-1 max-w-xl">
-            Traza directamente sobre el mapa satelital los límites de tus potreros para calcular superficies exactas, asignar hacienda y monitorear el balance forrajero.
+            Traza directamente sobre el mapa satelital los límites de tus parcelas de ganado para calcular superficies exactas, asignar hacienda y monitorear el balance forrajero.
           </p>
         </div>
 
@@ -2119,7 +2119,7 @@ export default function ParcelasView() {
                   <div>
                     <p className="font-bold text-sm text-[#182920]">Sin parcelas delimitadas</p>
                     <p className="text-xs text-[#6b7c6d] mt-1 max-w-xs mx-auto">
-                      Aún no has delimitado zonas en el mapa. Haz clic en "Trazar Parcela en Mapa" para marcar tu primer potrero.
+                      Aún no has delimitado zonas en el mapa. Haz clic en "Trazar Parcela en Mapa" para marcar tu primera parcela de ganado.
                     </p>
                   </div>
                   {puedeCrearOEditar && (
@@ -2177,12 +2177,12 @@ export default function ParcelasView() {
             <form onSubmit={manejarGuardarZona} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#182920] uppercase mb-1">
-                  Nombre de la Parcela / Potrero *
+                  Nombre de la Parcela / Ganado *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="Ej: Potrero 1 - Los Eucaliptos, Lote Norte..."
+                  placeholder="Ej: Lote 1 - Los Eucaliptos, Ganado Norte..."
                   value={formularioZona.nombre}
                   onChange={(e) => setFormularioZona({ ...formularioZona, nombre: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-[#ded7c4] text-sm focus:outline-none focus:ring-2 focus:ring-[#8fb56b]"
@@ -2385,7 +2385,7 @@ export default function ParcelasView() {
                         </span>
                       </div>
                       <span className="text-[10px] text-[#6b7c6d]">
-                        {g.potrero || "Sin potrero"}
+                        {g.potrero || "Sin asignar"}
                       </span>
                     </label>
                   );
@@ -2465,7 +2465,7 @@ export default function ParcelasView() {
                   rows={3}
                   value={motivoPermiso}
                   onChange={(e) => setMotivoPermiso(e.target.value)}
-                  placeholder="Ej: Actualizar límites de potrero o agregar nueva subdivisión..."
+                  placeholder="Ej: Actualizar límites de parcela de ganado o agregar nueva subdivisión..."
                   maxLength={300}
                   aria-label="Motivo de permiso para parcelas"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-[#ded7c4] text-sm text-[#182920] bg-[#fcfbf7] focus:bg-white focus:border-[#182920] outline-none"

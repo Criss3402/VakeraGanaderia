@@ -35,7 +35,7 @@ export default function ReportesView() {
             Balance General del Establecimiento
           </h2>
           <p className="text-xs text-[#ded7c4] mt-1 max-w-xl">
-            Consolidado patrimonial, valuación a precio de mercado vivo, rendimiento por potrero y tasa de sanidad.
+            Consolidado patrimonial, valuación a precio de mercado vivo, rendimiento del ganado y tasa de sanidad.
           </p>
         </div>
 
@@ -89,13 +89,13 @@ export default function ReportesView() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-2xl p-6 border border-[#ded7c4] shadow-sm">
           <h3 className="text-base font-bold text-[#182920] font-['Fraunces',serif] mb-3">
-            Ocupación y Superficie por Potrero
+            Ocupación y Superficie por Sector de Ganado
           </h3>
 
           <div className="space-y-3">
             {potreros.length === 0 ? (
               <p className="text-xs text-[#6b7c6d] italic p-3 bg-[#f8f5eb] rounded-xl border border-[#ded7c4]">
-                No hay potreros zonificados en este establecimiento.
+                No hay sectores de ganado zonificados en este establecimiento.
               </p>
             ) : (
               potreros.map((p) => (

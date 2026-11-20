@@ -101,7 +101,7 @@ export default function PanelPeon({ alCambiarVista }) {
             Puesto de Trabajo de Campo
           </h2>
           <p className="text-xs text-[#ded7c4] mt-1 max-w-xl">
-            Herramientas directas para carga ágil de partes diarios, reporte de novedades en potreros y solicitud de insumos.
+            Herramientas directas para carga ágil de partes diarios, reporte de novedades de ganado y solicitud de insumos.
           </p>
         </div>
 
@@ -143,7 +143,7 @@ export default function PanelPeon({ alCambiarVista }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-[#182920] uppercase mb-1">
-                  Potrero Inspeccionado
+                  Sector de Ganado Inspeccionado
                 </label>
                 <select
                   value={potreroSeleccionado}
@@ -227,10 +227,10 @@ export default function PanelPeon({ alCambiarVista }) {
           <div>
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-[#ded7c4]">
               <h3 className="text-base font-bold text-[#182920] font-['Fraunces',serif]">
-                Rodeo por Potrero
+                Rodeo por Sector de Ganado
               </h3>
               <span className="text-[10px] bg-[#f8f5eb] text-[#33512f] font-bold px-2 py-0.5 rounded-md border border-[#ded7c4]">
-                {potreros.length} Potreros
+                {potreros.length} Sectores
               </span>
             </div>
 

@@ -91,7 +91,7 @@ export default function PanelCapataz({ alCambiarVista }) {
             Mesa de Control Operativo
           </h2>
           <p className="text-xs text-[#ded7c4] mt-1 max-w-xl">
-            Revisión de novedades reportadas por peones, supervisión de potreros, enlace sanitario con la veterinaria y control de stock local.
+            Revisión de novedades reportadas por peones, supervisión de ganado, enlace sanitario con la veterinaria y control de stock local.
           </p>
         </div>
 
@@ -103,7 +103,7 @@ export default function PanelCapataz({ alCambiarVista }) {
             </p>
           </div>
           <div className="bg-[#122019] px-4 py-2.5 rounded-xl border border-[#8fb56b]/30 text-center">
-            <p className="text-[10px] text-gray-300 uppercase font-semibold">Potreros Activos</p>
+            <p className="text-[10px] text-gray-300 uppercase font-semibold">Sectores de Ganado</p>
             <p className="text-xl font-extrabold text-[#8fb56b] leading-none mt-0.5">
               {potreros.length}
             </p>
@@ -206,7 +206,7 @@ export default function PanelCapataz({ alCambiarVista }) {
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-[#ded7c4]">
             <div>
               <h3 className="text-base font-bold text-[#182920] font-['Fraunces',serif]">
-                Estado de Potreros de Campo
+                Estado de Sectores de Ganado
               </h3>
               <p className="text-xs text-[#6b7c6d]">Ocupación y capacidad</p>
             </div>
