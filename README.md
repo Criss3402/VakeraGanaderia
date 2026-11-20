@@ -59,9 +59,22 @@ npm run dev
 
 Escucha en `http://localhost:4000`. Atiende:
 - `/api/health` — Estado de salud del servicio.
-- `/api/auth/*` — Registro, login con emisión de JWT y perfil.
+- `/api/auth/*` — Registro, login con emisión de JWT, verificación de email, recuperación de contraseña y acceso/registro con Google OAuth 2.0.
+- `/api/contacto` — Recepción de mensajes del formulario de contacto (persistencia en PostgreSQL + envío por Gmail/SMTP a `soporte.vakera@gmail.com`).
 - `/api/dashboard/*` — Ganado, potreros, sanidad, stock de insumos y partes diarios.
 - `/api/permisos/*` — Gestión y auditoría de roles.
+
+---
+
+### Variables de Entorno (`.env` en raíz y `server/.env`)
+
+El repositorio utiliza dos archivos `.env` según el proceso que se ejecute:
+
+1. **`.env` (en la raíz del proyecto):** usado por **Prisma CLI** (`db:migrate`, `db:seed`, `db:studio`), **Docker Compose** (`db:up`) y el **backend Python/Django** (`server_py/`). Incluye `DATABASE_URL`, `JWT_SECRET`, `DJANGO_SECRET_KEY` y `DJANGO_DEBUG`.
+2. **`server/.env` (dentro de `server/`):** usado por el **backend Node.js / Express** al iniciar con `npm run server:node`. Incluye:
+   - Servidor y BD: `PORT`, `NODE_ENV`, `DATABASE_URL`, `JWT_SECRET`.
+   - Correo Gmail/SMTP (verificación, recuperación y contacto a `soporte.vakera@gmail.com`): `SMTP_SERVICE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `CONTACTO_DESTINO_EMAIL` (opcional).
+   - Google OAuth 2.0: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` (`http://localhost:4000/api/auth/google/callback`) y `FRONTEND_URL` (`http://localhost:5173`).
 
 ---
 
@@ -106,6 +119,12 @@ El archivo `client/vite.config.js` enruta transparentemente las solicitudes sin 
 ## Tests y Verificación de Calidad
 
 ```bash
+# Ejecutar tests unitarios del backend Node.js
+npm run test:node
+
+# Ejecutar tests del frontend React (Vitest)
+npm run test:client
+
 # Ejecutar suite de pruebas de Python (JWT interoperable, RBAC, nutrición y reportes)
 npm run py:test
 
