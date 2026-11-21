@@ -178,6 +178,52 @@ export default function PanelDueno({ alCambiarVista }) {
         </div>
       </div>
 
+      {/* Tarjeta de Tambo y Leche en Página Principal (solo si hubo ordeñes reales) */}
+      {reportes?.tamboLeche?.tieneOrdenes && (
+        <div className="bg-white rounded-2xl p-5 border border-[#ded7c4] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-[#e8f0e0] text-[#182920]">
+                Tambo & Leche · OCLA ({reportes.tamboLeche.periodo || "oct/2026"})
+              </span>
+              <span className="text-xs font-semibold text-[#33512f]">
+                ${Number(reportes.tamboLeche.precioLitro || 550.25).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/L
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-6 mt-2">
+              <div>
+                <span className="text-[10px] font-bold uppercase text-[#6b7c6d] block">
+                  Última Actualización ({reportes.tamboLeche.ultimaFecha})
+                </span>
+                <span className="text-xl font-extrabold text-[#182920]">
+                  ${Number(reportes.tamboLeche.ingresoUltimaActualizacionArs || 0).toLocaleString("es-AR")}
+                </span>
+                <span className="text-[11px] text-[#6b7c6d] ml-1.5">
+                  ({reportes.tamboLeche.litrosUltimaActualizacion} L)
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-[#6b7c6d] block">Total Mensual (Litros Reales)</span>
+                <span className="text-xl font-extrabold text-emerald-800">
+                  ${Number(reportes.tamboLeche.ingresoMensualArs || 0).toLocaleString("es-AR")}
+                </span>
+                <span className="text-[11px] text-[#6b7c6d] ml-1.5">
+                  ({Number(reportes.tamboLeche.litrosMensuales || 0).toLocaleString("es-AR")} L/mes)
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => alCambiarVista && alCambiarVista("tambo")}
+            className="bg-[#182920] hover:bg-[#233a2d] text-[#f1ecdd] font-bold text-xs uppercase px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 shrink-0"
+          >
+            <i className="fa-solid fa-droplet text-[#8fb56b]"></i> Ver Tambo y Leche
+          </button>
+        </div>
+      )}
+
       {/* Grid: Visión Operativa por Actor & Potreros */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Resumen de Módulos & Actores del Establecimiento */}

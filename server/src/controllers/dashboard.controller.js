@@ -3,9 +3,12 @@ const SanidadModel = require("../models/sanidad.model");
 const InsumoModel = require("../models/insumo.model");
 const ParteDiarioModel = require("../models/parteDiario.model");
 const ParcelaPermisoModel = require("../models/parcelaPermiso.model");
+const TamboConfigModel = require("../models/tamboConfig.model");
+const OrdenieModel = require("../models/ordenie.model");
 const WeatherService = require("../services/weather.service");
 const CotizacionService = require("../services/cotizacion.service");
 const DolarService = require("../services/dolar.service");
+const LecheService = require("../services/leche.service");
 const { ROLES } = require("../utils/roles.constants");
 const { exito, error } = require("../utils/apiResponse");
 
@@ -539,6 +542,78 @@ class DashboardController {
     }
   }
 
+  // 6d. Precio del Tambo de Leche (OCLA / SIGLeA) + Dólar + Config Tambo
+  static async obtenerLeche(req, res) {
+    try {
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const forzar = req.query?.refresh === "true";
+      const [leche, dolar, configuracion] = await Promise.all([
+        LecheService.obtenerPreciosLeche({ forzar }),
+        DolarService.obtenerCotizaciones({ forzar }),
+        TamboConfigModel.obtenerPorEstablecimiento(estId),
+      ]);
+      return exito(res, { ...leche, dolar, configuracion }, "Precio de leche OCLA obtenido con éxito.");
+    } catch (err) {
+      return error(res, "Error al consultar precio de leche OCLA: " + err.message, 500);
+    }
+  }
+
+  static async guardarConfiguracionTambo(req, res) {
+    try {
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const pesoPorCategoria = await GanadoModel.obtenerPesoPorCategoria(estId);
+      const maxVacasLecheras = pesoPorCategoria
+        .filter((item) => String(item.categoria || "").toLowerCase().includes("lecher"))
+        .reduce((acc, item) => acc + (Number(item.cabezas) || 0), 0);
+
+      const vacasSolicitadas = Math.max(0, Math.round(Number(req.body?.vacasOrdenie) || 0));
+      if (req.body?.modoEntrada !== "litros" && vacasSolicitadas > maxVacasLecheras) {
+        return error(
+          res,
+          `No podés asignar más vacas en ordeñe (${vacasSolicitadas}) que vacas lecheras registradas (${maxVacasLecheras}).`,
+          400
+        );
+      }
+
+      const guardada = await TamboConfigModel.guardar(estId, req.body || {});
+      return exito(res, guardada, "Configuración de tambo guardada en base de datos.");
+    } catch (err) {
+      return error(res, "Error al guardar configuración del tambo: " + err.message, 400);
+    }
+  }
+
+  static async listarOrdenies(req, res) {
+    try {
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const { fecha } = req.query || {};
+      const lista = await OrdenieModel.listar(estId, { fecha });
+      return exito(res, lista);
+    } catch (err) {
+      return error(res, "Error al consultar registros de ordeñe: " + err.message, 500);
+    }
+  }
+
+  static async registrarOrdenie(req, res) {
+    try {
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const creado = await OrdenieModel.registrar(estId, req.body || {});
+      return exito(res, creado, "Registro de ordeñe guardado.", 201);
+    } catch (err) {
+      return error(res, err.message || "Error al registrar ordeñe.", err.status || 400);
+    }
+  }
+
+  static async eliminarOrdenie(req, res) {
+    try {
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const { id } = req.params;
+      const resultado = await OrdenieModel.eliminar(id, estId);
+      return exito(res, resultado, "Registro de ordeñe eliminado.");
+    } catch (err) {
+      return error(res, err.message || "Error al eliminar registro de ordeñe.", err.status || 400);
+    }
+  }
+
   // 7. Reportes Consolidados (Dueño / Oficina / Capataz / Veterinario)
   static async obtenerReportes(req, res) {
     try {
@@ -548,6 +623,9 @@ class DashboardController {
         pesoPorCategoria,
         cotizaciones,
         dolar,
+        leche,
+        configTambo,
+        ordenes,
         insumosCriticos,
         partes,
         potreros,
@@ -557,6 +635,9 @@ class DashboardController {
         GanadoModel.obtenerPesoPorCategoria(estId),
         CotizacionService.obtenerCotizaciones(),
         DolarService.obtenerCotizaciones(),
+        LecheService.obtenerPreciosLeche(),
+        TamboConfigModel.obtenerPorEstablecimiento(estId),
+        OrdenieModel.listar(estId),
         InsumoModel.obtenerCriticos(estId),
         ParteDiarioModel.listarTodos(estId),
         GanadoModel.listarPotreros(estId),
@@ -599,10 +680,85 @@ class DashboardController {
         esCotizacionEnVivo: Boolean(cotizaciones.esEnVivo),
       };
 
+      const vacasLecherasLista = hacienda.filter((g) =>
+        String(g.categoria || "").toLowerCase().includes("lecher")
+      );
+      const vacasLecheras = vacasLecherasLista.length;
+      const precioLitro = Number(leche?.precioLitro) || 550.25;
+      const mesActualPrefix = new Date().toISOString().slice(0, 7); // YYYY-MM
+
+      const calcularResumenOrdenes = (listaOrdenes) => {
+        if (!Array.isArray(listaOrdenes) || listaOrdenes.length === 0) {
+          return null;
+        }
+        const ordenadas = [...listaOrdenes].sort((a, b) =>
+          String(b.fecha || "").localeCompare(String(a.fecha || ""))
+        );
+        const ultimaFecha = ordenadas[0].fecha;
+        const litrosUltimaActualizacion = Math.round(
+          ordenadas
+            .filter((o) => o.fecha === ultimaFecha)
+            .reduce((acc, o) => acc + (Number(o.litrosSacados) || 0), 0) * 100
+        ) / 100;
+
+        const ordenesMes = ordenadas.filter((o) =>
+          String(o.fecha || "").startsWith(mesActualPrefix)
+        );
+        const baseMensual = ordenesMes.length > 0 ? ordenesMes : ordenadas;
+        const litrosMensuales = Math.round(
+          baseMensual.reduce((acc, o) => acc + (Number(o.litrosSacados) || 0), 0) * 100
+        ) / 100;
+
+        return {
+          ultimaFecha,
+          litrosUltimaActualizacion,
+          ingresoUltimaActualizacionArs: Math.round(litrosUltimaActualizacion * precioLitro),
+          litrosMensuales,
+          ingresoMensualArs: Math.round(litrosMensuales * precioLitro),
+          cantidadRegistros: ordenadas.length,
+        };
+      };
+
+      const resumenGlobalOrdenes = calcularResumenOrdenes(ordenes);
+
+      const porParcelaLeche = potreros
+        .map((p) => {
+          const lecherasEnParcela = vacasLecherasLista.filter((g) =>
+            p.id && g.potreroId
+              ? g.potreroId === p.id
+              : (g.potreroNombre || "").toLowerCase() === (p.nombre || "").toLowerCase()
+          );
+          if (lecherasEnParcela.length === 0) return null;
+
+          const idsSet = new Set(lecherasEnParcela.map((a) => a.id));
+          const ordenesParcela = ordenes.filter((o) => idsSet.has(o.animalId));
+          const resumenParcela = calcularResumenOrdenes(ordenesParcela);
+          if (!resumenParcela) return null;
+
+          return {
+            potreroId: p.id,
+            potreroNombre: p.nombre,
+            vacasLecheras: lecherasEnParcela.length,
+            ...resumenParcela,
+          };
+        })
+        .filter(Boolean);
+
       const reporte = {
         resumenGanado: metricasGanado,
         resumenGeneral,
         valuacionPorCategoria,
+        tamboLeche: {
+          ...leche,
+          vacasLecheras,
+          tieneOrdenes: Boolean(resumenGlobalOrdenes),
+          ultimaFecha: resumenGlobalOrdenes?.ultimaFecha || null,
+          litrosUltimaActualizacion: resumenGlobalOrdenes?.litrosUltimaActualizacion || 0,
+          ingresoUltimaActualizacionArs: resumenGlobalOrdenes?.ingresoUltimaActualizacionArs || 0,
+          litrosMensuales: resumenGlobalOrdenes?.litrosMensuales || 0,
+          ingresoMensualArs: resumenGlobalOrdenes?.ingresoMensualArs || 0,
+          porParcela: porParcelaLeche,
+        },
         cotizacionesMercado: {
           mercado: cotizaciones.mercado,
           fechaRueda: cotizaciones.fechaRueda,

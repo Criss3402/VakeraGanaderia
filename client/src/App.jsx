@@ -19,6 +19,7 @@ const PartesView = lazy(() => import("./views/3_dashboard/modulos/PartesView.jsx
 const SanidadView = lazy(() => import("./views/3_dashboard/modulos/SanidadView.jsx"));
 const InsumosView = lazy(() => import("./views/3_dashboard/modulos/InsumosView.jsx"));
 const ReportesView = lazy(() => import("./views/3_dashboard/modulos/ReportesView.jsx"));
+const TamboLecheView = lazy(() => import("./views/3_dashboard/modulos/TamboLecheView.jsx"));
 const ParcelasView = lazy(() => import("./views/3_dashboard/modulos/ParcelasView.jsx"));
 const GestionUsuariosView = lazy(() => import("./views/4_permisos/GestionUsuariosView.jsx"));
 
@@ -32,21 +33,95 @@ function VistaCargando() {
   );
 }
 
+const PATH_A_APP = {
+  "/dashboard": "metricas",
+  "/ganado": "ganado",
+  "/parcelas": "parcelas",
+  "/partes": "partes",
+  "/sanidad": "sanidad",
+  "/insumos": "insumos",
+  "/reportes": "reportes",
+  "/tambo": "tambo",
+  "/tambo/vacas-ordenadas": "tambo-vacas-ordenadas",
+  "/permisos": "permisos",
+};
+
+const APP_A_PATH = Object.fromEntries(
+  Object.entries(PATH_A_APP).map(([path, vista]) => [vista, path])
+);
+
+const PATH_A_PUBLICA = {
+  "/": "landing",
+  "/login": "login",
+  "/registro": "registro",
+  "/verificar": "verificar",
+  "/recuperar": "recuperar",
+};
+
+function resolverEstadoDesdeUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const rQuery = params.get("ruta");
+  const googleNoReg = params.get("googleNoRegistrado") === "1";
+
+  if (rQuery === "login" && googleNoReg) {
+    return { ruta: "landing", subVista: "metricas" };
+  }
+  if (rQuery === "verificar" || rQuery === "recuperar" || rQuery === "login" || rQuery === "registro") {
+    return { ruta: rQuery, subVista: "metricas" };
+  }
+
+  const pathNorm = window.location.pathname.replace(/\/+$/, "") || "/";
+  if (PATH_A_APP[pathNorm]) {
+    return { ruta: "app", subVista: PATH_A_APP[pathNorm] };
+  }
+  if (PATH_A_PUBLICA[pathNorm]) {
+    return { ruta: PATH_A_PUBLICA[pathNorm], subVista: "metricas" };
+  }
+  return { ruta: "landing", subVista: "metricas" };
+}
+
+function obtenerPathParaEstado(ruta, subVista = "metricas") {
+  if (ruta === "app") {
+    return APP_A_PATH[subVista] || "/dashboard";
+  }
+  const entrada = Object.entries(PATH_A_PUBLICA).find(([, val]) => val === ruta);
+  return entrada ? entrada[0] : "/";
+}
+
 function AppContenido() {
   const { estaAutenticado, cargando, iniciarSesionConToken } = useAuth();
+  const [estadoInicialUrl] = useState(() => resolverEstadoDesdeUrl());
   // Vistas principales: 'landing' | 'login' | 'registro' | 'recuperar' | 'verificar' | 'app'
-  const [ruta, setRuta] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    const r = params.get("ruta");
-    const googleNoReg = params.get("googleNoRegistrado") === "1";
-    if (r === "login" && googleNoReg) {
-      return "landing";
+  const [ruta, setRuta] = useState(estadoInicialUrl.ruta);
+  // Sub-vista dentro de la app privada: 'metricas' | 'ganado' | 'parcelas' | 'partes' | 'sanidad' | 'insumos' | 'reportes' | 'tambo' | 'permisos'
+  const [subVistaApp, setSubVistaApp] = useState(estadoInicialUrl.subVista);
+
+  const navegarA = (nuevaRuta, nuevaSubVista = subVistaApp, { reemplazar = false } = {}) => {
+    const subFinal = nuevaRuta === "app" ? (nuevaSubVista || "metricas") : "metricas";
+    setRuta(nuevaRuta);
+    if (nuevaRuta === "app") {
+      setSubVistaApp(subFinal);
     }
-    if (r === "verificar" || r === "recuperar" || r === "login" || r === "registro") {
-      return r;
+    const destino = obtenerPathParaEstado(nuevaRuta, subFinal);
+    if (window.location.pathname !== destino) {
+      if (reemplazar) {
+        window.history.replaceState({ ruta: nuevaRuta, subVista: subFinal }, "", destino);
+      } else {
+        window.history.pushState({ ruta: nuevaRuta, subVista: subFinal }, "", destino);
+      }
     }
-    return "landing";
-  });
+  };
+
+  // Escuchar botones Atrás / Adelante del navegador
+  useEffect(() => {
+    const alCambiarHistorial = () => {
+      const { ruta: r, subVista } = resolverEstadoDesdeUrl();
+      setRuta(r);
+      setSubVistaApp(subVista);
+    };
+    window.addEventListener("popstate", alCambiarHistorial);
+    return () => window.removeEventListener("popstate", alCambiarHistorial);
+  }, []);
 
   const [paramsUrl, setParamsUrl] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -90,16 +165,14 @@ function AppContenido() {
     if (rutaUrl === "google-callback" && tokenUrl) {
       iniciarSesionConToken(tokenUrl)
         .then(() => {
-          window.history.replaceState({}, "", "/");
-          setRuta("app");
+          navegarA("app", "metricas", { reemplazar: true });
         })
         .catch((err) => {
-          window.history.replaceState({}, "", "/");
+          navegarA("login", "metricas", { reemplazar: true });
           setParamsUrl((prev) => ({
             ...prev,
             googleError: err.message || "No se pudo completar el acceso con Google.",
           }));
-          setRuta("login");
         });
     } else if (rutaUrl === "google-completar" && setupToken) {
       window.history.replaceState({}, "", "/");
@@ -107,9 +180,6 @@ function AppContenido() {
       window.history.replaceState({}, "", "/");
     }
   }, [iniciarSesionConToken]);
-
-  // Sub-vista dentro de la app privada: 'metricas' | 'ganado' | 'partes' | 'sanidad' | 'insumos' | 'reportes' | 'permisos'
-  const [subVistaApp, setSubVistaApp] = useState("metricas");
 
   // Si el usuario se autentica mientras está en login/registro, enviarlo al dashboard.
   // Si cierra sesión mientras está en la app privada, volver automáticamente a la portada.
@@ -121,11 +191,10 @@ function AppContenido() {
           : prev
       );
       if (ruta === "login" || ruta === "registro" || ruta === "verificar") {
-        setRuta("app");
+        navegarA("app", "metricas", { reemplazar: true });
       }
     } else if (!cargando && ruta === "app") {
-      setSubVistaApp("metricas");
-      setRuta("landing");
+      navegarA("landing", "metricas", { reemplazar: true });
     }
   }, [estaAutenticado, cargando, ruta]);
 
@@ -137,6 +206,8 @@ function AppContenido() {
     sanidad: "Calendario y Tratamientos Sanitarios",
     insumos: "Control de Insumos y Stock Crítico",
     reportes: "Reportes Contables y Auditoría",
+    tambo: "Tambo y Precio de la Leche (OCLA)",
+    "tambo-vacas-ordenadas": "Vacas Ordeñadas — Registro Diario",
     permisos: "Administración de Roles y Permisos (RBAC)",
   };
 
@@ -147,14 +218,14 @@ function AppContenido() {
         googleSetup={googleSetup}
         googleNoRegistrado={paramsUrl.googleNoRegistrado}
         googleError={paramsUrl.googleError}
-        alIniciarSesion={() => setRuta("login")}
-        alRegistrarse={() => setRuta("registro")}
-        alIrARecuperar={() => setRuta("recuperar")}
+        alIniciarSesion={() => navegarA("login")}
+        alRegistrarse={() => navegarA("registro")}
+        alIrARecuperar={() => navegarA("recuperar")}
         alIrAVerificar={(tok, em) => {
           setParamsUrl({ token: tok || "", email: em || "" });
-          setRuta("verificar");
+          navegarA("verificar");
         }}
-        alIrAlDashboard={() => setRuta("app")}
+        alIrAlDashboard={() => navegarA("app", "metricas")}
       />
     );
   }
@@ -165,14 +236,14 @@ function AppContenido() {
         <LoginView
           errorInicial={paramsUrl.googleError}
           googleNoRegistrado={paramsUrl.googleNoRegistrado}
-          alIrARegistro={() => setRuta("registro")}
-          alIrARecuperar={() => setRuta("recuperar")}
+          alIrARegistro={() => navegarA("registro")}
+          alIrARecuperar={() => navegarA("recuperar")}
           alIrAVerificar={(tok, em) => {
             setParamsUrl({ token: tok || "", email: em || "", googleError: "", googleNoRegistrado: false });
-            setRuta("verificar");
+            navegarA("verificar");
           }}
-          alIrALanding={() => setRuta("landing")}
-          alIniciarExito={() => setRuta("app")}
+          alIrALanding={() => navegarA("landing")}
+          alIniciarExito={() => navegarA("app", "metricas", { reemplazar: true })}
         />
       </Suspense>
     );
@@ -183,13 +254,13 @@ function AppContenido() {
       <Suspense fallback={<VistaCargando />}>
         <RegistroView
           errorInicial={paramsUrl.googleError}
-          alIrALogin={() => setRuta("login")}
+          alIrALogin={() => navegarA("login")}
           alIrAVerificar={(tok, em) => {
             setParamsUrl({ token: tok || "", email: em || "", googleError: "" });
-            setRuta("verificar");
+            navegarA("verificar");
           }}
-          alIrALanding={() => setRuta("landing")}
-          alRegistroExito={() => setRuta("app")}
+          alIrALanding={() => navegarA("landing")}
+          alRegistroExito={() => navegarA("app", "metricas", { reemplazar: true })}
         />
       </Suspense>
     );
@@ -201,9 +272,9 @@ function AppContenido() {
         <VerificarEmailView
           tokenInicial={paramsUrl.token}
           emailInicial={paramsUrl.email}
-          alIrALogin={() => setRuta("login")}
-          alIrALanding={() => setRuta("landing")}
-          alVerificacionExitosa={() => setRuta("app")}
+          alIrALogin={() => navegarA("login")}
+          alIrALanding={() => navegarA("landing")}
+          alVerificacionExitosa={() => navegarA("app", "metricas", { reemplazar: true })}
         />
       </Suspense>
     );
@@ -215,9 +286,9 @@ function AppContenido() {
         <RecuperarPasswordView
           tokenInicial={paramsUrl.token}
           emailInicial={paramsUrl.email}
-          alIrALogin={() => setRuta("login")}
-          alIrALanding={() => setRuta("landing")}
-          alRestablecerExito={() => setRuta("login")}
+          alIrALogin={() => navegarA("login")}
+          alIrALanding={() => navegarA("landing")}
+          alRestablecerExito={() => navegarA("login")}
         />
       </Suspense>
     );
@@ -225,17 +296,17 @@ function AppContenido() {
 
   // Renderizar Aplicación Privada Protegida
   return (
-    <ProtectedRoute alIrALogin={() => setRuta("login")}>
+    <ProtectedRoute alIrALogin={() => navegarA("login")}>
       <Suspense fallback={<VistaCargando />}>
         <PrivateLayout
           vistaActiva={subVistaApp}
-          alCambiarVista={(nuevaSubVista) => setSubVistaApp(nuevaSubVista)}
+          alCambiarVista={(nuevaSubVista) => navegarA("app", nuevaSubVista)}
           tituloVista={titulosVistas[subVistaApp] || "Panel General"}
-          alIrALanding={() => setRuta("landing")}
+          alIrALanding={() => navegarA("landing")}
         >
           <Suspense fallback={<VistaCargando />}>
             {subVistaApp === "permisos" && (
-              <ProtectedRoute rolesPermitidos={["dueno"]} alIrALogin={() => setRuta("login")}>
+              <ProtectedRoute rolesPermitidos={["dueno"]} alIrALogin={() => navegarA("login")}>
                 <GestionUsuariosView />
               </ProtectedRoute>
             )}
@@ -246,10 +317,24 @@ function AppContenido() {
             {subVistaApp === "sanidad" && <SanidadView />}
             {subVistaApp === "insumos" && <InsumosView />}
             {subVistaApp === "reportes" && <ReportesView />}
+            {subVistaApp === "tambo" && (
+              <TamboLecheView
+                vistaSubModulo="resumen"
+                alIrAVacasOrdenadas={() => navegarA("app", "tambo-vacas-ordenadas")}
+                alVolverTambo={() => navegarA("app", "tambo")}
+              />
+            )}
+            {subVistaApp === "tambo-vacas-ordenadas" && (
+              <TamboLecheView
+                vistaSubModulo="vacas-ordenadas"
+                alIrAVacasOrdenadas={() => navegarA("app", "tambo-vacas-ordenadas")}
+                alVolverTambo={() => navegarA("app", "tambo")}
+              />
+            )}
 
             {subVistaApp === "metricas" && (
               <DashboardView
-                alCambiarVista={(nuevaSubVista) => setSubVistaApp(nuevaSubVista)}
+                alCambiarVista={(nuevaSubVista) => navegarA("app", nuevaSubVista)}
               />
             )}
           </Suspense>

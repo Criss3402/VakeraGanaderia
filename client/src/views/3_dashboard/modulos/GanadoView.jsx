@@ -376,11 +376,19 @@ export default function GanadoView() {
       </div>
 
       {/* KPI Cards Rápidos */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-white rounded-2xl p-4 border border-[#ded7c4] shadow-sm">
           <p className="text-[10px] font-bold text-[#6b7c6d] uppercase">Total Rodeo</p>
           <p className="text-2xl font-extrabold text-[#182920] mt-0.5">{ganado.length} Cabezas</p>
           <span className="text-[11px] text-[#33512f] font-medium">Distribuido en {potreros.length} sectores de ganado</span>
+        </div>
+
+        <div className="bg-white rounded-2xl p-4 border border-[#ded7c4] shadow-sm">
+          <p className="text-[10px] font-bold text-[#33512f] uppercase">Vacas Lecheras (Tambo)</p>
+          <p className="text-2xl font-extrabold text-[#182920] mt-0.5">
+            {ganado.filter((g) => (g.categoria || "").toLowerCase().includes("lecher")).length} Cabezas
+          </p>
+          <span className="text-[11px] text-[#33512f]">Rodeo asignado a producción lechera</span>
         </div>
 
         <div className="bg-white rounded-2xl p-4 border border-[#ded7c4] shadow-sm">
@@ -444,6 +452,7 @@ export default function GanadoView() {
               >
                 <option value="todas">Todas las Categorías</option>
                 <option value="Vacas">Vacas</option>
+                <option value="Vacas Lecheras">Vacas Lecheras</option>
                 <option value="Toros">Toros</option>
                 <option value="Novillos">Novillos</option>
                 <option value="Terneras">Terneras</option>
@@ -951,6 +960,7 @@ export default function GanadoView() {
                     className="w-full bg-[#f8f5eb] border border-[#ded7c4] rounded-xl px-3 py-2 text-[#182920] outline-none"
                   >
                     <option value="Vacas">Vacas</option>
+                    <option value="Vacas Lecheras">Vacas Lecheras</option>
                     <option value="Toros">Toros</option>
                     <option value="Novillos">Novillos</option>
                     <option value="Terneras">Terneras</option>

@@ -23,6 +23,7 @@ export default function ParcelaDetalleReporte({
   parcela,
   hacienda = [],
   cotizacionesMercado = {},
+  tamboLeche = {},
   moneda = "ARS",
   setMoneda,
   tipoDolar = "oficial",
@@ -112,49 +113,51 @@ export default function ParcelaDetalleReporte({
 
   return (
     <div className="space-y-6">
-      {/* Banner de Parcela */}
-      <div className="bg-[#182920] rounded-2xl p-6 text-white border border-[#33512f] shadow-sm flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-        <div>
-          <button
-            type="button"
-            onClick={alVolver}
-            className="inline-flex items-center gap-2 text-xs font-bold text-[#8fb56b] hover:text-[#a9d183] mb-2 transition-colors"
-          >
-            <i className="fa-solid fa-arrow-left"></i> Volver al Balance General
-          </button>
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="bg-[#8fb56b] text-[#182920] text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full">
-              Detalle Completo de Parcela
-            </span>
-            <span className="text-xs text-[#ded7c4]">
-              {superficie} Has · Capacidad máx. {capacidad || "-"} cab.
-            </span>
+      {/* Banner de Parcela con flecha atrás al costado */}
+      <div className="flex items-stretch gap-3">
+        <button
+          type="button"
+          onClick={alVolver}
+          title="Volver al Balance General"
+          aria-label="Volver al Balance General"
+          className="bg-[#8fb56b] hover:bg-[#a1c97c] text-[#182920] rounded-2xl px-4 flex items-center justify-center shadow-sm transition-all shrink-0"
+        >
+          <i className="fa-solid fa-arrow-left text-lg"></i>
+        </button>
+
+        <div className="flex-1 bg-[#182920] rounded-2xl p-6 text-white border border-[#33512f] shadow-sm flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div>
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <span className="bg-[#8fb56b] text-[#182920] text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full">
+                Detalle Completo de Parcela
+              </span>
+              <span className="text-xs text-[#ded7c4]">
+                {superficie} Has · {capacidad ? `Capacidad máx. ${capacidad} cab.` : "Sin límite de cabezas"}
+              </span>
+            </div>
+            <h2 className="text-2xl font-bold font-['Fraunces',serif] text-[#f1ecdd]">
+              Sector: {parcela?.nombre || "Parcela"}
+            </h2>
+            <p className="text-xs text-[#ded7c4] mt-1">
+              Inventario completo, carga animal, valuación por categoría y trazabilidad individual del rodeo en este potrero.
+            </p>
           </div>
-          <h2 className="text-2xl font-bold font-['Fraunces',serif] text-[#f1ecdd]">
-            Sector: {parcela?.nombre || "Parcela"}
-          </h2>
-          <p className="text-xs text-[#ded7c4] mt-1">
-            Inventario completo, carga animal, valuación por categoría y trazabilidad individual del rodeo en este potrero.
-          </p>
-        </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="flex items-center bg-[#122018] border border-[#33512f] rounded-xl p-1 shadow-inner">
             <button
               type="button"
               onClick={() => setMoneda("ARS")}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${
-                moneda === "ARS" ? "bg-[#8fb56b] text-[#182920] shadow-sm" : "text-[#ded7c4] hover:text-white"
-              }`}
+              className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${moneda === "ARS" ? "bg-[#8fb56b] text-[#182920] shadow-sm" : "text-[#ded7c4] hover:text-white"
+                }`}
             >
               ARS $
             </button>
             <button
               type="button"
               onClick={() => setMoneda("USD")}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${
-                moneda === "USD" ? "bg-[#8fb56b] text-[#182920] shadow-sm" : "text-[#ded7c4] hover:text-white"
-              }`}
+              className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${moneda === "USD" ? "bg-[#8fb56b] text-[#182920] shadow-sm" : "text-[#ded7c4] hover:text-white"
+                }`}
             >
               USD US$
             </button>
@@ -165,9 +168,8 @@ export default function ParcelaDetalleReporte({
             value={tipoDolar}
             onChange={(e) => setTipoDolar(e.target.value)}
             aria-label="Tipo de cambio dólar"
-            className={`bg-[#122018] border border-[#33512f] text-[#f1ecdd] text-xs font-bold rounded-xl px-3 py-2.5 focus:outline-none ${
-              moneda === "USD" ? "cursor-pointer" : "opacity-45 cursor-not-allowed"
-            }`}
+            className={`bg-[#122018] border border-[#33512f] text-[#f1ecdd] text-xs font-bold rounded-xl px-3 py-2.5 focus:outline-none ${moneda === "USD" ? "cursor-pointer" : "opacity-45 cursor-not-allowed"
+              }`}
           >
             <option value="oficial">Oficial (${Math.round(cotizacionesDolar.oficial?.venta || 1600).toLocaleString("es-AR")})</option>
             <option value="blue">Blue (${Math.round(cotizacionesDolar.blue?.venta || 1675).toLocaleString("es-AR")})</option>
@@ -181,6 +183,7 @@ export default function ParcelaDetalleReporte({
           >
             <i className="fa-solid fa-print"></i> Imprimir
           </button>
+        </div>
         </div>
       </div>
 
@@ -201,10 +204,10 @@ export default function ParcelaDetalleReporte({
         <div className="bg-white rounded-2xl p-5 border border-[#ded7c4] shadow-sm">
           <p className="text-[11px] font-bold text-[#6b7c6d] uppercase">Ocupación y Carga</p>
           <p className="text-2xl font-extrabold text-[#182920] mt-1">
-            {totalCabezas} / {capacidad || "-"} cab.
+            {capacidad ? `${totalCabezas} / ${capacidad} cab.` : `${totalCabezas} cab.`}
           </p>
           <span className="text-[11px] text-[#33512f]">
-            Carga: {porcentajeCarga}% · {densidad} cab/Ha
+            {capacidad ? `Carga: ${porcentajeCarga}%` : "Sin límite"} · {densidad} cab/Ha
           </span>
         </div>
 
@@ -228,6 +231,62 @@ export default function ParcelaDetalleReporte({
           </span>
         </div>
       </div>
+
+      {/* Producción Lechera de la Parcela (solo si hubo ordeñes reales) */}
+      {(() => {
+        const parcelaLeche = (tamboLeche.porParcela || []).find(
+          (pl) => pl.potreroId === parcela?.id || pl.potreroNombre === parcela?.nombre
+        );
+        if (!parcelaLeche) return null;
+        const precioLitro = Number(tamboLeche.precioLitro) || 550.25;
+
+        return (
+          <div className="bg-white rounded-2xl p-6 border border-[#ded7c4] shadow-sm space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-base font-bold text-[#182920] font-['Fraunces',serif]">
+                  Producción Lechera en {parcela?.nombre} (OCLA / SIGLeA)
+                </h3>
+                <p className="text-[11px] text-[#6b7c6d]">
+                  Calculado en base a litros sacados reales · Último ordeñe: {parcelaLeche.ultimaFecha}
+                </p>
+              </div>
+              <span className="text-xs font-bold text-[#33512f] bg-[#f8f5eb] px-3 py-1 rounded-full border border-[#ded7c4]">
+                Precio OCLA: {formatearMonto(precioLitro, 2)}/L
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-3.5 rounded-xl bg-[#f8f5eb] border border-[#ded7c4]">
+                <span className="text-[10px] font-bold uppercase text-[#6b7c6d] block">Precio Litro</span>
+                <span className="text-lg font-extrabold text-[#182920]">
+                  {formatearMonto(precioLitro, 2)} / L
+                </span>
+              </div>
+              <div className="p-3.5 rounded-xl bg-[#f8f5eb] border border-[#ded7c4]">
+                <span className="text-[10px] font-bold uppercase text-[#6b7c6d] block">
+                  Última Actualización ({parcelaLeche.ultimaFecha})
+                </span>
+                <span className="text-lg font-extrabold text-[#182920]">
+                  {formatearMonto(parcelaLeche.ingresoUltimaActualizacionArs, moneda === "USD" ? 2 : 0)}
+                </span>
+                <span className="text-[10px] text-[#6b7c6d] block">
+                  {parcelaLeche.litrosUltimaActualizacion} L sacados
+                </span>
+              </div>
+              <div className="p-3.5 rounded-xl bg-[#f8f5eb] border border-[#ded7c4]">
+                <span className="text-[10px] font-bold uppercase text-[#6b7c6d] block">Total Mensual (Litros Reales)</span>
+                <span className="text-lg font-extrabold text-emerald-800">
+                  {formatearMonto(parcelaLeche.ingresoMensualArs, moneda === "USD" ? 2 : 0)}
+                </span>
+                <span className="text-[10px] text-[#6b7c6d] block">
+                  {parcelaLeche.litrosMensuales.toLocaleString("es-AR")} L acumulados en el mes
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Resumen por Categoría en esta Parcela */}
       <div className="bg-white rounded-2xl p-6 border border-[#ded7c4] shadow-sm">

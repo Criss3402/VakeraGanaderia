@@ -22,6 +22,13 @@ router.get("/cotizaciones", DashboardController.obtenerCotizaciones);
 // 2c. Cotización del dólar en Argentina (DolarApi / Contingencia)
 router.get("/dolar", DashboardController.obtenerDolar);
 
+// 2d. Precio del tambo de leche al productor (OCLA / SIGLeA)
+router.get("/leche", DashboardController.obtenerLeche);
+router.put("/leche/configuracion", DashboardController.guardarConfiguracionTambo);
+router.get("/leche/ordenes", DashboardController.listarOrdenies);
+router.post("/leche/ordenes", DashboardController.registrarOrdenie);
+router.delete("/leche/ordenes/:id", DashboardController.eliminarOrdenie);
+
 // 3. Módulo de Ganado y Potreros
 router.get("/ganado", DashboardController.obtenerGanado);
 router.get("/ganado/:id", DashboardController.obtenerFichaAnimal);

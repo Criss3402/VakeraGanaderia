@@ -351,6 +351,10 @@ const db = {
   solicitudesChat: [],
 
   solicitudesParcelas: [],
+
+  configuracionesTambo: [],
+
+  registrosOrdenie: [],
 };
 
 module.exports = db;

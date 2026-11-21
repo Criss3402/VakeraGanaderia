@@ -48,6 +48,7 @@ export default function ReportesView() {
   const resumen = datos?.resumenGeneral || {};
   const valuacionCategorias = datos?.valuacionPorCategoria || [];
   const cotizacionesMercado = datos?.cotizacionesMercado || {};
+  const tamboLeche = datos?.tamboLeche || {};
   const dolarInfo = datos?.dolar?.cotizaciones ? datos.dolar : (dolarExtra || {});
   const cotizacionesDolar = {
     oficial: dolarInfo?.cotizaciones?.oficial || DOLAR_FALLBACK.oficial,
@@ -82,6 +83,7 @@ export default function ReportesView() {
         parcela={parcelaSeleccionada}
         hacienda={hacienda}
         cotizacionesMercado={cotizacionesMercado}
+        tamboLeche={tamboLeche}
         moneda={moneda}
         setMoneda={setMoneda}
         tipoDolar={tipoDolar}
@@ -308,6 +310,94 @@ export default function ReportesView() {
         )}
       </div>
 
+      {/* Tambo y Producción Lechera (solo si hay ordeñes registrados) */}
+      {tamboLeche.tieneOrdenes && (
+        <div className="bg-white rounded-2xl p-6 border border-[#ded7c4] shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h3 className="text-base font-bold text-[#182920] font-['Fraunces',serif]">
+                Tambo y Producción Lechera (OCLA / SIGLeA)
+              </h3>
+              <p className="text-[11px] text-[#6b7c6d]">
+                Período OCLA {tamboLeche.periodo || "oct/2026"} ·{" "}
+                {tamboLeche.esEnVivo ? "Cotización en vivo" : "Valor de referencia"} ·{" "}
+                Último ordeñe: {tamboLeche.ultimaFecha}
+              </p>
+            </div>
+            <span className="text-xs font-bold text-[#33512f] bg-[#f8f5eb] px-3 py-1 rounded-full border border-[#ded7c4] self-start">
+              {tamboLeche.vacasLecheras} vacas lecheras registradas
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="p-3.5 rounded-xl bg-[#f8f5eb] border border-[#ded7c4]">
+              <span className="text-[10px] font-bold uppercase text-[#6b7c6d] block">Precio Litro (SIGLeA)</span>
+              <span className="text-lg font-extrabold text-[#182920]">
+                {formatearMonto(tamboLeche.precioLitro ?? 550.25, 2)}/L
+              </span>
+            </div>
+            <div className="p-3.5 rounded-xl bg-[#f8f5eb] border border-[#ded7c4]">
+              <span className="text-[10px] font-bold uppercase text-[#6b7c6d] block">Sólidos Útiles</span>
+              <span className="text-lg font-extrabold text-[#182920]">
+                {formatearMonto(tamboLeche.precioKgSu ?? 7550.57, 2)}/kg SU
+              </span>
+            </div>
+            <div className="p-3.5 rounded-xl bg-[#f8f5eb] border border-[#ded7c4]">
+              <span className="text-[10px] font-bold uppercase text-[#6b7c6d] block">
+                Última Actualización ({tamboLeche.ultimaFecha})
+              </span>
+              <span className="text-lg font-extrabold text-[#182920]">
+                {formatearMonto(tamboLeche.ingresoUltimaActualizacionArs ?? 0, moneda === "USD" ? 2 : 0)}
+              </span>
+              <span className="text-[10px] text-[#6b7c6d] block">
+                {(tamboLeche.litrosUltimaActualizacion ?? 0).toLocaleString("es-AR")} L ordeñados
+              </span>
+            </div>
+            <div className="p-3.5 rounded-xl bg-[#f8f5eb] border border-[#ded7c4]">
+              <span className="text-[10px] font-bold uppercase text-[#6b7c6d] block">Total Mensual (Litros Reales)</span>
+              <span className="text-lg font-extrabold text-emerald-800">
+                {formatearMonto(tamboLeche.ingresoMensualArs ?? 0, moneda === "USD" ? 2 : 0)}
+              </span>
+              <span className="text-[10px] text-[#6b7c6d] block">
+                {(tamboLeche.litrosMensuales ?? 0).toLocaleString("es-AR")} L acumulados en el mes
+              </span>
+            </div>
+          </div>
+
+          {Array.isArray(tamboLeche.porParcela) && tamboLeche.porParcela.length > 0 && (
+            <div className="pt-2 border-t border-[#ded7c4]">
+              <p className="text-[11px] font-bold uppercase text-[#6b7c6d] mb-2">
+                Total por Parcela con Vacas Ordeñadas
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {tamboLeche.porParcela.map((pl) => (
+                  <div key={pl.potreroId || pl.potreroNombre} className="p-3 rounded-xl bg-[#f8f5eb] border border-[#ded7c4] text-xs">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="font-bold text-[#182920]">{pl.potreroNombre}</span>
+                      <span className="text-[10px] font-bold text-[#33512f] bg-white px-2 py-0.5 rounded border border-[#ded7c4]">
+                        Últ: {pl.ultimaFecha}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[11px] text-[#6b7c6d]">
+                      <span>Últ. act. ({pl.litrosUltimaActualizacion} L)</span>
+                      <span className="font-bold text-[#182920]">
+                        {formatearMonto(pl.ingresoUltimaActualizacionArs, moneda === "USD" ? 2 : 0)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[11px] text-[#6b7c6d]">
+                      <span>Mensual ({pl.litrosMensuales.toLocaleString("es-AR")} L)</span>
+                      <span className="font-extrabold text-emerald-800">
+                        {formatearMonto(pl.ingresoMensualArs, moneda === "USD" ? 2 : 0)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Distribución por Potrero */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-2xl p-6 border border-[#ded7c4] shadow-sm">
@@ -321,30 +411,43 @@ export default function ReportesView() {
                 No hay sectores de ganado zonificados en este establecimiento.
               </p>
             ) : (
-              potreros.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setParcelaSeleccionada(p)}
-                  className="w-full text-left p-3 rounded-xl bg-[#f8f5eb] border border-[#ded7c4] hover:border-[#8fb56b] hover:bg-[#f1ebd9] transition-all cursor-pointer group"
-                >
-                  <div className="flex justify-between items-center text-xs mb-1">
-                    <span className="font-bold text-[#182920] group-hover:text-[#33512f] flex items-center gap-2">
-                      {p.nombre}
-                      <span className="text-[10px] font-semibold text-[#33512f] bg-white px-1.5 py-0.5 rounded border border-[#ded7c4]">
-                        Ver detalle ›
+              potreros.map((p) => {
+                const lecheParcela = (tamboLeche.porParcela || []).find(
+                  (pl) => pl.potreroId === p.id || pl.potreroNombre === p.nombre
+                );
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setParcelaSeleccionada(p)}
+                    className="w-full text-left p-3 rounded-xl bg-[#f8f5eb] border border-[#ded7c4] hover:border-[#8fb56b] hover:bg-[#f1ebd9] transition-all cursor-pointer group"
+                  >
+                    <div className="flex justify-between items-center text-xs mb-1">
+                      <span className="font-bold text-[#182920] group-hover:text-[#33512f] flex items-center gap-2">
+                        {p.nombre}
+                        <span className="text-[10px] font-semibold text-[#33512f] bg-white px-1.5 py-0.5 rounded border border-[#ded7c4]">
+                          Ver detalle ›
+                        </span>
                       </span>
-                    </span>
-                    <span className="font-bold text-[#33512f]">
-                      {p.totalAnimales ?? 0} cabezas ({p.superficieHas} Has)
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-[11px] text-[#6b7c6d]">
-                    <span>Capacidad máxima: {p.capacidad}</span>
-                    <span>Carga: {Math.round(((p.totalAnimales ?? 0) / (p.capacidad || 100)) * 100)}%</span>
-                  </div>
-                </button>
-              ))
+                      <span className="font-bold text-[#33512f]">
+                        {p.totalAnimales ?? 0} cabezas ({p.superficieHas} Has)
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[11px] text-[#6b7c6d]">
+                      <span>Capacidad máxima: {p.capacidad ? p.capacidad : "Sin límite"}</span>
+                      <span>
+                        Carga: {p.capacidad ? `${Math.round(((p.totalAnimales ?? 0) / p.capacidad) * 100)}%` : "Sin límite"}
+                      </span>
+                    </div>
+                    {lecheParcela && (
+                      <div className="mt-1.5 pt-1.5 border-t border-[#ded7c4]/70 flex justify-between text-[11px] text-emerald-800 font-semibold">
+                        <span>Ordeñe ({lecheParcela.litrosUltimaActualizacion} L · {lecheParcela.ultimaFecha})</span>
+                        <span>Mensual: {formatearMonto(lecheParcela.ingresoMensualArs, moneda === "USD" ? 2 : 0)}</span>
+                      </div>
+                    )}
+                  </button>
+                );
+              })
             )}
           </div>
         </div>

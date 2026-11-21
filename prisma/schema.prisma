@@ -284,3 +284,33 @@ model SolicitudPermisoParcela {
   @@index([establecimientoId, estado])
   @@map("solicitudes_permiso_parcela")
 }
+
+// 12. Configuración de Producción Lechera / Tambo por Establecimiento
+model ConfiguracionTambo {
+  id                  String   @id @default(cuid())
+  establecimientoId   String   @unique
+  modoEntrada         String   @default("vacas")
+  vacasOrdenie        Int      @default(0)
+  litrosPorVaca       Float    @default(22)
+  litrosDiariosManual Float    @default(0)
+  diasPeriodo         Int      @default(30)
+  diferencialPorc     Float    @default(0)
+  actualizadoEn       DateTime @updatedAt
+
+  @@map("configuracion_tambo")
+}
+
+// 13. Registro Diario de Vacas Ordeñadas (Tambo)
+model RegistroOrdenie {
+  id                String   @id @default(cuid())
+  establecimientoId String
+  fecha             String
+  animalId          String
+  caravana          String
+  litrosSacados     Float
+  observaciones     String?
+  creadoEn          DateTime @default(now())
+
+  @@index([establecimientoId, fecha])
+  @@map("registros_ordenie")
+}

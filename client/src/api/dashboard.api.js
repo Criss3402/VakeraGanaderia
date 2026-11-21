@@ -20,6 +20,36 @@ export async function obtenerDolar(params = {}) {
   return request(`/dashboard/dolar${query ? `?${query}` : ""}`);
 }
 
+export async function obtenerLeche(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return request(`/dashboard/leche${query ? `?${query}` : ""}`);
+}
+
+export async function guardarConfiguracionTambo(datos) {
+  return request("/dashboard/leche/configuracion", {
+    method: "PUT",
+    body: JSON.stringify(datos),
+  });
+}
+
+export async function obtenerOrdenies(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return request(`/dashboard/leche/ordenes${query ? `?${query}` : ""}`);
+}
+
+export async function registrarOrdenie(datos) {
+  return request("/dashboard/leche/ordenes", {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export async function eliminarOrdenie(id) {
+  return request(`/dashboard/leche/ordenes/${id}`, {
+    method: "DELETE",
+  });
+}
+
 // Ganado y Potreros
 export async function obtenerGanado(params = {}) {
   const query = new URLSearchParams(params).toString();

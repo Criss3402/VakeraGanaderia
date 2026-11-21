@@ -12,6 +12,8 @@ const PREFETCH_MODULOS = {
   sanidad: () => import("../../views/3_dashboard/modulos/SanidadView.jsx"),
   insumos: () => import("../../views/3_dashboard/modulos/InsumosView.jsx"),
   reportes: () => import("../../views/3_dashboard/modulos/ReportesView.jsx"),
+  tambo: () => import("../../views/3_dashboard/modulos/TamboLecheView.jsx"),
+  "tambo-vacas-ordenadas": () => import("../../views/3_dashboard/modulos/TamboLecheView.jsx"),
   permisos: () => import("../../views/4_permisos/GestionUsuariosView.jsx"),
 };
 
@@ -85,11 +87,19 @@ export default function Sidebar({
 
   const enlaces = [
     { id: "metricas", etiqueta: "Panel General", icono: "fa-house" },
-    { id: "ganado", etiqueta: "Ganado", icono: "fa-cow" },
     { id: "parcelas", etiqueta: "Parcelas", icono: "fa-draw-polygon" },
-    { id: "partes", etiqueta: "Partes de Campo", icono: "fa-clipboard-list" },
-    { id: "sanidad", etiqueta: "Sanidad y Vacunas", icono: "fa-syringe" },
+    { id: "ganado", etiqueta: "Ganado", icono: "fa-cow" },
+    {
+      id: "tambo",
+      etiqueta: "Tambo y Leche",
+      icono: "fa-droplet",
+      subEnlaces: [
+        { id: "tambo-vacas-ordenadas", etiqueta: "Vacas Ordeñadas", icono: "fa-clipboard-check" },
+      ],
+    },
     { id: "insumos", etiqueta: "Insumos y Stock", icono: "fa-boxes-stacked" },
+    { id: "sanidad", etiqueta: "Sanidad y Vacunas", icono: "fa-syringe" },
+    { id: "partes", etiqueta: "Partes de Campo", icono: "fa-clipboard-list" },
     { id: "reportes", etiqueta: "Reportes", icono: "fa-chart-simple" },
     { id: "permisos", etiqueta: "Usuarios y Roles", icono: "fa-shield-halved", visible: esDueno },
   ];
@@ -169,38 +179,69 @@ export default function Sidebar({
           {enlaces
             .filter((e) => e.visible !== false)
             .map((enlace) => {
-              const activo = vistaActiva === enlace.id;
+              const tieneSubActivo = (enlace.subEnlaces || []).some((s) => s.id === vistaActiva);
+              const activo = vistaActiva === enlace.id || tieneSubActivo;
               return (
-                <button
-                  key={enlace.id}
-                  type="button"
-                  onMouseEnter={() => precargarModulo(enlace.id)}
-                  onFocus={() => precargarModulo(enlace.id)}
-                  onClick={() => {
-                    alCambiarVista(enlace.id);
-                    if (alCerrarMenu) alCerrarMenu();
-                  }}
-                  title={colapsado ? enlace.etiqueta : ""}
-                  className={`
-                    w-full flex items-center rounded-xl transition-all duration-200 font-medium text-left
-                    ${colapsado ? "justify-center px-0 py-3" : "gap-3.5 px-3.5 py-2.5"}
-                    ${activo
-                      ? "bg-[#243e2e] text-[#f1ecdd] border-l-4 border-[#8fb56b] shadow-sm font-semibold"
-                      : "text-[#eef2e9]/75 hover:bg-[#192b20] hover:text-white"
-                    }
-                  `}
-                >
-                  <i
-                    className={`fa-solid ${enlace.icono} text-base transition-colors ${activo ? "text-[#8fb56b]" : "text-[#8fb56b]/70 group-hover:text-[#8fb56b]"
-                      } ${colapsado ? "text-center" : "w-5 text-center"}`}
-                  ></i>
-                  {!colapsado && (
-                    <span className="text-sm truncate">{enlace.etiqueta}</span>
+                <div key={enlace.id} className="space-y-1">
+                  <button
+                    type="button"
+                    onMouseEnter={() => precargarModulo(enlace.id)}
+                    onFocus={() => precargarModulo(enlace.id)}
+                    onClick={() => {
+                      alCambiarVista(enlace.id);
+                      if (alCerrarMenu) alCerrarMenu();
+                    }}
+                    title={colapsado ? enlace.etiqueta : ""}
+                    className={`
+                      w-full flex items-center rounded-xl transition-all duration-200 font-medium text-left
+                      ${colapsado ? "justify-center px-0 py-3" : "gap-3.5 px-3.5 py-2.5"}
+                      ${activo
+                        ? "bg-[#243e2e] text-[#f1ecdd] border-l-4 border-[#8fb56b] shadow-sm font-semibold"
+                        : "text-[#eef2e9]/75 hover:bg-[#192b20] hover:text-white"
+                      }
+                    `}
+                  >
+                    <i
+                      className={`fa-solid ${enlace.icono} text-base transition-colors ${activo ? "text-[#8fb56b]" : "text-[#8fb56b]/70 group-hover:text-[#8fb56b]"
+                        } ${colapsado ? "text-center" : "w-5 text-center"}`}
+                    ></i>
+                    {!colapsado && (
+                      <span className="text-sm truncate">{enlace.etiqueta}</span>
+                    )}
+                    {activo && !colapsado && (
+                      <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#8fb56b]"></span>
+                    )}
+                  </button>
+
+                  {!colapsado && activo && enlace.subEnlaces && enlace.subEnlaces.length > 0 && (
+                    <div className="ml-5 pl-3 border-l border-[#8fb56b]/25 space-y-1">
+                      {enlace.subEnlaces.map((sub) => {
+                        const subActivo = vistaActiva === sub.id;
+                        return (
+                          <button
+                            key={sub.id}
+                            type="button"
+                            onMouseEnter={() => precargarModulo(sub.id)}
+                            onClick={() => {
+                              alCambiarVista(sub.id);
+                              if (alCerrarMenu) alCerrarMenu();
+                            }}
+                            className={`
+                              w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs transition-all text-left
+                              ${subActivo
+                                ? "bg-[#8fb56b] text-[#182920] font-bold shadow-sm"
+                                : "bg-[#17281e]/70 text-[#ded7c4]/85 hover:bg-[#1e3528] hover:text-white font-medium"
+                              }
+                            `}
+                          >
+                            <i className={`fa-solid ${sub.icono} text-[11px] ${subActivo ? "text-[#182920]" : "text-[#8fb56b]"}`}></i>
+                            <span className="truncate">{sub.etiqueta}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
-                  {activo && !colapsado && (
-                    <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#8fb56b]"></span>
-                  )}
-                </button>
+                </div>
               );
             })}
         </nav>

@@ -420,7 +420,7 @@ export default function ParcelasView() {
   const [formularioZona, setFormularioZona] = useState({
     nombre: "",
     superficieHas: 0,
-    capacidad: 100,
+    capacidad: "",
     pastura: "Campo Natural y Gramíneas",
     estadoPastura: "Óptimo",
     aguada: "Bebedero / Tanque",
@@ -1028,7 +1028,7 @@ export default function ParcelasView() {
     setFormularioZona({
       nombre: parcela.nombre || "",
       superficieHas: parseFloat(parcela.superficieHas) || 0,
-      capacidad: parseInt(parcela.capacidad, 10) || 100,
+      capacidad: parcela.capacidad ? String(parcela.capacidad) : "",
       pastura: parcela.pastura || "Campo Natural y Gramíneas",
       estadoPastura: parcela.estadoPastura || "Óptimo",
       aguada: parcela.aguada || "Bebedero / Tanque",
@@ -1127,7 +1127,6 @@ export default function ParcelasView() {
     }
 
     const superficieCalculada = calcularAreaHectareas(puntos);
-    const capacidadSugerida = Math.max(10, Math.round(superficieCalculada * 1.2));
 
     const coordenadasCerradas = [...puntos];
     const primero = coordenadasCerradas[0];
@@ -1147,7 +1146,7 @@ export default function ParcelasView() {
       setFormularioZona({
         nombre: `Parcela ${potreros.length + 1}`,
         superficieHas: superficieCalculada,
-        capacidad: capacidadSugerida,
+        capacidad: "",
         pastura: "Campo Natural y Gramíneas",
         estadoPastura: "Óptimo",
         aguada: "Bebedero / Tanque",
@@ -1174,10 +1173,17 @@ export default function ParcelasView() {
     setProcesando(true);
     try {
       if (parcelaEditandoId) {
+        const capacidadNormalizada =
+          formularioZona.capacidad !== "" &&
+          formularioZona.capacidad !== null &&
+          parseInt(formularioZona.capacidad, 10) > 0
+            ? parseInt(formularioZona.capacidad, 10)
+            : null;
         const res = await actualizarPotrero(parcelaEditandoId, {
           nombre: nombreLimpio,
           nombreAnterior: nombreOriginalEditando,
           superficieHas: parseFloat(formularioZona.superficieHas) || 0,
+          capacidad: capacidadNormalizada,
           coordinates: formularioZona.coordinates,
           color: formularioZona.color,
           pastura: formularioZona.pastura,
@@ -1253,10 +1259,17 @@ export default function ParcelasView() {
         return;
       }
 
+      const capacidadNormalizada =
+        formularioZona.capacidad !== "" &&
+        formularioZona.capacidad !== null &&
+        parseInt(formularioZona.capacidad, 10) > 0
+          ? parseInt(formularioZona.capacidad, 10)
+          : null;
+
       const res = await registrarPotrero({
         nombre: nombreLimpio,
         superficieHas: parseFloat(formularioZona.superficieHas) || 0,
-        capacidad: parseInt(formularioZona.capacidad, 10) || 100,
+        capacidad: capacidadNormalizada,
         coordinates: formularioZona.coordinates,
         color: formularioZona.color,
         pastura: formularioZona.pastura,
@@ -1269,7 +1282,7 @@ export default function ParcelasView() {
         id: `pot-${Date.now()}`,
         nombre: nombreLimpio,
         superficieHas: parseFloat(formularioZona.superficieHas) || 0,
-        capacidad: parseInt(formularioZona.capacidad, 10) || 100,
+        capacidad: capacidadNormalizada,
         coordinates: formularioZona.coordinates,
         color: formularioZona.color,
         pastura: formularioZona.pastura,
@@ -2269,6 +2282,23 @@ export default function ParcelasView() {
                 </div>
                 <span className="text-[10px] text-emerald-700 font-semibold mt-0.5 block">
                   Calculada geodésicamente ({formatearSuperficie(formularioZona.superficieHas, "m2")} / {formatearSuperficie(formularioZona.superficieHas, "has")})
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#182920] uppercase mb-1">
+                  Límite de Cabezas <span className="text-[#6b7c6d] font-normal">(Opcional)</span>
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="Sin límite"
+                  value={formularioZona.capacidad}
+                  onChange={(e) => setFormularioZona({ ...formularioZona, capacidad: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-[#ded7c4] text-sm focus:outline-none focus:ring-2 focus:ring-[#8fb56b]"
+                />
+                <span className="text-[10px] text-[#6b7c6d] mt-0.5 block">
+                  Si lo dejás vacío, la parcela no tendrá límite de cabezas.
                 </span>
               </div>
 

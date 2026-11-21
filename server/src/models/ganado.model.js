@@ -470,7 +470,10 @@ class GanadoModel {
           nombre: (nombre || "Nueva Parcela").trim(),
           descripcion: descSerializada,
           superficieHas: superficieHas ? parseFloat(superficieHas) : null,
-          capacidad: capacidad ? parseInt(capacidad, 10) : 100,
+          capacidad:
+            capacidad !== null && capacidad !== undefined && capacidad !== "" && parseInt(capacidad, 10) > 0
+              ? parseInt(capacidad, 10)
+              : null,
           establecimientoId: establecimientoId || null,
           establecimiento: establecimiento || null,
         },
@@ -497,7 +500,10 @@ class GanadoModel {
         aguada: metaGeo.aguada,
         estadoPastura: metaGeo.estadoPastura,
         superficieHas: parseFloat(superficieHas) || 0,
-        capacidad: parseInt(capacidad, 10) || 100,
+        capacidad:
+          capacidad !== null && capacidad !== undefined && capacidad !== "" && parseInt(capacidad, 10) > 0
+            ? parseInt(capacidad, 10)
+            : null,
         establecimientoId: establecimientoId || "est-el-rancho",
         establecimiento: establecimiento || "Mi Establecimiento",
         animales: [],
@@ -571,7 +577,12 @@ class GanadoModel {
             ? { superficieHas: parseFloat(datos.superficieHas) || 0 }
             : {}),
           ...(datos.capacidad !== undefined
-            ? { capacidad: parseInt(datos.capacidad, 10) || 100 }
+            ? {
+                capacidad:
+                  datos.capacidad !== null && datos.capacidad !== "" && parseInt(datos.capacidad, 10) > 0
+                    ? parseInt(datos.capacidad, 10)
+                    : null,
+              }
             : {}),
         },
         include: { animales: true },
@@ -621,7 +632,9 @@ class GanadoModel {
               : previo.superficieHas,
           capacidad:
             datos.capacidad !== undefined
-              ? parseInt(datos.capacidad, 10) || 100
+              ? datos.capacidad !== null && datos.capacidad !== "" && parseInt(datos.capacidad, 10) > 0
+                ? parseInt(datos.capacidad, 10)
+                : null
               : previo.capacidad,
           coordinates: Array.isArray(datos.coordinates)
             ? datos.coordinates
