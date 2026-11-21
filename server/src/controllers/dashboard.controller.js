@@ -2,14 +2,14 @@ const GanadoModel = require("../models/ganado.model");
 const SanidadModel = require("../models/sanidad.model");
 const InsumoModel = require("../models/insumo.model");
 const ParteDiarioModel = require("../models/parteDiario.model");
-const ParcelaPermisoModel = require("../models/parcelaPermiso.model");
-const { ChatModel } = require("../models/chat.model");
 const WeatherService = require("../services/weather.service");
+<<<<<<< Updated upstream
+=======
 const CotizacionService = require("../services/cotizacion.service");
 const DolarService = require("../services/dolar.service");
 const { ROLES } = require("../utils/roles.constants");
+>>>>>>> Stashed changes
 const { exito, error } = require("../utils/apiResponse");
-const { emitirEventoRealtime } = require("../services/realtime.service");
 
 function obtenerEstablecimientoContexto(req) {
   const estId =
@@ -142,28 +142,7 @@ class DashboardController {
   static async registrarPotrero(req, res) {
     try {
       const { estId, estNombre } = obtenerEstablecimientoContexto(req);
-      const rolNorm = String(req.usuario?.rol || "").toLowerCase();
-      let solicitudAConsumir = null;
-      if (rolNorm === ROLES.OFICINA) {
-        const perm = await ParcelaPermisoModel.tienePermisoParaAccion({
-          usuarioId: req.usuario?.id,
-          rol: rolNorm,
-          establecimientoId: estId,
-          accion: "AGREGAR",
-        });
-        if (!perm.autorizado) {
-          return error(
-            res,
-            "Como Administrador debes solicitar permiso al Dueño y esperar su aprobación para agregar esta parcela.",
-            403
-          );
-        }
-        solicitudAConsumir = perm.solicitudId;
-      }
       const nuevo = await GanadoModel.crearPotrero(req.body, estId, estNombre);
-      if (solicitudAConsumir) {
-        await ParcelaPermisoModel.consumirPermiso(solicitudAConsumir);
-      }
       return exito(res, nuevo, "Potrero creado exitosamente.", 201);
     } catch (err) {
       return error(res, err.message, 400);
@@ -174,29 +153,7 @@ class DashboardController {
     try {
       const { id } = req.params;
       const { estId } = obtenerEstablecimientoContexto(req);
-      const rolNorm = String(req.usuario?.rol || "").toLowerCase();
-      let solicitudAConsumir = null;
-      if (rolNorm === ROLES.OFICINA) {
-        const perm = await ParcelaPermisoModel.tienePermisoParaAccion({
-          usuarioId: req.usuario?.id,
-          rol: rolNorm,
-          establecimientoId: estId,
-          accion: "EDITAR",
-          parcelaId: id,
-        });
-        if (!perm.autorizado) {
-          return error(
-            res,
-            "Como Administrador debes solicitar permiso al Dueño y esperar su aprobación para editar esta parcela.",
-            403
-          );
-        }
-        solicitudAConsumir = perm.solicitudId;
-      }
       const actualizado = await GanadoModel.actualizarPotrero(id, req.body || {}, estId);
-      if (solicitudAConsumir) {
-        await ParcelaPermisoModel.consumirPermiso(solicitudAConsumir);
-      }
       const nombreAnterior = actualizado.nombreAnterior || req.body?.nombreAnterior;
       if (nombreAnterior && actualizado.nombre && nombreAnterior !== actualizado.nombre) {
         try {
@@ -588,6 +545,10 @@ class DashboardController {
   static async obtenerReportes(req, res) {
     try {
       const { estId } = obtenerEstablecimientoContexto(req);
+<<<<<<< Updated upstream
+      const [metricasGanado, insumosCriticos, partes, potreros, hacienda] = await Promise.all([
+        GanadoModel.obtenerMetricas(estId),
+=======
       const [
         metricasGanado,
         pesoPorCategoria,
@@ -602,14 +563,20 @@ class DashboardController {
         GanadoModel.obtenerPesoPorCategoria(estId),
         CotizacionService.obtenerCotizaciones(),
         DolarService.obtenerCotizaciones(),
+>>>>>>> Stashed changes
         InsumoModel.obtenerCriticos(estId),
-        ParteDiarioModel.obtenerResumen(estId),
+        ParteDiarioModel.listarTodos(estId),
         GanadoModel.listarPotreros(estId),
         GanadoModel.listarTodos(estId),
       ]);
 
       const totalCabezas = metricasGanado.totalCabezas || 0;
       const pesoPromedio = metricasGanado.pesoPromedioKg || 0;
+<<<<<<< Updated upstream
+      const valorHaciendaEstimado = totalCabezas > 0
+        ? Math.round(hacienda.reduce((acc, a) => acc + (Number(a.pesoKg) || 0) * precioKgVivo, 0))
+        : 0;
+=======
 
       const valuacionPorCategoria = pesoPorCategoria.map((item) => {
         const { precioKgVivo, categoriaReferencia } =
@@ -629,16 +596,24 @@ class DashboardController {
         totalCabezas > 0
           ? valuacionPorCategoria.reduce((acc, item) => acc + item.valorEstimado, 0)
           : 0;
+>>>>>>> Stashed changes
 
       const resumenGeneral = {
         totalCabezas,
         pesoPromedio,
         valorHaciendaEstimado,
         tasaMortalidad: metricasGanado.tasaMortalidadMensual || "0.0%",
+<<<<<<< Updated upstream
+        tratamientosCompletados: partes.filter((p) => {
+          const txt = (p.novedades || "").toLowerCase();
+          return txt.includes("vacun") || txt.includes("curac") || txt.includes("sanit");
+        }).length,
+=======
         tratamientosCompletados: resumenPartes.tratamientosCompletados || 0,
         fuenteCotizacion: cotizaciones.fuente,
         fechaCotizacion: cotizaciones.fechaRueda,
         esCotizacionEnVivo: Boolean(cotizaciones.esEnVivo),
+>>>>>>> Stashed changes
       };
 
       const reporte = {
@@ -663,260 +638,15 @@ class DashboardController {
         distribucionPotreros: potreros,
         haciendaDetalle: hacienda,
         insumosCriticos,
-        totalPartes: resumenPartes.totalPartes || 0,
-        partesAprobados: resumenPartes.partesAprobados || 0,
-        partesPendientes: resumenPartes.partesPendientes || 0,
+        totalPartes: partes.length,
+        partesAprobados: partes.filter((p) => (p.estado || "").toUpperCase() === "APROBADO").length,
+        partesPendientes: partes.filter((p) => (p.estado || "").toUpperCase() === "PENDIENTE").length,
         fechaGeneracion: new Date().toISOString(),
       };
 
       return exito(res, reporte, "Reportes consolidados generados exitosamente.");
     } catch (err) {
       return error(res, "Error al generar reportes: " + err.message, 500);
-    }
-  }
-
-  // 8. Permisos de Modificación/Alta de Parcelas (Administrador -> Dueño)
-  static async obtenerPermisosParcelas(req, res) {
-    try {
-      const { estId } = obtenerEstablecimientoContexto(req);
-      const resultado = await ParcelaPermisoModel.obtenerEstadoYSolicitudes({
-        usuarioId: req.usuario?.id,
-        rol: req.usuario?.rol,
-        establecimientoId: estId,
-      });
-      return exito(res, resultado);
-    } catch (err) {
-      return error(res, err.message || "Error al consultar permisos de parcelas.", err.status || 400);
-    }
-  }
-
-  static async solicitarPermisoParcelas(req, res) {
-    try {
-      const { estId } = obtenerEstablecimientoContexto(req);
-      const { accion, parcelaId, parcelaNombre, motivo } = req.body || {};
-      const solicitud = await ParcelaPermisoModel.solicitarPermiso({
-        solicitanteId: req.usuario?.id,
-        establecimientoId: estId,
-        accion,
-        parcelaId,
-        parcelaNombre,
-        motivo,
-      });
-      emitirEventoRealtime({
-        broadcast: true,
-        payload: { event: "notification_updated", tipo: "permiso_parcela" },
-      });
-      return exito(
-        res,
-        solicitud,
-        solicitud.estado === "APROBADA"
-          ? "Tu permiso para modificar parcelas ya se encuentra aprobado."
-          : "Solicitud de permiso enviada al Dueño.",
-        201
-      );
-    } catch (err) {
-      return error(res, err.message || "No se pudo enviar la solicitud.", err.status || 400);
-    }
-  }
-
-  static async responderPermisoParcelas(req, res) {
-    try {
-      const { estId } = obtenerEstablecimientoContexto(req);
-      const { solicitudId } = req.params;
-      const { estado } = req.body || {};
-      const actualizada = await ParcelaPermisoModel.responderSolicitud({
-        solicitudId,
-        revisorId: req.usuario?.id,
-        establecimientoId: estId,
-        estado,
-      });
-      emitirEventoRealtime({
-        broadcast: true,
-        payload: { event: "notification_updated", tipo: "estado_permiso_parcela" },
-      });
-      return exito(
-        res,
-        actualizada,
-        actualizada.estado === "APROBADA"
-          ? "Permiso aprobado para el Administrador."
-          : "Solicitud de permiso rechazada."
-      );
-    } catch (err) {
-      return error(res, err.message || "No se pudo responder la solicitud.", err.status || 400);
-    }
-  }
-
-  // 9. Centro de Notificaciones (Campanita del Header)
-  static async obtenerNotificaciones(req, res) {
-    try {
-      const { estId } = obtenerEstablecimientoContexto(req);
-      const usuarioId = req.usuario?.id;
-      const rolNorm = String(req.usuario?.rol || "").toLowerCase();
-
-      const [
-        permisosParcelas,
-        insumosCriticos,
-        eventosSanidad,
-        partes,
-        chatData,
-      ] = await Promise.all([
-        ParcelaPermisoModel.obtenerEstadoYSolicitudes({
-          usuarioId,
-          rol: rolNorm,
-          establecimientoId: estId,
-        }).catch((err) => {
-          console.warn("[DashboardController.obtenerNotificaciones] Permisos parcelas:", err.message);
-          return { solicitudesPendientes: [], solicitudActual: null };
-        }),
-        InsumoModel.obtenerCriticos(estId).catch((err) => {
-          console.warn("[DashboardController.obtenerNotificaciones] Insumos:", err.message);
-          return [];
-        }),
-        SanidadModel.listarAlertasYEventos(estId).catch((err) => {
-          console.warn("[DashboardController.obtenerNotificaciones] Sanidad:", err.message);
-          return [];
-        }),
-        ParteDiarioModel.listarTodos(estId).catch((err) => {
-          console.warn("[DashboardController.obtenerNotificaciones] Partes:", err.message);
-          return [];
-        }),
-        usuarioId
-          ? ChatModel.listarContactosPermitidos(usuarioId).catch((err) => {
-              console.warn("[DashboardController.obtenerNotificaciones] Chat:", err.message);
-              return { solicitudesPendientes: [] };
-            })
-          : Promise.resolve({ solicitudesPendientes: [] }),
-      ]);
-
-      const notificaciones = [];
-
-      // 1) Solicitudes de permiso de parcelas pendientes (para el Dueño)
-      if (rolNorm === ROLES.DUENO) {
-        (permisosParcelas.solicitudesPendientes || []).forEach((s) => {
-          notificaciones.push({
-            id: `perm-parcela-${s.id}`,
-            tipo: "permiso_parcela",
-            prioridad: "alta",
-            titulo: "Solicitud de permiso en Parcelas",
-            descripcion: `${s.solicitanteNombre} solicita permiso para ${
-              s.accion === "EDITAR"
-                ? `editar${s.parcelaNombre ? ` "${s.parcelaNombre}"` : " parcelas"}`
-                : s.accion === "AGREGAR"
-                ? "agregar parcelas"
-                : "agregar y editar parcelas"
-            }.${s.motivo ? ` Motivo: ${s.motivo}` : ""}`,
-            fecha: s.fechaSolicitud,
-            vistaDestino: "parcelas",
-            solicitudId: s.id,
-            requiereAccion: true,
-          });
-        });
-      }
-
-      // 2) Estado de solicitud de parcelas (para el Administrador)
-      if (rolNorm === ROLES.OFICINA && permisosParcelas.solicitudActual) {
-        const sol = permisosParcelas.solicitudActual;
-        if (sol.estado === "PENDIENTE" || sol.estado === "APROBADA" || sol.estado === "RECHAZADA") {
-          notificaciones.push({
-            id: `mi-perm-parcela-${sol.id}-${sol.estado}`,
-            tipo: "estado_permiso_parcela",
-            prioridad: sol.estado === "RECHAZADA" ? "alta" : "media",
-            titulo:
-              sol.estado === "APROBADA"
-                ? "Permiso de Parcelas aprobado"
-                : sol.estado === "RECHAZADA"
-                ? "Permiso de Parcelas rechazado"
-                : "Permiso de Parcelas pendiente",
-            descripcion:
-              sol.estado === "APROBADA"
-                ? "El Dueño aprobó tu permiso para agregar y editar parcelas."
-                : sol.estado === "RECHAZADA"
-                ? "El Dueño rechazó tu solicitud para modificar parcelas."
-                : "Esperando aprobación del Dueño para agregar o editar parcelas.",
-            fecha: sol.fechaRespuesta || sol.fechaSolicitud,
-            vistaDestino: "parcelas",
-            requiereAccion: false,
-          });
-        }
-      }
-
-      // 3) Solicitudes de chat pendientes (Dueño / Oficina)
-      (chatData?.solicitudesPendientes || []).forEach((s) => {
-        notificaciones.push({
-          id: `chat-sol-${s.id}`,
-          tipo: "chat",
-          prioridad: "alta",
-          titulo: "Solicitud de chat de Peón",
-          descripcion: `${s.solicitanteNombre} solicita habilitar chat: "${s.motivo}"`,
-          fecha: s.fechaSolicitud,
-          vistaDestino: "dashboard",
-          requiereAccion: false,
-        });
-      });
-
-      // 4) Partes diarios pendientes (Dueño / Capataz)
-      if (rolNorm === ROLES.DUENO || rolNorm === ROLES.CAPATAZ) {
-        (partes || [])
-          .filter((p) => String(p.estado || "").toUpperCase() === "PENDIENTE")
-          .slice(0, 5)
-          .forEach((p) => {
-            notificaciones.push({
-              id: `parte-${p.id}`,
-              tipo: "parte",
-              prioridad: "media",
-              titulo: "Parte diario pendiente de revisión",
-              descripcion: `${p.peonNombre || "Peón"} · ${p.potrero || "Campo"}: ${(p.novedades || "").slice(0, 75)}`,
-              fecha: p.fechaCarga || p.fecha,
-              vistaDestino: "partes",
-              requiereAccion: false,
-            });
-          });
-      }
-
-      // 5) Alertas de bajo stock (Dueño / Oficina / Capataz / Veterinario)
-      if (rolNorm !== ROLES.PEON) {
-        (insumosCriticos || []).slice(0, 5).forEach((ins) => {
-          notificaciones.push({
-            id: `insumo-${ins.id}`,
-            tipo: "stock",
-            prioridad: "alta",
-            titulo: `Stock crítico: ${ins.nombre}`,
-            descripcion: `Disponible: ${ins.stockActual} ${ins.unidad || ""} (mínimo ${ins.stockMinimo}).`,
-            fecha: new Date().toISOString(),
-            vistaDestino: "insumos",
-            requiereAccion: false,
-          });
-        });
-      }
-
-      // 6) Alertas sanitarias próximas / pendientes (Dueño / Veterinario / Capataz / Oficina)
-      if (rolNorm !== ROLES.PEON) {
-        (eventosSanidad || [])
-          .filter((e) => {
-            const st = String(e.estado || "").toUpperCase();
-            return st.includes("PRÓX") || st.includes("PROX") || st === "PENDIENTE";
-          })
-          .slice(0, 5)
-          .forEach((ev) => {
-            notificaciones.push({
-              id: `sanidad-${ev.id}`,
-              tipo: "sanidad",
-              prioridad: "media",
-              titulo: ev.evento || "Alerta sanitaria",
-              descripcion: `${ev.tipo || "Acto"} · ${ev.lote || "Rodeo"} (${ev.fechaProgramada || "Próximo"})`,
-              fecha: ev.fechaProgramada || new Date().toISOString(),
-              vistaDestino: "sanidad",
-              requiereAccion: false,
-            });
-          });
-      }
-
-      return exito(res, {
-        totalNoLeidas: notificaciones.length,
-        notificaciones,
-      });
-    } catch (err) {
-      return error(res, "Error al consultar notificaciones: " + err.message, 500);
     }
   }
 }

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { obtenerReportes, obtenerDolar } from "../../../api/dashboard.api";
 import { useAuth } from "../../../context/AuthContext";
-import ParcelaDetalleView from "./ParcelaDetalleView";
 
 const DOLAR_FALLBACK = {
   oficial: { nombre: "Oficial", venta: 1600 },
@@ -17,7 +16,6 @@ export default function ReportesView() {
   const [moneda, setMoneda] = useState("ARS");
   const [tipoDolar, setTipoDolar] = useState("oficial");
   const [menuDolarAbierto, setMenuDolarAbierto] = useState(false);
-  const [parcelaSeleccionada, setParcelaSeleccionada] = useState(null);
   const menuDolarRef = useRef(null);
 
   useEffect(() => {
@@ -75,20 +73,6 @@ export default function ReportesView() {
 
   const potreros = datos?.distribucionPotreros || [];
   const hacienda = datos?.haciendaDetalle || [];
-
-  if (parcelaSeleccionada) {
-    return (
-      <ParcelaDetalleView
-        parcela={parcelaSeleccionada}
-        hacienda={hacienda}
-        cotizacionesMercado={cotizacionesMercado}
-        dolarInfo={dolarInfo}
-        moneda={moneda}
-        tipoDolar={tipoDolar}
-        alVolver={() => setParcelaSeleccionada(null)}
-      />
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -322,17 +306,9 @@ export default function ReportesView() {
               </p>
             ) : (
               potreros.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setParcelaSeleccionada(p)}
-                  className="w-full text-left p-3 rounded-xl bg-[#f8f5eb] hover:bg-[#efead9] border border-[#ded7c4] hover:border-[#8fb56b] transition-all cursor-pointer group"
-                >
+                <div key={p.id} className="p-3 rounded-xl bg-[#f8f5eb] border border-[#ded7c4]">
                   <div className="flex justify-between items-center text-xs mb-1">
-                    <span className="font-bold text-[#182920] group-hover:text-[#33512f] flex items-center gap-1.5">
-                      {p.nombre}
-                      <i className="fa-solid fa-arrow-up-right-from-square text-[10px] text-[#8fb56b] opacity-0 group-hover:opacity-100 transition-opacity"></i>
-                    </span>
+                    <span className="font-bold text-[#182920]">{p.nombre}</span>
                     <span className="font-bold text-[#33512f]">
                       {p.totalAnimales ?? 0} cabezas ({p.superficieHas} Has)
                     </span>
@@ -341,7 +317,7 @@ export default function ReportesView() {
                     <span>Capacidad máxima: {p.capacidad}</span>
                     <span>Carga: {Math.round(((p.totalAnimales ?? 0) / (p.capacidad || 100)) * 100)}%</span>
                   </div>
-                </button>
+                </div>
               ))
             )}
           </div>
