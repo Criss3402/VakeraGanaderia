@@ -3,6 +3,9 @@ const SanidadModel = require("../models/sanidad.model");
 const InsumoModel = require("../models/insumo.model");
 const ParteDiarioModel = require("../models/parteDiario.model");
 const WeatherService = require("../services/weather.service");
+const CotizacionService = require("../services/cotizacion.service");
+const DolarService = require("../services/dolar.service");
+const { ROLES } = require("../utils/roles.constants");
 const { exito, error } = require("../utils/apiResponse");
 
 function obtenerEstablecimientoContexto(req) {
@@ -513,24 +516,73 @@ class DashboardController {
     }
   }
 
+  // 6b. Cotizaciones Ganaderas en Tiempo Real (MAG / Contingencia)
+  static async obtenerCotizaciones(req, res) {
+    try {
+      const forzar = req.query?.refresh === "true";
+      const cotizaciones = await CotizacionService.obtenerCotizaciones({ forzar });
+      return exito(res, cotizaciones, "Cotizaciones ganaderas obtenidas con éxito.");
+    } catch (err) {
+      return error(res, "Error al consultar cotizaciones ganaderas: " + err.message, 500);
+    }
+  }
+
+  // 6c. Cotización del Dólar en Argentina (DolarApi / Contingencia)
+  static async obtenerDolar(req, res) {
+    try {
+      const forzar = req.query?.refresh === "true";
+      const dolar = await DolarService.obtenerCotizaciones({ forzar });
+      return exito(res, dolar, "Cotización del dólar obtenida con éxito.");
+    } catch (err) {
+      return error(res, "Error al consultar cotización del dólar: " + err.message, 500);
+    }
+  }
+
   // 7. Reportes Consolidados (Dueño / Oficina / Capataz / Veterinario)
   static async obtenerReportes(req, res) {
     try {
       const { estId } = obtenerEstablecimientoContexto(req);
-      const [metricasGanado, insumosCriticos, partes, potreros, hacienda] = await Promise.all([
+      const [
+        metricasGanado,
+        pesoPorCategoria,
+        cotizaciones,
+        dolar,
+        insumosCriticos,
+        partes,
+        potreros,
+        hacienda,
+      ] = await Promise.all([
         GanadoModel.obtenerMetricas(estId),
+        GanadoModel.obtenerPesoPorCategoria(estId),
+        CotizacionService.obtenerCotizaciones(),
+        DolarService.obtenerCotizaciones(),
         InsumoModel.obtenerCriticos(estId),
         ParteDiarioModel.listarTodos(estId),
         GanadoModel.listarPotreros(estId),
         GanadoModel.listarTodos(estId),
       ]);
 
-      const precioKgVivo = 2400; // Referencia mercado ARS
       const totalCabezas = metricasGanado.totalCabezas || 0;
       const pesoPromedio = metricasGanado.pesoPromedioKg || 0;
-      const valorHaciendaEstimado = totalCabezas > 0
-        ? Math.round(hacienda.reduce((acc, a) => acc + (Number(a.pesoKg) || 0) * precioKgVivo, 0))
-        : 0;
+
+      const valuacionPorCategoria = pesoPorCategoria.map((item) => {
+        const { precioKgVivo, categoriaReferencia } =
+          CotizacionService.obtenerPrecioPorCategoria(item.categoria, cotizaciones);
+        const valorEstimado = Math.round(item.pesoTotalKg * precioKgVivo);
+        return {
+          categoria: item.categoria,
+          categoriaReferencia,
+          cabezas: item.cabezas,
+          pesoTotalKg: Math.round(item.pesoTotalKg),
+          precioKgVivo,
+          valorEstimado,
+        };
+      });
+
+      const valorHaciendaEstimado =
+        totalCabezas > 0
+          ? valuacionPorCategoria.reduce((acc, item) => acc + item.valorEstimado, 0)
+          : 0;
 
       const resumenGeneral = {
         totalCabezas,
@@ -541,11 +593,30 @@ class DashboardController {
           const txt = (p.novedades || "").toLowerCase();
           return txt.includes("vacun") || txt.includes("curac") || txt.includes("sanit");
         }).length,
+        fuenteCotizacion: cotizaciones.fuente,
+        fechaCotizacion: cotizaciones.fechaRueda,
+        esCotizacionEnVivo: Boolean(cotizaciones.esEnVivo),
       };
 
       const reporte = {
         resumenGanado: metricasGanado,
         resumenGeneral,
+        valuacionPorCategoria,
+        cotizacionesMercado: {
+          mercado: cotizaciones.mercado,
+          fechaRueda: cotizaciones.fechaRueda,
+          esEnVivo: cotizaciones.esEnVivo,
+          fuente: cotizaciones.fuente,
+          indices: cotizaciones.indices,
+          categorias: cotizaciones.categorias,
+        },
+        dolar: {
+          proveedor: dolar.proveedor,
+          esEnVivo: dolar.esEnVivo,
+          fuente: dolar.fuente,
+          fechaActualizacion: dolar.fechaActualizacion,
+          cotizaciones: dolar.cotizaciones,
+        },
         distribucionPotreros: potreros,
         haciendaDetalle: hacienda,
         insumosCriticos,

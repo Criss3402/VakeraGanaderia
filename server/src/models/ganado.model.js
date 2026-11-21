@@ -240,6 +240,62 @@ class GanadoModel {
     }
   }
 
+  /**
+   * Calcula la suma total de peso (kg) del rodeo directamente en PostgreSQL
+   * mediante `aggregate({ _sum })` sin cargar registros individuales en memoria.
+   */
+  static async obtenerSumaPesoKg(establecimientoId) {
+    try {
+      const whereClause = establecimientoId ? { establecimientoId } : {};
+      const agg = await prisma.ganado.aggregate({
+        where: whereClause,
+        _sum: { pesoKg: true },
+      });
+      return Number(agg?._sum?.pesoKg) || 0;
+    } catch (e) {
+      console.warn("[GanadoModel.obtenerSumaPesoKg] Fallback a memoria:", e.message);
+      const fuente = Array.isArray(db.ganado) ? db.ganado : [];
+      const lista = establecimientoId
+        ? fuente.filter((g) => g.establecimientoId === establecimientoId)
+        : fuente;
+      return lista.reduce((acc, curr) => acc + (Number(curr.pesoKg) || 0), 0);
+    }
+  }
+
+  /**
+   * Agrupa cabezas y suma total de peso (kg) por categoría del rodeo.
+   */
+  static async obtenerPesoPorCategoria(establecimientoId) {
+    try {
+      const whereClause = establecimientoId ? { establecimientoId } : {};
+      const grupos = await prisma.ganado.groupBy({
+        by: ["categoria"],
+        where: whereClause,
+        _sum: { pesoKg: true },
+        _count: { _all: true },
+      });
+      return grupos.map((g) => ({
+        categoria: g.categoria || "Sin categoría",
+        cabezas: g._count?._all || 0,
+        pesoTotalKg: Number(g._sum?.pesoKg) || 0,
+      }));
+    } catch (e) {
+      console.warn("[GanadoModel.obtenerPesoPorCategoria] Fallback a memoria:", e.message);
+      const fuente = Array.isArray(db.ganado) ? db.ganado : [];
+      const lista = establecimientoId
+        ? fuente.filter((g) => g.establecimientoId === establecimientoId)
+        : fuente;
+      const mapa = new Map();
+      for (const animal of lista) {
+        const cat = animal.categoria || "Sin categoría";
+        const actual = mapa.get(cat) || { categoria: cat, cabezas: 0, pesoTotalKg: 0 };
+        actual.cabezas += 1;
+        actual.pesoTotalKg += Number(animal.pesoKg) || 0;
+        mapa.set(cat, actual);
+      }
+      return Array.from(mapa.values());
+    }
+  }
   static async registrar(animal, establecimientoId, establecimiento) {
     try {
       let potreroId = animal.potreroId;

@@ -10,6 +10,16 @@ export async function obtenerClimaActual(params = {}) {
   return request(`/dashboard/clima${query ? `?${query}` : ""}`);
 }
 
+export async function obtenerCotizaciones(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return request(`/dashboard/cotizaciones${query ? `?${query}` : ""}`);
+}
+
+export async function obtenerDolar(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return request(`/dashboard/dolar${query ? `?${query}` : ""}`);
+}
+
 // Ganado y Potreros
 export async function obtenerGanado(params = {}) {
   const query = new URLSearchParams(params).toString();
