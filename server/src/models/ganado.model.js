@@ -240,8 +240,6 @@ class GanadoModel {
     }
   }
 
-<<<<<<< Updated upstream
-=======
   /**
    * Calcula la suma total de peso (kg) del rodeo directamente en PostgreSQL
    * mediante `aggregate({ _sum })` sin cargar registros individuales en memoria.
@@ -298,8 +296,6 @@ class GanadoModel {
       return Array.from(mapa.values());
     }
   }
-
->>>>>>> Stashed changes
   static async registrar(animal, establecimientoId, establecimiento) {
     try {
       let potreroId = animal.potreroId;

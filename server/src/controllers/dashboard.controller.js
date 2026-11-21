@@ -2,13 +2,11 @@ const GanadoModel = require("../models/ganado.model");
 const SanidadModel = require("../models/sanidad.model");
 const InsumoModel = require("../models/insumo.model");
 const ParteDiarioModel = require("../models/parteDiario.model");
+const ParcelaPermisoModel = require("../models/parcelaPermiso.model");
 const WeatherService = require("../services/weather.service");
-<<<<<<< Updated upstream
-=======
 const CotizacionService = require("../services/cotizacion.service");
 const DolarService = require("../services/dolar.service");
 const { ROLES } = require("../utils/roles.constants");
->>>>>>> Stashed changes
 const { exito, error } = require("../utils/apiResponse");
 
 function obtenerEstablecimientoContexto(req) {
@@ -545,17 +543,13 @@ class DashboardController {
   static async obtenerReportes(req, res) {
     try {
       const { estId } = obtenerEstablecimientoContexto(req);
-<<<<<<< Updated upstream
-      const [metricasGanado, insumosCriticos, partes, potreros, hacienda] = await Promise.all([
-        GanadoModel.obtenerMetricas(estId),
-=======
       const [
         metricasGanado,
         pesoPorCategoria,
         cotizaciones,
         dolar,
         insumosCriticos,
-        resumenPartes,
+        partes,
         potreros,
         hacienda,
       ] = await Promise.all([
@@ -563,7 +557,6 @@ class DashboardController {
         GanadoModel.obtenerPesoPorCategoria(estId),
         CotizacionService.obtenerCotizaciones(),
         DolarService.obtenerCotizaciones(),
->>>>>>> Stashed changes
         InsumoModel.obtenerCriticos(estId),
         ParteDiarioModel.listarTodos(estId),
         GanadoModel.listarPotreros(estId),
@@ -572,11 +565,6 @@ class DashboardController {
 
       const totalCabezas = metricasGanado.totalCabezas || 0;
       const pesoPromedio = metricasGanado.pesoPromedioKg || 0;
-<<<<<<< Updated upstream
-      const valorHaciendaEstimado = totalCabezas > 0
-        ? Math.round(hacienda.reduce((acc, a) => acc + (Number(a.pesoKg) || 0) * precioKgVivo, 0))
-        : 0;
-=======
 
       const valuacionPorCategoria = pesoPorCategoria.map((item) => {
         const { precioKgVivo, categoriaReferencia } =
@@ -596,24 +584,19 @@ class DashboardController {
         totalCabezas > 0
           ? valuacionPorCategoria.reduce((acc, item) => acc + item.valorEstimado, 0)
           : 0;
->>>>>>> Stashed changes
 
       const resumenGeneral = {
         totalCabezas,
         pesoPromedio,
         valorHaciendaEstimado,
         tasaMortalidad: metricasGanado.tasaMortalidadMensual || "0.0%",
-<<<<<<< Updated upstream
         tratamientosCompletados: partes.filter((p) => {
           const txt = (p.novedades || "").toLowerCase();
           return txt.includes("vacun") || txt.includes("curac") || txt.includes("sanit");
         }).length,
-=======
-        tratamientosCompletados: resumenPartes.tratamientosCompletados || 0,
         fuenteCotizacion: cotizaciones.fuente,
         fechaCotizacion: cotizaciones.fechaRueda,
         esCotizacionEnVivo: Boolean(cotizaciones.esEnVivo),
->>>>>>> Stashed changes
       };
 
       const reporte = {
@@ -647,6 +630,87 @@ class DashboardController {
       return exito(res, reporte, "Reportes consolidados generados exitosamente.");
     } catch (err) {
       return error(res, "Error al generar reportes: " + err.message, 500);
+    }
+  }
+
+  // 8. Permisos de Modificación/Alta de Parcelas (Oficina -> Dueño)
+  static async obtenerPermisosParcelas(req, res) {
+    try {
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const resultado = await ParcelaPermisoModel.obtenerEstadoYSolicitudes({
+        usuarioId: req.usuario?.id,
+        rol: req.usuario?.rol,
+        establecimientoId: estId,
+      });
+      return exito(res, resultado);
+    } catch (err) {
+      return error(res, err.message || "Error al consultar permisos de parcelas.", err.status || 400);
+    }
+  }
+
+  static async solicitarPermisoParcelas(req, res) {
+    try {
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const { accion, parcelaId, parcelaNombre, motivo } = req.body || {};
+      const solicitud = await ParcelaPermisoModel.solicitarPermiso({
+        solicitanteId: req.usuario?.id,
+        establecimientoId: estId,
+        accion,
+        parcelaId,
+        parcelaNombre,
+        motivo,
+      });
+      return exito(res, solicitud, "Solicitud de permiso de parcela enviada.", 201);
+    } catch (err) {
+      return error(res, err.message || "Error al solicitar permiso de parcela.", err.status || 400);
+    }
+  }
+
+  static async responderPermisoParcelas(req, res) {
+    try {
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const { solicitudId } = req.params;
+      const { estado } = req.body || {};
+      const actualizada = await ParcelaPermisoModel.responderSolicitud({
+        solicitudId,
+        revisorId: req.usuario?.id,
+        establecimientoId: estId,
+        estado,
+      });
+      return exito(res, actualizada, "Solicitud de permiso de parcela actualizada.");
+    } catch (err) {
+      return error(res, err.message || "Error al responder solicitud de parcela.", err.status || 400);
+    }
+  }
+
+  // 9. Notificaciones consolidadas
+  static async obtenerNotificaciones(req, res) {
+    try {
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const [alertas, criticos, pendientes, permisos] = await Promise.all([
+        SanidadModel.obtenerAlertasActivas(estId),
+        InsumoModel.obtenerCriticos(estId),
+        ParteDiarioModel.obtenerPendientes(estId),
+        ParcelaPermisoModel.obtenerEstadoYSolicitudes({
+          usuarioId: req.usuario?.id,
+          rol: req.usuario?.rol,
+          establecimientoId: estId,
+        }).catch(() => ({ solicitudesPendientes: [] })),
+      ]);
+
+      return exito(res, {
+        alertasSanitarias: alertas.length,
+        insumosCriticos: criticos.length,
+        partesPendientes: pendientes.length,
+        solicitudesParcelas: (permisos?.solicitudesPendientes || []).length,
+        total:
+          alertas.length +
+          criticos.length +
+          pendientes.length +
+          (permisos?.solicitudesPendientes || []).length,
+      });
+    } catch (err) {
+      return error(res, "Error al consultar notificaciones: " + err.message, 500);
     }
   }
 }

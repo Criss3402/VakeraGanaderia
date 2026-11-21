@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { obtenerReportes, obtenerDolar } from "../../../api/dashboard.api";
 import { useAuth } from "../../../context/AuthContext";
+import ParcelaDetalleReporte from "./ParcelaDetalleReporte.jsx";
 
 const DOLAR_FALLBACK = {
   oficial: { nombre: "Oficial", venta: 1600 },
@@ -16,6 +17,7 @@ export default function ReportesView() {
   const [moneda, setMoneda] = useState("ARS");
   const [tipoDolar, setTipoDolar] = useState("oficial");
   const [menuDolarAbierto, setMenuDolarAbierto] = useState(false);
+  const [parcelaSeleccionada, setParcelaSeleccionada] = useState(null);
   const menuDolarRef = useRef(null);
 
   useEffect(() => {
@@ -74,6 +76,24 @@ export default function ReportesView() {
   const potreros = datos?.distribucionPotreros || [];
   const hacienda = datos?.haciendaDetalle || [];
 
+  if (parcelaSeleccionada) {
+    return (
+      <ParcelaDetalleReporte
+        parcela={parcelaSeleccionada}
+        hacienda={hacienda}
+        cotizacionesMercado={cotizacionesMercado}
+        moneda={moneda}
+        setMoneda={setMoneda}
+        tipoDolar={tipoDolar}
+        setTipoDolar={setTipoDolar}
+        cotizacionesDolar={cotizacionesDolar}
+        dolarSeleccionado={dolarSeleccionado}
+        formatearMonto={formatearMonto}
+        alVolver={() => setParcelaSeleccionada(null)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Banner */}
@@ -101,11 +121,10 @@ export default function ReportesView() {
                 setMoneda("ARS");
                 setMenuDolarAbierto(false);
               }}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                moneda === "ARS"
-                  ? "bg-[#8fb56b] text-[#182920] shadow-sm"
-                  : "text-[#ded7c4] hover:text-white hover:bg-[#1e3326]"
-              }`}
+              className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${moneda === "ARS"
+                ? "bg-[#8fb56b] text-[#182920] shadow-sm"
+                : "text-[#ded7c4] hover:text-white hover:bg-[#1e3326]"
+                }`}
             >
               <span>ARS</span>
               <span className="opacity-75">$</span>
@@ -113,11 +132,10 @@ export default function ReportesView() {
             <button
               type="button"
               onClick={() => setMoneda("USD")}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                moneda === "USD"
-                  ? "bg-[#8fb56b] text-[#182920] shadow-sm"
-                  : "text-[#ded7c4] hover:text-white hover:bg-[#1e3326]"
-              }`}
+              className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${moneda === "USD"
+                ? "bg-[#8fb56b] text-[#182920] shadow-sm"
+                : "text-[#ded7c4] hover:text-white hover:bg-[#1e3326]"
+                }`}
             >
               <span>USD</span>
               <span className="opacity-75">US$</span>
@@ -133,11 +151,10 @@ export default function ReportesView() {
               }}
               aria-expanded={moneda === "USD" && menuDolarAbierto}
               aria-label="Tipo de cambio dólar"
-              className={`bg-[#122018] border border-[#33512f] text-[#f1ecdd] text-xs font-bold rounded-xl px-3.5 py-2.5 transition-all flex items-center gap-2.5 shadow-inner ${
-                moneda === "USD"
-                  ? "hover:bg-[#1e3326] hover:border-[#8fb56b]/60 cursor-pointer"
-                  : "opacity-45 cursor-not-allowed"
-              }`}
+              className={`bg-[#122018] border border-[#33512f] text-[#f1ecdd] text-xs font-bold rounded-xl px-3.5 py-2.5 transition-all flex items-center gap-2.5 shadow-inner ${moneda === "USD"
+                ? "hover:bg-[#1e3326] hover:border-[#8fb56b]/60 cursor-pointer"
+                : "opacity-45 cursor-not-allowed"
+                }`}
             >
               <span className={`w-2 h-2 rounded-full shrink-0 ${moneda === "USD" ? "bg-[#8fb56b]" : "bg-[#6b7c6d]"}`}></span>
               <span>{dolarSeleccionado.nombre || "Oficial"}</span>
@@ -172,11 +189,10 @@ export default function ReportesView() {
                         setTipoDolar(opcion.key);
                         setMenuDolarAbierto(false);
                       }}
-                      className={`w-full px-3.5 py-2.5 text-left text-xs flex items-center justify-between transition-colors ${
-                        activo
-                          ? "bg-[#264030] text-[#f1ecdd] font-bold"
-                          : "text-[#ded7c4] hover:bg-[#203628] hover:text-white"
-                      }`}
+                      className={`w-full px-3.5 py-2.5 text-left text-xs flex items-center justify-between transition-colors ${activo
+                        ? "bg-[#264030] text-[#f1ecdd] font-bold"
+                        : "text-[#ded7c4] hover:bg-[#203628] hover:text-white"
+                        }`}
                     >
                       <span className="flex items-center gap-2">
                         <i className={`fa-solid fa-check text-[10px] ${activo ? "text-[#8fb56b]" : "opacity-0"}`}></i>
@@ -306,9 +322,19 @@ export default function ReportesView() {
               </p>
             ) : (
               potreros.map((p) => (
-                <div key={p.id} className="p-3 rounded-xl bg-[#f8f5eb] border border-[#ded7c4]">
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setParcelaSeleccionada(p)}
+                  className="w-full text-left p-3 rounded-xl bg-[#f8f5eb] border border-[#ded7c4] hover:border-[#8fb56b] hover:bg-[#f1ebd9] transition-all cursor-pointer group"
+                >
                   <div className="flex justify-between items-center text-xs mb-1">
-                    <span className="font-bold text-[#182920]">{p.nombre}</span>
+                    <span className="font-bold text-[#182920] group-hover:text-[#33512f] flex items-center gap-2">
+                      {p.nombre}
+                      <span className="text-[10px] font-semibold text-[#33512f] bg-white px-1.5 py-0.5 rounded border border-[#ded7c4]">
+                        Ver detalle ›
+                      </span>
+                    </span>
                     <span className="font-bold text-[#33512f]">
                       {p.totalAnimales ?? 0} cabezas ({p.superficieHas} Has)
                     </span>
@@ -317,7 +343,7 @@ export default function ReportesView() {
                     <span>Capacidad máxima: {p.capacidad}</span>
                     <span>Carga: {Math.round(((p.totalAnimales ?? 0) / (p.capacidad || 100)) * 100)}%</span>
                   </div>
-                </div>
+                </button>
               ))
             )}
           </div>
