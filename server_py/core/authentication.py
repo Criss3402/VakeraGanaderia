@@ -11,10 +11,12 @@ from rest_framework.exceptions import AuthenticationFailed
 class AuthUser:
     """Representación en memoria del usuario autenticado a partir del payload del JWT."""
     
-    def __init__(self, user_id, email, rol, nombre=None):
+    def __init__(self, user_id, email, rol, establecimiento_id=None, nombre=None):
         self.id = user_id
+        self.pk = user_id
         self.email = email
         self.rol = (rol or "").lower()  # Normalización estricta según AGENTS.md Regla 3.2
+        self.establecimiento_id = establecimiento_id
         self.nombre = nombre or email
         self.is_authenticated = True
         self.is_anonymous = False
@@ -61,14 +63,15 @@ class UnifiedJWTAuthentication(BaseAuthentication):
         except jwt.ExpiredSignatureError:
             raise AuthenticationFailed("La sesión ha expirado. Por favor, volvé a iniciar sesión.")
         except jwt.InvalidTokenError as e:
-            raise AuthenticationFailed(f"Token de sesión inválido: {str(e)}")
+            raise AuthenticationFailed(f"Token de sesión inválido: {e!s}")
 
         user_id = payload.get("id")
         email = payload.get("email", "")
         rol = payload.get("rol", "")
+        establecimiento_id = payload.get("establecimientoId")
 
         if not user_id:
             raise AuthenticationFailed("El token no contiene un identificador de usuario válido.")
 
-        user = AuthUser(user_id=user_id, email=email, rol=rol)
+        user = AuthUser(user_id=user_id, email=email, rol=rol, establecimiento_id=establecimiento_id)
         return (user, token)

@@ -929,7 +929,7 @@ describe("7. Eliminación de Actos Sanitarios y Partes Diarios de Campo", () => 
           aguada: "Molino Solar",
           color: "#0284c7",
         },
-        usuario: { id: "usr-1", establecimientoId: "est-pot-edit", email: "test@unit.com" },
+        usuario: { id: "usr-1", rol: "dueno", establecimientoId: "est-pot-edit", email: "test@unit.com" },
       };
       const resEdit = crearMockRes();
       await DashboardController.actualizarPotrero(reqEdit, resEdit);

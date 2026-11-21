@@ -1,11 +1,13 @@
 """
 Tests para el motor de formulación nutricional y proyecciones.
 """
+import time
+
+import jwt
+from django.conf import settings
 from django.test import TestCase
 from rest_framework.test import APIClient
-import jwt
-import time
-from django.conf import settings
+
 from nutricion.services.racion_calculator import calcular_racion_bovina
 
 

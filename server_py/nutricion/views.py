@@ -1,11 +1,12 @@
 """
 Vistas para el módulo de nutrición y proyecciones biométricas.
 """
-from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
-from core.responses import api_success, api_error
-from nutricion.services.racion_calculator import calcular_racion_bovina
+from core.responses import api_error, api_success
 from legacy_models.models import Ganado
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
+
+from nutricion.services.racion_calculator import calcular_racion_bovina
 
 
 class CalcularRacionView(APIView):
@@ -71,7 +72,11 @@ class ProyeccionPesoView(APIView):
 
         if caravana:
             try:
-                animal = Ganado.objects.filter(caravana__iexact=caravana.strip()).first()
+                est_id = getattr(request.user, "establecimiento_id", None)
+                qs = Ganado.objects.filter(caravana__iexact=caravana.strip())
+                if est_id:
+                    qs = qs.filter(establecimiento_id=est_id)
+                animal = qs.first()
                 if animal:
                     peso_inicial = float(animal.peso_kg)
                     animal_info = {

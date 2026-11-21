@@ -3,11 +3,12 @@ Tests unitarios para Django Channels WebSocket (autenticación JWT, presencia, p
 """
 import asyncio
 import json
+from datetime import UTC, datetime, timedelta
+
 import jwt
-from datetime import datetime, timedelta, timezone
+from channels.testing import WebsocketCommunicator
 from django.conf import settings
 from django.test import SimpleTestCase
-from channels.testing import WebsocketCommunicator
 from rest_framework.test import APIClient
 from vakera_backend.asgi import application
 
@@ -17,7 +18,7 @@ def _crear_token(user_id="usr-ws-1", email="ws@vakera.com", rol="dueno"):
         "id": user_id,
         "email": email,
         "rol": rol,
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=30),
+        "exp": datetime.now(UTC) + timedelta(minutes=30),
     }
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
 

@@ -3,8 +3,10 @@ Middleware de autenticación JWT para conexiones WebSocket (Django Channels).
 Valida ?token=<jwt> usando el mismo JWT_SECRET compartido con Express.js.
 """
 from urllib.parse import parse_qs
+
 from channels.middleware import BaseMiddleware
 from rest_framework.exceptions import AuthenticationFailed
+
 from core.authentication import UnifiedJWTAuthentication
 
 

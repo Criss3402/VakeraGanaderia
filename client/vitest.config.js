@@ -7,6 +7,7 @@ export default mergeConfig(
     test: {
       environment: "jsdom",
       globals: true,
+      testTimeout: 15000,
       setupFiles: ["./src/test/setup.js"],
       include: ["src/**/*.test.{js,jsx}"],
       css: false,

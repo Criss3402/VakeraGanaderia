@@ -26,9 +26,11 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/vakera_db?schema=public
-      - JWT_SECRET=vakera_super_secret_jwt_key_2026
-      - DJANGO_DEBUG=True
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/vakera_db?schema=public}
+      - JWT_SECRET=${JWT_SECRET:-vakera_super_secret_jwt_key_2026}
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-vakera-django-dev-secret-key-2026-solo-desarrollo-local-50chars}
+      - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
+      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend-python}
     depends_on:
       postgres:
         condition: service_healthy

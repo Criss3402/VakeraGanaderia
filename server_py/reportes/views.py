@@ -1,21 +1,21 @@
 """
 Controladores / Vistas para la generación y consulta de reportes analíticos.
 """
-from django.http import HttpResponse
-from rest_framework.views import APIView
-from rest_framework import status
-from django.db.models import Avg, Sum, Count
 from core.permissions import CanAccessReports
-from core.responses import api_success, api_error
-from legacy_models.models import Ganado, Insumo, SanidadEvento, ParteDiario
-from reportes.services.pdf_service import generar_pdf_hacienda
+from core.responses import api_error, api_success
+from django.db.models import Avg, Count, Sum
+from django.http import HttpResponse
+from legacy_models.models import Ganado, Insumo, ParteDiario, SanidadEvento
+from rest_framework.views import APIView
+
 from reportes.services.excel_service import generar_excel_inventario
+from reportes.services.pdf_service import generar_pdf_hacienda
 
 
-def _obtener_datos_hacienda():
-    """Consulta la base de datos o retorna una muestra calculada si no hay registros aún."""
+def _obtener_datos_hacienda(establecimiento_id=None):
+    """Consulta la base de datos filtrando por establecimiento o retorna una muestra vacía."""
     try:
-        qs = Ganado.objects.all()
+        qs = Ganado.objects.filter(establecimiento_id=establecimiento_id) if establecimiento_id else Ganado.objects.all()
         total = qs.count()
         if total > 0:
             agg = qs.aggregate(
@@ -40,7 +40,7 @@ def _obtener_datos_hacienda():
                 "por_categoria": por_categoria,
             }
             return animales_lista, metricas
-    except Exception as e:
+    except Exception:
         # Fallback si las tablas unmanaged aún no existen en el entorno de pruebas
         pass
 
@@ -53,9 +53,9 @@ def _obtener_datos_hacienda():
     }
 
 
-def _obtener_datos_insumos():
+def _obtener_datos_insumos(establecimiento_id=None):
     try:
-        qs = Insumo.objects.all()
+        qs = Insumo.objects.filter(establecimiento_id=establecimiento_id) if establecimiento_id else Insumo.objects.all()
         if qs.exists():
             return list(qs.values("nombre", "categoria", "stock_actual", "stock_minimo", "unidad", "ubicacion", "estado", "requiere_reposicion"))
     except Exception:
@@ -72,23 +72,33 @@ class ResumenEjecutivoView(APIView):
 
     def get(self, request):
         try:
-            animales, metricas_ganado = _obtener_datos_hacienda()
+            est_id = getattr(request.user, "establecimiento_id", None)
+            animales, metricas_ganado = _obtener_datos_hacienda(est_id)
             
             # Sanidad defensiva
             try:
-                eventos_pendientes = SanidadEvento.objects.filter(estado__iexact="Pendiente").count()
+                san_qs = SanidadEvento.objects.filter(estado__iexact="Pendiente")
+                if est_id:
+                    san_qs = san_qs.filter(establecimiento_id=est_id)
+                eventos_pendientes = san_qs.count()
             except Exception:
                 eventos_pendientes = 0
             
             # Insumos defensivos
             try:
-                insumos_criticos = Insumo.objects.filter(requiere_reposicion=True).count()
+                ins_qs = Insumo.objects.filter(requiere_reposicion=True)
+                if est_id:
+                    ins_qs = ins_qs.filter(establecimiento_id=est_id)
+                insumos_criticos = ins_qs.count()
             except Exception:
                 insumos_criticos = 0
 
             # Partes defensivos
             try:
-                partes_pendientes = ParteDiario.objects.filter(estado="PENDIENTE").count()
+                partes_qs = ParteDiario.objects.filter(estado="PENDIENTE")
+                if est_id:
+                    partes_qs = partes_qs.filter(establecimiento_id=est_id)
+                partes_pendientes = partes_qs.count()
             except Exception:
                 partes_pendientes = 0
 
@@ -111,7 +121,7 @@ class ResumenEjecutivoView(APIView):
             }
             return api_success(data=resumen, mensaje="Resumen ejecutivo calculado exitosamente.")
         except Exception as e:
-            return api_error(mensaje=f"Error al calcular resumen: {str(e)}", status_code=500)
+            return api_error(mensaje=f"Error al calcular resumen: {e!s}", status_code=500)
 
 
 class ExportarPdfHaciendaView(APIView):
@@ -123,14 +133,15 @@ class ExportarPdfHaciendaView(APIView):
 
     def get(self, request):
         try:
-            animales, metricas = _obtener_datos_hacienda()
+            est_id = getattr(request.user, "establecimiento_id", None)
+            animales, metricas = _obtener_datos_hacienda(est_id)
             pdf_buffer = generar_pdf_hacienda(animales, metricas)
             
             response = HttpResponse(pdf_buffer.getvalue(), content_type="application/pdf")
             response["Content-Disposition"] = 'attachment; filename="vakera_informe_hacienda.pdf"'
             return response
         except Exception as e:
-            return api_error(mensaje=f"Error al generar PDF: {str(e)}", status_code=500)
+            return api_error(mensaje=f"Error al generar PDF: {e!s}", status_code=500)
 
 
 class ExportarExcelStockView(APIView):
@@ -141,8 +152,9 @@ class ExportarExcelStockView(APIView):
 
     def get(self, request):
         try:
-            animales, _ = _obtener_datos_hacienda()
-            insumos = _obtener_datos_insumos()
+            est_id = getattr(request.user, "establecimiento_id", None)
+            animales, _ = _obtener_datos_hacienda(est_id)
+            insumos = _obtener_datos_insumos(est_id)
             excel_buffer = generar_excel_inventario(animales, insumos)
 
             response = HttpResponse(
@@ -152,4 +164,4 @@ class ExportarExcelStockView(APIView):
             response["Content-Disposition"] = 'attachment; filename="vakera_inventario_general.xlsx"'
             return response
         except Exception as e:
-            return api_error(mensaje=f"Error al generar Excel: {str(e)}", status_code=500)
+            return api_error(mensaje=f"Error al generar Excel: {e!s}", status_code=500)

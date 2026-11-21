@@ -86,17 +86,19 @@ class DashboardController {
   static async actualizarGanado(req, res) {
     try {
       const { id } = req.params;
-      const animal = await GanadoModel.actualizar(id, req.body);
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const animal = await GanadoModel.actualizar(id, req.body, estId);
       return exito(res, animal, "Ficha de ganado actualizada correctamente.");
     } catch (err) {
-      return error(res, err.message, 400);
+      return error(res, err.message, err.status || 400);
     }
   }
 
   static async obtenerFichaAnimal(req, res) {
     try {
       const { id } = req.params;
-      const animal = await GanadoModel.buscarPorId(id);
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const animal = await GanadoModel.buscarPorId(id, estId);
       if (!animal) return error(res, "Animal no encontrado.", 404);
       return exito(res, animal);
     } catch (err) {
@@ -107,11 +109,12 @@ class DashboardController {
   static async darDeBajaAnimal(req, res) {
     try {
       const { id } = req.params;
+      const { estId } = obtenerEstablecimientoContexto(req);
       const { motivo } = req.body || {};
-      const baja = await GanadoModel.darDeBaja(id, motivo);
+      const baja = await GanadoModel.darDeBaja(id, motivo, estId);
       return exito(res, baja, `Baja del animal registrada con éxito (${motivo || "Venta"}).`);
     } catch (err) {
-      return error(res, err.message, 400);
+      return error(res, err.message, err.status || 400);
     }
   }
 
@@ -132,18 +135,31 @@ class DashboardController {
 
   static async trasladoMasivoGanado(req, res) {
     try {
+      const { estId } = obtenerEstablecimientoContexto(req);
       const { animalIds, potreroDestinoId } = req.body || {};
-      const resultado = await GanadoModel.trasladoMasivo(animalIds, potreroDestinoId);
+      const resultado = await GanadoModel.trasladoMasivo(animalIds, potreroDestinoId, estId);
       return exito(res, resultado, `Traslado masivo completado exitosamente.`);
     } catch (err) {
-      return error(res, err.message, 400);
+      return error(res, err.message, err.status || 400);
     }
   }
 
   static async registrarPotrero(req, res) {
     try {
       const { estId, estNombre } = obtenerEstablecimientoContexto(req);
+      const permiso = await ParcelaPermisoModel.tienePermisoParaAccion({
+        usuarioId: req.usuario?.id,
+        rol: req.usuario?.rol,
+        establecimientoId: estId,
+        accion: "AGREGAR",
+      });
+      if (!permiso.autorizado) {
+        return error(res, "Acceso denegado: no tenés autorización para crear parcelas. Solicitá permiso al Dueño.", 403);
+      }
       const nuevo = await GanadoModel.crearPotrero(req.body, estId, estNombre);
+      if (permiso.solicitudId) {
+        await ParcelaPermisoModel.consumirPermiso(permiso.solicitudId);
+      }
       return exito(res, nuevo, "Potrero creado exitosamente.", 201);
     } catch (err) {
       return error(res, err.message, 400);
@@ -154,7 +170,20 @@ class DashboardController {
     try {
       const { id } = req.params;
       const { estId } = obtenerEstablecimientoContexto(req);
+      const permiso = await ParcelaPermisoModel.tienePermisoParaAccion({
+        usuarioId: req.usuario?.id,
+        rol: req.usuario?.rol,
+        establecimientoId: estId,
+        accion: "EDITAR",
+        parcelaId: id,
+      });
+      if (!permiso.autorizado) {
+        return error(res, "Acceso denegado: no tenés autorización para editar esta parcela. Solicitá permiso al Dueño.", 403);
+      }
       const actualizado = await GanadoModel.actualizarPotrero(id, req.body || {}, estId);
+      if (permiso.solicitudId) {
+        await ParcelaPermisoModel.consumirPermiso(permiso.solicitudId);
+      }
       const nombreAnterior = actualizado.nombreAnterior || req.body?.nombreAnterior;
       if (nombreAnterior && actualizado.nombre && nombreAnterior !== actualizado.nombre) {
         try {
@@ -209,11 +238,12 @@ class DashboardController {
   static async actualizarEstadoSanitario(req, res) {
     try {
       const { id } = req.params;
+      const { estId } = obtenerEstablecimientoContexto(req);
       const { estado } = req.body;
-      const actualizado = await SanidadModel.actualizarEstado(id, estado);
+      const actualizado = await SanidadModel.actualizarEstado(id, estado, estId);
       return exito(res, actualizado, `Evento sanitario actualizado a '${estado}'.`);
     } catch (err) {
-      return error(res, err.message, 400);
+      return error(res, err.message, err.status || 400);
     }
   }
 
@@ -267,11 +297,12 @@ class DashboardController {
   static async actualizarStockInsumo(req, res) {
     try {
       const { id } = req.params;
+      const { estId } = obtenerEstablecimientoContexto(req);
       const { cantidad, operacion } = req.body;
-      const actualizado = await InsumoModel.actualizarStock(id, cantidad, operacion);
+      const actualizado = await InsumoModel.actualizarStock(id, cantidad, operacion, estId);
       return exito(res, actualizado, "Stock de insumo actualizado correctamente.");
     } catch (err) {
-      return error(res, err.message, 400);
+      return error(res, err.message, err.status || 400);
     }
   }
 
@@ -282,7 +313,7 @@ class DashboardController {
       const eliminado = await InsumoModel.eliminar(id, estId);
       return exito(res, eliminado, "Insumo eliminado del inventario exitosamente.");
     } catch (err) {
-      return error(res, err.message, 400);
+      return error(res, err.message, err.status || 400);
     }
   }
 
@@ -409,16 +440,17 @@ class DashboardController {
   static async conteoPertenencias(req, res) {
     try {
       const { id } = req.params;
+      const { estId } = obtenerEstablecimientoContexto(req);
       const { stockContado } = req.body;
 
       if (stockContado === undefined || stockContado === null) {
         return error(res, "Debe ingresar la cantidad física contada.", 400);
       }
 
-      const actualizado = await InsumoModel.actualizarStock(id, stockContado, "conteo");
+      const actualizado = await InsumoModel.actualizarStock(id, stockContado, "conteo", estId);
       return exito(res, actualizado, `Conteo de pertenencias actualizado a ${stockContado} ${actualizado.unidad}.`);
     } catch (err) {
-      return error(res, err.message, 400);
+      return error(res, err.message, err.status || 400);
     }
   }
 
@@ -476,10 +508,11 @@ class DashboardController {
     }
 
     try {
-      const parteActualizado = await ParteDiarioModel.cambiarEstado(id, estadoNormalizado, req.usuario);
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const parteActualizado = await ParteDiarioModel.cambiarEstado(id, estadoNormalizado, req.usuario, estId);
       return exito(res, parteActualizado, `Parte diario marcado como ${estadoNormalizado}.`);
     } catch (err) {
-      return error(res, "Error al actualizar estado del parte diario: " + err.message, 500);
+      return error(res, "Error al actualizar estado del parte diario: " + err.message, err.status || 500);
     }
   }
 
@@ -854,16 +887,27 @@ class DashboardController {
         }).catch(() => ({ solicitudesPendientes: [] })),
       ]);
 
+      const solicitudesPendientes = permisos?.solicitudesPendientes || [];
+      const notificaciones = solicitudesPendientes.map((sol) => ({
+        id: `notif-perm-${sol.id}`,
+        tipo: "permiso_parcela",
+        solicitudId: sol.id,
+        titulo: `Solicitud de permiso de parcela (${sol.accion})`,
+        mensaje: `${sol.solicitanteNombre || "Administración"} solicita permiso para ${sol.accion}`,
+        fecha: sol.fechaSolicitud,
+      }));
+
       return exito(res, {
         alertasSanitarias: alertas.length,
         insumosCriticos: criticos.length,
         partesPendientes: pendientes.length,
-        solicitudesParcelas: (permisos?.solicitudesPendientes || []).length,
+        solicitudesParcelas: solicitudesPendientes.length,
+        notificaciones,
         total:
           alertas.length +
           criticos.length +
           pendientes.length +
-          (permisos?.solicitudesPendientes || []).length,
+          solicitudesPendientes.length,
       });
     } catch (err) {
       return error(res, "Error al consultar notificaciones: " + err.message, 500);

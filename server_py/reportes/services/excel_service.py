@@ -3,8 +3,9 @@ Servicio para la exportación de planillas de cálculo Excel (.xlsx) con openpyx
 """
 import io
 from datetime import datetime
+
 import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 
 def generar_excel_inventario(animales_data, insumos_data):

@@ -1,6 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 const compression = require("compression");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 
 const path = require("path");
 const fs = require("fs");
@@ -31,6 +33,9 @@ const chatRoutes = require("./routes/chat.routes");
 const app = express();
 const PORT = process.env.PORT || 4000;
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
+if (IS_PRODUCTION) {
+  app.set("trust proxy", 1);
+}
 
 // --- CORS: restringir orígenes en producción ---
 const origenesPermitidos = process.env.CORS_ORIGINS
@@ -54,9 +59,21 @@ app.use(
   })
 );
 
+app.use(helmet());
 app.use(compression());
 
 app.use(express.json({ limit: "1mb" }));
+
+// Rate limiting estricto para autenticación (desactivado en entorno de tests)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test",
+  message: { ok: false, error: "Demasiados intentos de acceso. Intente nuevamente en 15 minutos." },
+});
+app.use("/api/auth", authLimiter);
 
 // Endpoint de verificación de salud del servidor
 app.get("/api/health", (req, res) => {

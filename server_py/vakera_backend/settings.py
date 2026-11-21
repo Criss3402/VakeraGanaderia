@@ -2,10 +2,11 @@
 Django settings for Vakera Ganaderia Backend (Python Module).
 Diseñado para coexistir con el backend principal de Node.js y Express.
 """
-from pathlib import Path
 import os
 import sys
 import urllib.parse
+from pathlib import Path
+
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -18,12 +19,26 @@ for env_path in env_paths:
         load_dotenv(dotenv_path=env_path)
         break
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "vakera-django-secret-key-production-dev-2026")
-DEBUG = os.getenv("DJANGO_DEBUG", "True").lower() in ("true", "1")
-ALLOWED_HOSTS = ["*"]
+DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() in ("true", "1")
+_corriendo_tests_cli = "test" in sys.argv or "pytest" in sys.modules
 
-# Clave compartida para verificar tokens emitidos por Node.js / Express
-JWT_SECRET = os.getenv("JWT_SECRET", "vakera_super_secret_jwt_key_2026")
+SECRET_KEY = os.getenv(
+    "DJANGO_SECRET_KEY",
+    "vakera-django-dev-secret-key-2026-solo-desarrollo-local-50chars" if (DEBUG or _corriendo_tests_cli) else "",
+)
+JWT_SECRET = os.getenv(
+    "JWT_SECRET",
+    "vakera_super_secret_jwt_key_2026" if (DEBUG or _corriendo_tests_cli) else "",
+)
+if not DEBUG and not _corriendo_tests_cli and (not SECRET_KEY or not JWT_SECRET):
+    raise RuntimeError("DJANGO_SECRET_KEY y JWT_SECRET son obligatorios cuando DJANGO_DEBUG=False.")
+
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver").split(",")
+    if h.strip()
+]
+
 JWT_ALGORITHM = "HS256"
 INTERNAL_WS_SECRET = os.getenv("INTERNAL_WS_SECRET", JWT_SECRET)
 
@@ -40,8 +55,10 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 ROOT_URLCONF = "vakera_backend.urls"
@@ -137,15 +154,42 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "60/minute",
+        "user": "300/minute",
+    },
     "EXCEPTION_HANDLER": "core.exceptions.vakera_exception_handler",
     "UNAUTHENTICATED_USER": None,
 }
 
 # -----------------------------------------------------------------------------
-# Configuración CORS
+# Configuración CORS y Headers de Seguridad
 # -----------------------------------------------------------------------------
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:5173,http://localhost:5174,http://localhost:4000",
+    ).split(",")
+    if o.strip()
+]
 CORS_ALLOW_CREDENTIALS = True
+X_FRAME_OPTIONS = "DENY"
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+if not DEBUG and not _corriendo_tests_cli:
+    SECURE_SSL_REDIRECT = os.getenv("DJANGO_SECURE_SSL_REDIRECT", "True").lower() == "true"
+    SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_SECURE_HSTS_SECONDS", "31536000"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # Internacionalización
 LANGUAGE_CODE = "es-ar"

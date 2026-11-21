@@ -3,10 +3,10 @@ Manejador global de excepciones para Django REST Framework en Vakera.
 Garantiza que cualquier error o fallo retorne el formato canónico:
 { "ok": False, "error": "...", "detalles": ... }
 """
-from django.db import OperationalError, DatabaseError
-from rest_framework.views import exception_handler
-from rest_framework.response import Response
+from django.db import DatabaseError, OperationalError
 from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import exception_handler
 
 
 def vakera_exception_handler(exc, context):

@@ -2,6 +2,7 @@
 Servicio de emisión de eventos en tiempo real hacia el Channel Layer de Django Channels.
 """
 import logging
+
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 

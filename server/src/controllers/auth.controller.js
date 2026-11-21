@@ -7,7 +7,7 @@ const { exito, error } = require("../utils/apiResponse");
 
 const { ROLES } = require("../utils/roles.constants");
 
-const JWT_SECRET = process.env.JWT_SECRET || "vakera_dev_secret_no_usar_en_produccion";
+const { JWT_SECRET } = require("../config/env");
 const JWT_EXPIRES_IN = "8h";
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -122,8 +122,8 @@ class AuthController {
     }
 
     try {
-      // Generar código numérico amigable de 6 dígitos para verificación
-      const tokenVerificacion = Math.floor(100000 + Math.random() * 900000).toString();
+      // Generar código numérico criptográfico de 6 dígitos para verificación
+      const tokenVerificacion = crypto.randomInt(100000, 1000000).toString();
       const tokenExpiracion = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
 
       const nuevoUsuario = await UsuarioModel.crear({
@@ -231,12 +231,12 @@ class AuthController {
         return error(res, "Esta cuenta ya está verificada. Podés iniciar sesión normalmente.", 400);
       }
 
-      const nuevoToken = Math.floor(100000 + Math.random() * 900000).toString();
+      const nuevoToken = crypto.randomInt(100000, 1000000).toString();
       const nuevaExpiracion = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
       await UsuarioModel.guardarTokenVerificacion(usuario.id, nuevoToken, nuevaExpiracion);
 
-      const urlBase = req.headers.origin || "http://localhost:5173";
+      const urlBase = process.env.FRONTEND_URL || "http://localhost:5173";
       await emailService.enviarEmailVerificacion({
         email: usuario.email,
         nombre: usuario.nombre,
@@ -277,12 +277,12 @@ class AuthController {
       }
 
       // Código de 6 dígitos para recuperación
-      const tokenRecuperacion = Math.floor(100000 + Math.random() * 900000).toString();
+      const tokenRecuperacion = crypto.randomInt(100000, 1000000).toString();
       const expiracion = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
 
       await UsuarioModel.guardarTokenRecuperacion(usuario.id, tokenRecuperacion, expiracion);
 
-      const urlBase = req.headers.origin || "http://localhost:5173";
+      const urlBase = process.env.FRONTEND_URL || "http://localhost:5173";
       await emailService.enviarEmailRecuperacion({
         email: usuario.email,
         nombre: usuario.nombre,

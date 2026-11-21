@@ -158,6 +158,9 @@ describe("API — /api/permisos (Gestión de Roles, Asignación y Control de Emp
 
   describe("PATCH /api/permisos/usuarios/:id/rol (Modificación y Protección I7)", () => {
     it("dueño cambia el rol de un colaborador a un rol permitido y responde 200", async () => {
+      const colab = db.usuarios.find((u) => u.id === "usr-3");
+      if (colab) colab.establecimientoId = "est-el-rancho";
+
       const tokenDueno = firmarToken({
         id: "usr-1",
         rol: ROLES.DUENO,

@@ -85,8 +85,19 @@ class SanidadModel {
     }
   }
 
-  static async actualizarEstado(id, nuevoEstado) {
+  static async actualizarEstado(id, nuevoEstado, establecimientoId = null) {
     try {
+      if (establecimientoId) {
+        const existe = await prisma.sanidadEvento.findFirst({
+          where: { id, establecimientoId },
+          select: { id: true },
+        });
+        if (!existe) {
+          const err = new Error("Evento sanitario no encontrado en este establecimiento.");
+          err.status = 404;
+          throw err;
+        }
+      }
       const act = await prisma.sanidadEvento.update({
         where: { id },
         data: { estado: nuevoEstado },
@@ -96,12 +107,18 @@ class SanidadModel {
         fechaProgramada: act.fechaProgramada ? act.fechaProgramada.toISOString().split("T")[0] : null,
       };
     } catch (e) {
-      const ev = (db.sanidad || []).find((s) => s.id === id);
+      if (e.status === 404) throw e;
+      const ev = (db.sanidad || []).find((s) => {
+        if (s.id !== id) return false;
+        return establecimientoId ? s.establecimientoId === establecimientoId : true;
+      });
       if (ev) {
         ev.estado = nuevoEstado;
         return ev;
       }
-      throw e;
+      const err = new Error("Evento sanitario no encontrado en este establecimiento.");
+      err.status = 404;
+      throw err;
     }
   }
 

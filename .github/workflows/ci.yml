@@ -1,0 +1,42 @@
+name: Vakera CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  node-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm --prefix server ci
+      - run: npx prisma generate --schema=prisma/schema.prisma
+      - run: npm --prefix server audit --omit=dev --audit-level=high
+      - run: node --test server/tests/api/dashboard.api.test.js server/tests/unit/*.test.js
+
+  python-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r server_py/requirements.txt
+      - run: python server_py/manage.py check
+      - run: python server_py/manage.py test core nutricion reportes
+
+  react-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm --prefix client ci
+      - run: npm --prefix client test
+      - run: npm --prefix client run build

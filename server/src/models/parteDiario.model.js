@@ -169,18 +169,24 @@ class ParteDiarioModel {
     }
   }
 
-  static async cambiarEstado(id, nuevoEstado, revisorUsuario = null) {
+  static async cambiarEstado(id, nuevoEstado, revisorUsuario = null, establecimientoId = null) {
     const estadoMayus = (nuevoEstado || "").toUpperCase();
     const ESTADOS = ["PENDIENTE", "APROBADO", "RECHAZADO"];
     if (!ESTADOS.includes(estadoMayus)) {
       throw new Error(`Estado inválido: ${nuevoEstado}. Debe ser uno de: ${ESTADOS.join(", ")}`);
     }
 
+    const estId = establecimientoId || (typeof revisorUsuario === "object" ? revisorUsuario?.establecimientoId : null);
     const revisadoPorId = typeof revisorUsuario === "string" ? revisorUsuario : revisorUsuario?.id;
 
     try {
       const parteExistente = await prisma.parteDiario.findUnique({ where: { id } });
       if (parteExistente) {
+        if (estId && parteExistente.establecimientoId && parteExistente.establecimientoId !== estId) {
+          const err = new Error("Parte diario no encontrado en este establecimiento.");
+          err.status = 404;
+          throw err;
+        }
         const dataUpdate = {
           estado: estadoMayus,
           fechaRevision: new Date(),
@@ -201,13 +207,19 @@ class ParteDiarioModel {
         return this.formatearParte(actualizado);
       }
     } catch (err) {
+      if (err.status === 404) throw err;
       console.warn("[ParteDiarioModel] Fallo al actualizar en Prisma, probando fallback:", err.message);
     }
 
     // Fallback en memoria
-    const parte = (db.partesDiarios || []).find((p) => p.id === id);
+    const parte = (db.partesDiarios || []).find((p) => {
+      if (p.id !== id) return false;
+      return estId ? p.establecimientoId === estId : true;
+    });
     if (!parte) {
-      throw new Error("Parte diario no encontrado.");
+      const err = new Error("Parte diario no encontrado.");
+      err.status = 404;
+      throw err;
     }
     parte.estado = estadoMayus;
     parte.revisadoPor = typeof revisorUsuario === "object" && revisorUsuario ? `${revisorUsuario.nombre} (${revisorUsuario.rol})` : "Supervisor";

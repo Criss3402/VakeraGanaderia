@@ -3,10 +3,11 @@ Servicio para la generación de reportes oficiales en formato PDF con ReportLab.
 """
 import io
 from datetime import datetime
-from reportlab.lib.pagesizes import letter
+
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 
 def generar_pdf_hacienda(animales_data, metricas):

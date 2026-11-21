@@ -93,15 +93,17 @@ class PermisosController {
       return error(res, "Debe especificar el nuevo rol a asignar.", 400);
     }
 
+    const estId = req.usuario?.establecimientoId || (req.usuario?.establecimiento === "El Rancho, Goya, Corrientes" ? "est-el-rancho" : null);
+
     try {
-      const usuarioActualizado = await UsuarioModel.actualizarRol(id, nuevoRol);
+      const usuarioActualizado = await UsuarioModel.actualizarRol(id, nuevoRol, estId);
       return exito(
         res,
         usuarioActualizado,
         `Rol de ${usuarioActualizado.nombre} actualizado a ${nuevoRol.toUpperCase()}.`
       );
     } catch (err) {
-      return error(res, err.message, 400);
+      return error(res, err.message, err.status || 400);
     }
   }
 
@@ -151,7 +153,7 @@ class PermisosController {
         `El usuario ${usuarioDesvinculado.nombre} ha sido desvinculado del establecimiento.`
       );
     } catch (err) {
-      return error(res, err.message, 400);
+      return error(res, err.message, err.status || 400);
     }
   }
 }

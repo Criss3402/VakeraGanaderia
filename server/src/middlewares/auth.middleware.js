@@ -2,7 +2,7 @@ const jwt = require("jsonwebtoken");
 const UsuarioModel = require("../models/usuario.model");
 const { error } = require("../utils/apiResponse");
 
-const JWT_SECRET = process.env.JWT_SECRET || "vakera_dev_secret_no_usar_en_produccion";
+const { JWT_SECRET } = require("../config/env");
 
 async function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;

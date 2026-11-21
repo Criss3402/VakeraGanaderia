@@ -321,16 +321,26 @@ class UsuarioModel {
     }
   }
 
-  static async actualizarRol(id, nuevoRol) {
+  static async actualizarRol(id, nuevoRol, establecimientoId = null) {
     // Validar que el nuevo rol sea válido
     const rolNormalizado = nuevoRol.toUpperCase();
     if (!ROLES_LIST.includes(rolNormalizado.toLowerCase())) {
       throw new Error(`Rol inválido: ${nuevoRol}. Roles permitidos: ${ROLES_LIST.join(", ")}`);
     }
 
-    // No permitir degradar al dueño del establecimiento
+    // Verificar existencia y pertenencia al establecimiento (prevención IDOR)
     const actual = await this.buscarPorId(id);
-    if (actual && (actual.email === "dueno@vakera.com" || actual.rol === "dueno") && rolNormalizado !== "DUENO") {
+    if (!actual) {
+      throw new Error("Usuario no encontrado.");
+    }
+    if (establecimientoId && actual.establecimientoId !== establecimientoId) {
+      const err = new Error("Usuario no encontrado en este establecimiento.");
+      err.status = 404;
+      throw err;
+    }
+
+    // No permitir degradar al dueño del establecimiento
+    if ((actual.email === "dueno@vakera.com" || actual.rol === "dueno") && rolNormalizado !== "DUENO") {
       throw new Error("No es posible modificar el rol del propietario del establecimiento.");
     }
 
@@ -401,6 +411,11 @@ class UsuarioModel {
     const usuario = await this.buscarPorId(id);
     if (!usuario) {
       throw new Error("Usuario no encontrado.");
+    }
+    if (establecimientoId && usuario.establecimientoId !== establecimientoId) {
+      const err = new Error("Usuario no encontrado en este establecimiento.");
+      err.status = 404;
+      throw err;
     }
     if (usuario.rol === "dueno") {
       throw new Error("No es posible desvincular al propietario del establecimiento.");

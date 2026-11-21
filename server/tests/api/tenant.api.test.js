@@ -306,7 +306,6 @@ describe("Fase 3B — Aislamiento Multi-Tenant y Protección IDOR (Contrato API)
 
     it(
       "R3 IDOR: DELETE /api/dashboard/ganado/:idB de otro tenant debe responder 404 y no dar de baja",
-      { todo: "R3: GanadoModel.darDeBaja no valida establecimientoId y permite dar de baja ganado de otro tenant" },
       async () => {
         const res = await request(app)
           .delete("/api/dashboard/ganado/gan-tenant-b")
@@ -323,7 +322,6 @@ describe("Fase 3B — Aislamiento Multi-Tenant y Protección IDOR (Contrato API)
 
     it(
       "R3 IDOR: PATCH /api/dashboard/insumos/:idB/stock de otro tenant debe responder 404 y no alterar stock",
-      { todo: "R3: InsumoModel.actualizarStock no valida establecimientoId y altera inventario ajeno" },
       async () => {
         const res = await request(app)
           .patch("/api/dashboard/insumos/ins-tenant-b/stock")
@@ -341,7 +339,6 @@ describe("Fase 3B — Aislamiento Multi-Tenant y Protección IDOR (Contrato API)
 
     it(
       "R3 IDOR: DELETE /api/dashboard/insumos/:idB de otro tenant debe responder 404 y no eliminar",
-      { todo: "R3: DashboardController.eliminarInsumo responde 400 en vez de 404 para recursos ajenos" },
       async () => {
         const res = await request(app)
           .delete("/api/dashboard/insumos/ins-tenant-b")
@@ -358,7 +355,6 @@ describe("Fase 3B — Aislamiento Multi-Tenant y Protección IDOR (Contrato API)
 
     it(
       "R3 IDOR: PATCH /api/dashboard/partes/:idB/estado de otro tenant debe responder 404 y no alterar el estado",
-      { todo: "R3: ParteDiarioModel.cambiarEstado no valida establecimientoId y permite aprobar partes ajenos" },
       async () => {
         const res = await request(app)
           .patch("/api/dashboard/partes/part-tenant-b/estado")
@@ -376,7 +372,6 @@ describe("Fase 3B — Aislamiento Multi-Tenant y Protección IDOR (Contrato API)
 
     it(
       "R3 IDOR: PATCH /api/dashboard/sanidad/:idB/estado de otro tenant debe responder 404 y no alterar evento",
-      { todo: "R3: SanidadModel.actualizarEstado no valida establecimientoId y altera eventos de otro tenant" },
       async () => {
         const res = await request(app)
           .patch("/api/dashboard/sanidad/san-tenant-b/estado")
@@ -394,7 +389,6 @@ describe("Fase 3B — Aislamiento Multi-Tenant y Protección IDOR (Contrato API)
 
     it(
       "R3 IDOR: POST /api/dashboard/ganado/traslado-masivo hacia potrero de otro tenant debe responder 404",
-      { todo: "R3: GanadoModel.trasladoMasivo no valida que el potreroDestinoId pertenezca al tenant del solicitante" },
       async () => {
         const res = await request(app)
           .post("/api/dashboard/ganado/traslado-masivo")
@@ -415,7 +409,6 @@ describe("Fase 3B — Aislamiento Multi-Tenant y Protección IDOR (Contrato API)
 
     it(
       "R3 IDOR: PATCH /api/permisos/usuarios/:idB/rol de otro tenant debe responder 404 y no alterar el rol",
-      { todo: "R3: PermisosController y UsuarioModel.actualizarRol no validan tenantId del usuario a modificar" },
       async () => {
         const res = await request(app)
           .patch("/api/permisos/usuarios/usr-peon-b/rol")

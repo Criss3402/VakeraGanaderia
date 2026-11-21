@@ -2,13 +2,15 @@
 Tests para autenticación unificada JWT y RBAC en Django.
 """
 import time
+
 import jwt
-from django.test import TestCase
 from django.conf import settings
-from rest_framework.test import APIRequestFactory
+from django.test import TestCase
 from rest_framework.exceptions import AuthenticationFailed
-from core.authentication import UnifiedJWTAuthentication, AuthUser
-from core.permissions import IsDueno, IsPeon, CanAccessReports
+from rest_framework.test import APIRequestFactory
+
+from core.authentication import AuthUser, UnifiedJWTAuthentication
+from core.permissions import CanAccessReports, IsDueno, IsPeon
 
 
 class UnifiedJWTAuthenticationTestCase(TestCase):

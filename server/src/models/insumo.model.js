@@ -176,10 +176,16 @@ class InsumoModel {
     }
   }
 
-  static async actualizarStock(id, cantidadCambio, operacion = "sumar") {
+  static async actualizarStock(id, cantidadCambio, operacion = "sumar", establecimientoId = null) {
     try {
-      const actual = await prisma.insumo.findUnique({ where: { id } });
-      if (!actual) throw new Error("Insumo no encontrado");
+      const whereClause = { id };
+      if (establecimientoId) whereClause.establecimientoId = establecimientoId;
+      const actual = await prisma.insumo.findFirst({ where: whereClause });
+      if (!actual) {
+        const err = new Error("Insumo no encontrado en este establecimiento.");
+        err.status = 404;
+        throw err;
+      }
 
       const delta = parseFloat(cantidadCambio) || 0;
       let nuevoStock = actual.stockActual;
@@ -204,7 +210,11 @@ class InsumoModel {
         },
       });
     } catch (e) {
-      const insumo = (db.insumos || []).find((i) => i.id === id);
+      if (e.status === 404) throw e;
+      const insumo = (db.insumos || []).find((i) => {
+        if (i.id !== id) return false;
+        return establecimientoId ? i.establecimientoId === establecimientoId : true;
+      });
       if (insumo) {
         const delta = parseFloat(cantidadCambio) || 0;
         if (operacion === "conteo") {
@@ -218,18 +228,32 @@ class InsumoModel {
         insumo.estado = insumo.requiereReposicion ? "Bajo Stock" : "OK";
         return insumo;
       }
-      throw e;
+      const err = new Error("Insumo no encontrado en este establecimiento.");
+      err.status = 404;
+      throw err;
     }
   }
 
   static async eliminar(id, establecimientoId) {
     if (!id) throw new Error("ID de insumo requerido.");
     try {
+      if (establecimientoId) {
+        const existe = await prisma.insumo.findFirst({
+          where: { id, establecimientoId },
+          select: { id: true },
+        });
+        if (!existe) {
+          const err = new Error("Insumo no encontrado en este establecimiento.");
+          err.status = 404;
+          throw err;
+        }
+      }
       const eliminado = await prisma.insumo.delete({
         where: { id },
       });
       return eliminado;
     } catch (e) {
+      if (e.status === 404) throw e;
       console.warn("[InsumoModel] Fallo al eliminar en Prisma, usando fallback:", e.message);
       if (Array.isArray(db.insumos)) {
         const idx = db.insumos.findIndex(
@@ -240,7 +264,9 @@ class InsumoModel {
           return del;
         }
       }
-      throw new Error("Insumo no encontrado o ya eliminado.");
+      const err = new Error("Insumo no encontrado o ya eliminado.");
+      err.status = 404;
+      throw err;
     }
   }
 

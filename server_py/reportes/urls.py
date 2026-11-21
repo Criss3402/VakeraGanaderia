@@ -2,7 +2,12 @@
 Rutas para el subsistema de Reportes.
 """
 from django.urls import path
-from reportes.views import ResumenEjecutivoView, ExportarPdfHaciendaView, ExportarExcelStockView
+
+from reportes.views import (
+    ExportarExcelStockView,
+    ExportarPdfHaciendaView,
+    ResumenEjecutivoView,
+)
 
 urlpatterns = [
     path("resumen-ejecutivo", ResumenEjecutivoView.as_view(), name="reportes-resumen"),

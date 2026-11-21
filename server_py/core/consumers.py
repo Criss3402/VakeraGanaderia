@@ -3,6 +3,7 @@ Consumers WebSocket de tiempo real para Vakera (Django Channels).
 Maneja autenticación por JWT, presencia online/offline y broadcast de eventos.
 """
 import json
+
 from channels.generic.websocket import AsyncWebsocketConsumer
 
 

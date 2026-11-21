@@ -116,11 +116,13 @@ class GanadoModel {
     }
   }
 
-  static async buscarPorId(id) {
+  static async buscarPorId(id, establecimientoId) {
     if (!id) return null;
     try {
-      const g = await prisma.ganado.findUnique({
-        where: { id },
+      const whereClause = { id };
+      if (establecimientoId) whereClause.establecimientoId = establecimientoId;
+      const g = await prisma.ganado.findFirst({
+        where: whereClause,
         include: {
           potrero: true,
           eventosSanitarios: {
@@ -136,7 +138,10 @@ class GanadoModel {
         potreroNombre: g.potrero ? g.potrero.nombre : "Sin potrero asignado",
       };
     } catch {
-      return (db.ganado || []).find((g) => g.id === id) || null;
+      return (db.ganado || []).find((g) => {
+        if (g.id !== id) return false;
+        return establecimientoId ? g.establecimientoId === establecimientoId : true;
+      }) || null;
     }
   }
 
@@ -348,8 +353,20 @@ class GanadoModel {
     }
   }
 
-  static async actualizar(id, datos) {
+  static async actualizar(id, datos, establecimientoId) {
     try {
+      if (establecimientoId) {
+        const existente = await prisma.ganado.findFirst({
+          where: { id, establecimientoId },
+          select: { id: true },
+        });
+        if (!existente) {
+          const err = new Error("Animal no encontrado en este establecimiento.");
+          err.status = 404;
+          throw err;
+        }
+      }
+
       const dataUpdate = {};
       if (datos.caravana) dataUpdate.caravana = datos.caravana.trim().toUpperCase();
       if (datos.categoria) dataUpdate.categoria = datos.categoria;
@@ -371,28 +388,51 @@ class GanadoModel {
         potreroNombre: actualizado.potrero ? actualizado.potrero.nombre : "Sin potrero asignado",
       };
     } catch (e) {
-      const index = (db.ganado || []).findIndex((g) => g.id === id);
+      if (e.status === 404) throw e;
+      const index = (db.ganado || []).findIndex((g) => {
+        if (g.id !== id) return false;
+        return establecimientoId ? g.establecimientoId === establecimientoId : true;
+      });
       if (index !== -1) {
         db.ganado[index] = { ...db.ganado[index], ...datos };
         return db.ganado[index];
       }
-      throw e;
+      const err = new Error("Animal no encontrado en este establecimiento.");
+      err.status = 404;
+      throw err;
     }
   }
 
-  static async darDeBaja(id, motivo = "Venta") {
+  static async darDeBaja(id, motivo = "Venta", establecimientoId) {
     try {
+      if (establecimientoId) {
+        const existente = await prisma.ganado.findFirst({
+          where: { id, establecimientoId },
+          select: { id: true },
+        });
+        if (!existente) {
+          const err = new Error("Animal no encontrado en este establecimiento.");
+          err.status = 404;
+          throw err;
+        }
+      }
       const eliminado = await prisma.ganado.delete({
         where: { id },
       });
       return { ...eliminado, motivoBaja: motivo };
     } catch (e) {
-      const index = (db.ganado || []).findIndex((g) => g.id === id);
+      if (e.status === 404) throw e;
+      const index = (db.ganado || []).findIndex((g) => {
+        if (g.id !== id) return false;
+        return establecimientoId ? g.establecimientoId === establecimientoId : true;
+      });
       if (index !== -1) {
         const [del] = db.ganado.splice(index, 1);
         return { ...del, motivoBaja: motivo };
       }
-      throw e;
+      const err = new Error("Animal no encontrado en este establecimiento.");
+      err.status = 404;
+      throw err;
     }
   }
 
@@ -421,23 +461,55 @@ class GanadoModel {
     }
   }
 
-  static async trasladoMasivo(animalIds = [], potreroDestinoId) {
+  static async trasladoMasivo(animalIds = [], potreroDestinoId, establecimientoId) {
     if (!animalIds || animalIds.length === 0) {
       throw new Error("Debe seleccionar al menos un animal para trasladar.");
     }
 
     try {
+      if (establecimientoId && potreroDestinoId) {
+        const potrero = await prisma.potrero.findFirst({
+          where: { id: potreroDestinoId, establecimientoId },
+          select: { id: true },
+        });
+        if (!potrero) {
+          const err = new Error("El potrero destino no pertenece a este establecimiento.");
+          err.status = 404;
+          throw err;
+        }
+      }
+
+      const whereClause = { id: { in: animalIds } };
+      if (establecimientoId) whereClause.establecimientoId = establecimientoId;
       const res = await prisma.ganado.updateMany({
-        where: { id: { in: animalIds } },
+        where: whereClause,
         data: { potreroId: potreroDestinoId },
       });
       return res;
     } catch (e) {
+      if (e.status === 404) throw e;
+      if (establecimientoId && potreroDestinoId) {
+        const potreroMem = (db.potreros || []).find(
+          (p) => p.id === potreroDestinoId && p.establecimientoId === establecimientoId
+        );
+        if (!potreroMem) {
+          const err = new Error("El potrero destino no pertenece a este establecimiento.");
+          err.status = 404;
+          throw err;
+        }
+      }
+      let count = 0;
       animalIds.forEach((id) => {
-        const animal = (db.ganado || []).find((g) => g.id === id);
-        if (animal) animal.potreroId = potreroDestinoId;
+        const animal = (db.ganado || []).find((g) => {
+          if (g.id !== id) return false;
+          return establecimientoId ? g.establecimientoId === establecimientoId : true;
+        });
+        if (animal) {
+          animal.potreroId = potreroDestinoId;
+          count++;
+        }
       });
-      return { count: animalIds.length };
+      return { count };
     }
   }
 
