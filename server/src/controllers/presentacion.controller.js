@@ -1,6 +1,7 @@
 const servicios = require("../data/servicios");
 const db = require("../config/db");
 const prisma = require("../config/prisma");
+const emailService = require("../services/email.service");
 const { exito, error } = require("../utils/apiResponse");
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -41,9 +42,10 @@ class PresentacionController {
       return error(res, "El mensaje debe tener al menos 10 caracteres.", 400);
     }
 
+    let nuevoMensaje;
     try {
       // Persistir en PostgreSQL (Prisma)
-      const nuevoMensaje = await prisma.mensajeContacto.create({
+      nuevoMensaje = await prisma.mensajeContacto.create({
         data: {
           nombre: nombre.trim(),
           email: email.toLowerCase().trim(),
@@ -51,18 +53,11 @@ class PresentacionController {
           mensaje: mensaje.trim(),
         },
       });
-
-      return exito(
-        res,
-        nuevoMensaje,
-        "Gracias, recibimos tu mensaje. Te contactaremos a la brevedad.",
-        201
-      );
     } catch (err) {
       console.warn("Fallo Prisma en contacto, guardando en memoria:", err.message);
 
       // Fallback en memoria
-      const nuevoMensaje = {
+      nuevoMensaje = {
         id: db.mensajesContacto.length + 1,
         nombre: nombre.trim(),
         email: email.toLowerCase().trim(),
@@ -72,14 +67,25 @@ class PresentacionController {
         fechaEnvio: new Date().toISOString(),
       };
       db.mensajesContacto.push(nuevoMensaje);
-
-      return exito(
-        res,
-        nuevoMensaje,
-        "Gracias, recibimos tu mensaje. Te contactaremos a la brevedad.",
-        201
-      );
     }
+
+    try {
+      await emailService.enviarEmailContacto({
+        nombre: nuevoMensaje.nombre,
+        email: nuevoMensaje.email,
+        telefono: nuevoMensaje.telefono,
+        mensaje: nuevoMensaje.mensaje,
+      });
+    } catch (err) {
+      console.warn("No se pudo despachar el email de contacto:", err.message);
+    }
+
+    return exito(
+      res,
+      nuevoMensaje,
+      "Gracias, recibimos tu mensaje. Te contactaremos a la brevedad.",
+      201
+    );
   }
 
   static async listarContactos(req, res) {

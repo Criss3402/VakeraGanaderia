@@ -253,13 +253,13 @@ export default function PanelDueno({ alCambiarVista }) {
               className="p-4 rounded-xl bg-[#f8f5eb] border border-[#ded7c4] hover:border-[#33512f] transition-all cursor-pointer group"
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-[#182920]">Peones en Potreros</span>
+                <span className="text-xs font-bold text-[#182920]">Peones con Ganado</span>
                 <span className="text-[10px] bg-white px-2 py-0.5 rounded font-bold text-[#33512f] border border-[#ded7c4]">
                   Operario
                 </span>
               </div>
               <p className="text-xs text-[#555] mb-2">
-                Recorridas de potreros, reporte diario de nacimientos y estado de alambrados.
+                Recorridas de ganado, reporte diario de nacimientos y estado de alambrados.
               </p>
               <span className="text-xs font-bold text-[#33512f] group-hover:underline">
                 Ver estado de hacienda →
@@ -273,9 +273,9 @@ export default function PanelDueno({ alCambiarVista }) {
           <div>
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-[#ded7c4]">
               <h3 className="text-base font-bold text-[#182920] font-['Fraunces',serif]">
-                Zonificación de Potreros
+                Zonificación de Ganado
               </h3>
-              <span className="text-xs font-bold text-[#33512f]">{potreros.length} Potreros</span>
+              <span className="text-xs font-bold text-[#33512f]">{potreros.length} Sectores</span>
             </div>
 
             <div className="space-y-2.5">

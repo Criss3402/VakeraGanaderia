@@ -8,6 +8,9 @@ import {
   actualizarPotrero,
   eliminarPotrero,
   trasladoMasivoGanado,
+  obtenerPermisosParcelas,
+  solicitarPermisoParcelas,
+  responderPermisoParcelas,
 } from "../../../api/dashboard.api";
 import { useAuth } from "../../../context/AuthContext";
 
@@ -430,6 +433,12 @@ export default function ParcelasView() {
   const [modalTraslado, setModalTraslado] = useState(false);
   const [trasladoAnimalesIds, setTrasladoAnimalesIds] = useState([]);
 
+  // Permisos de parcelas (Administrador -> Dueño)
+  const [permisoParcelas, setPermisoParcelas] = useState(null);
+  const [modalSolicitarPermiso, setModalSolicitarPermiso] = useState(null); // { accion, parcelaId, parcelaNombre }
+  const [motivoPermiso, setMotivoPermiso] = useState("");
+  const [procesandoPermiso, setProcesandoPermiso] = useState(false);
+
   // Sincronizar refs para eventos de MapLibre sin stale closures
   const modoTrazadoRef = useRef(false);
   modoTrazadoRef.current = modoTrazado;
@@ -440,7 +449,17 @@ export default function ParcelasView() {
   const potrerosRef = useRef([]);
   potrerosRef.current = potreros;
 
-  const puedeGestionar = rol === "dueno" || rol === "capataz";
+  const rolNorm = String(rol || "").toLowerCase();
+  const esDueno = rolNorm === "dueno";
+  const esCapataz = rolNorm === "capataz";
+  const esOficina = rolNorm === "oficina";
+  const puedeGestionar = esDueno || esCapataz;
+  const permisoAgregarEstado = permisoParcelas?.permisoAgregarEstado || "NINGUNA";
+  const permisoAgregarAprobado = !esOficina || permisoAgregarEstado === "APROBADA";
+  const permisosEditarPorParcela = permisoParcelas?.permisosEditarPorParcela || {};
+  const obtenerEstadoPermisoEditar = (parcelaId) =>
+    permisosEditarPorParcela[parcelaId] || "NINGUNA";
+  const puedeCrearOEditar = puedeGestionar || esOficina;
 
   // Actualizar coordenadas de proyección SVG en pantalla (parcelas guardadas + trazado activo)
   const actualizarSvgOverlay = useCallback(() => {
@@ -633,10 +652,36 @@ export default function ParcelasView() {
     }
   }
 
+  const cargarPermisosParcelas = useCallback(async () => {
+    if (!esDueno && !esOficina) return;
+    try {
+      const res = await obtenerPermisosParcelas();
+      if (res?.data) {
+        setPermisoParcelas(res.data);
+      }
+    } catch (err) {
+      console.warn("[ParcelasView] No se pudieron cargar permisos de parcelas:", err.message);
+    }
+  }, [esDueno, esOficina]);
+
   useEffect(() => {
     setParcelaSeleccionada(null);
     cargarDatos();
-  }, [storageKeyCuenta]);
+    cargarPermisosParcelas();
+  }, [storageKeyCuenta, cargarPermisosParcelas]);
+
+  useEffect(() => {
+    function manejarActualizacionExterna() {
+      cargarPermisosParcelas();
+    }
+    window.addEventListener("vakera:permisos-parcelas-actualizados", manejarActualizacionExterna);
+    return () => {
+      window.removeEventListener(
+        "vakera:permisos-parcelas-actualizados",
+        manejarActualizacionExterna
+      );
+    };
+  }, [cargarPermisosParcelas]);
 
   function mostrarNotificacion(texto) {
     setMensaje(texto);
@@ -931,6 +976,18 @@ export default function ParcelasView() {
 
   // Activar modo delimitación de zona en el mapa (nueva parcela)
   function activarModoTrazado() {
+    if (esOficina && !permisoAgregarAprobado) {
+      setMenuMetricaAbierto(false);
+      setMenuAccionesAbierto(false);
+      if (permisoAgregarEstado === "PENDIENTE") {
+        mostrarNotificacion(
+          "Ya enviaste una solicitud para agregar una parcela. Esperando aprobación del Dueño."
+        );
+        return;
+      }
+      setModalSolicitarPermiso({ accion: "AGREGAR", parcelaId: null, parcelaNombre: null });
+      return;
+    }
     setParcelaEditandoId(null);
     setNombreOriginalEditando("");
     puntosTrazadoRef.current = [];
@@ -949,6 +1006,23 @@ export default function ParcelasView() {
     if (!parcela) return;
     setMenuMetricaAbierto(false);
     setMenuAccionesAbierto(false);
+    if (esOficina) {
+      const estadoEdit = obtenerEstadoPermisoEditar(parcela.id);
+      if (estadoEdit !== "APROBADA") {
+        if (estadoEdit === "PENDIENTE") {
+          mostrarNotificacion(
+            `Ya enviaste una solicitud para editar "${parcela.nombre}". Esperando aprobación del Dueño.`
+          );
+          return;
+        }
+        setModalSolicitarPermiso({
+          accion: "EDITAR",
+          parcelaId: parcela.id,
+          parcelaNombre: parcela.nombre,
+        });
+        return;
+      }
+    }
     setParcelaEditandoId(parcela.id);
     setNombreOriginalEditando(parcela.nombre || "");
     setFormularioZona({
@@ -976,6 +1050,51 @@ export default function ParcelasView() {
     marcadoresVerticesRef.current.forEach((m) => m.remove());
     marcadoresVerticesRef.current = [];
     mostrarNotificacion(`Re-trazando límites de "${formularioZona.nombre}": marca los nuevos vértices en el mapa.`);
+  }
+
+  async function manejarEnviarSolicitudPermiso(e) {
+    if (e) e.preventDefault();
+    if (procesandoPermiso) return;
+    setProcesandoPermiso(true);
+    try {
+      const res = await solicitarPermisoParcelas({
+        accion: modalSolicitarPermiso?.accion || "GESTIONAR",
+        parcelaId: modalSolicitarPermiso?.parcelaId || null,
+        parcelaNombre: modalSolicitarPermiso?.parcelaNombre || null,
+        motivo: motivoPermiso,
+      });
+      setModalSolicitarPermiso(null);
+      setMotivoPermiso("");
+      await cargarPermisosParcelas();
+      window.dispatchEvent(new CustomEvent("vakera:notificaciones-actualizar"));
+      mostrarNotificacion(
+        res?.mensaje || "Solicitud enviada al Dueño. Te avisaremos cuando la apruebe."
+      );
+    } catch (err) {
+      alert(err.message || "No se pudo enviar la solicitud de permiso.");
+    } finally {
+      setProcesandoPermiso(false);
+    }
+  }
+
+  async function manejarResponderPermisoDueno(solicitudId, estado) {
+    if (!solicitudId || procesandoPermiso) return;
+    setProcesandoPermiso(true);
+    try {
+      const res = await responderPermisoParcelas(solicitudId, estado);
+      await cargarPermisosParcelas();
+      window.dispatchEvent(new CustomEvent("vakera:notificaciones-actualizar"));
+      mostrarNotificacion(
+        res?.mensaje ||
+          (estado === "APROBADA"
+            ? "Permiso aprobado para el Administrador."
+            : "Solicitud rechazada.")
+      );
+    } catch (err) {
+      alert(err.message || "No se pudo responder la solicitud.");
+    } finally {
+      setProcesandoPermiso(false);
+    }
   }
 
   // Cancelar trazado
@@ -1126,6 +1245,10 @@ export default function ParcelasView() {
         marcadoresVerticesRef.current = [];
 
         setParcelaSeleccionada(parcelaActualizada);
+        if (esOficina) {
+          await cargarPermisosParcelas();
+          window.dispatchEvent(new CustomEvent("vakera:notificaciones-actualizar"));
+        }
         mostrarNotificacion(`¡Parcela "${nombreLimpio}" actualizada correctamente!`);
         return;
       }
@@ -1193,6 +1316,10 @@ export default function ParcelasView() {
       marcadoresVerticesRef.current.forEach((m) => m.remove());
       marcadoresVerticesRef.current = [];
 
+      if (esOficina) {
+        await cargarPermisosParcelas();
+        window.dispatchEvent(new CustomEvent("vakera:notificaciones-actualizar"));
+      }
       mostrarNotificacion(`¡Parcela "${nombreLimpio}" delimitada y sincronizada con las locaciones del campo!`);
 
       // Seleccionar y enfocar en la nueva parcela
@@ -1333,10 +1460,10 @@ export default function ParcelasView() {
             <span className="text-xs text-[#8fb56b]">Delimitación y Receptividad Satelital</span>
           </div>
           <h2 className="text-2xl font-bold font-['Fraunces',serif] text-[#f1ecdd]">
-            Mapeo de Parcelas & Potreros
+            Mapeo de Parcelas & Ganado
           </h2>
           <p className="text-xs text-[#ded7c4] mt-1 max-w-xl">
-            Traza directamente sobre el mapa satelital los límites de tus potreros para calcular superficies exactas, asignar hacienda y monitorear el balance forrajero.
+            Traza directamente sobre el mapa satelital los límites de tus parcelas de ganado para calcular superficies exactas, asignar hacienda y monitorear el balance forrajero.
           </p>
         </div>
 
@@ -1350,7 +1477,7 @@ export default function ParcelasView() {
             <i className="fa-solid fa-crosshairs text-[#8fb56b]"></i> Centrar
           </button>
 
-          {puedeGestionar && !modoTrazado && (
+          {puedeCrearOEditar && !modoTrazado && (
             <button
               type="button"
               onClick={activarModoTrazado}
@@ -1361,6 +1488,81 @@ export default function ParcelasView() {
           )}
         </div>
       </div>
+
+      {/* Banner de Permiso de Parcelas para Administrador */}
+      {esOficina && (
+        <div className="px-4 py-3 rounded-2xl border text-xs font-medium flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm bg-stone-50 border-[#ded7c4] text-[#182920]">
+          <div className="flex items-center gap-2.5">
+            <i className="fa-solid fa-user-shield text-amber-700 text-base"></i>
+            <span>
+              Cada vez que necesites <strong>agregar una parcela</strong> o{" "}
+              <strong>editar una parcela</strong>, debés solicitar permiso al Dueño (un permiso por modificación).
+              {permisoAgregarAprobado && (
+                <strong className="ml-1.5 text-emerald-700">
+                  • Autorizado para agregar 1 nueva parcela.
+                </strong>
+              )}
+              {Object.values(permisosEditarPorParcela).includes("APROBADA") && (
+                <strong className="ml-1.5 text-emerald-700">
+                  • Tenés una edición de parcela aprobada lista para usar.
+                </strong>
+              )}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Banner de Solicitudes Pendientes de Administrador para el Dueño */}
+      {esDueno && (permisoParcelas?.solicitudesPendientes || []).length > 0 && (
+        <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 space-y-2.5 shadow-sm">
+          <div className="flex items-center gap-2 text-xs font-extrabold uppercase text-amber-900">
+            <i className="fa-solid fa-user-shield text-amber-700"></i>
+            <span>
+              Solicitudes de permiso para Parcelas ({permisoParcelas.solicitudesPendientes.length})
+            </span>
+          </div>
+          <div className="space-y-2">
+            {permisoParcelas.solicitudesPendientes.map((sol) => (
+              <div
+                key={sol.id}
+                className="bg-white rounded-xl p-3 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+              >
+                <div className="text-xs text-[#182920]">
+                  <p className="font-bold">
+                    {sol.solicitanteNombre} solicita permiso para{" "}
+                    {sol.accion === "EDITAR"
+                      ? `editar${sol.parcelaNombre ? ` "${sol.parcelaNombre}"` : " parcelas"}`
+                      : sol.accion === "AGREGAR"
+                      ? "agregar parcelas"
+                      : "agregar y editar parcelas"}
+                  </p>
+                  {sol.motivo && (
+                    <p className="text-[11px] text-[#526354] mt-0.5">Motivo: {sol.motivo}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    disabled={procesandoPermiso}
+                    onClick={() => manejarResponderPermisoDueno(sol.id, "APROBADA")}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    Aprobar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={procesandoPermiso}
+                    onClick={() => manejarResponderPermisoDueno(sol.id, "RECHAZADA")}
+                    className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    Rechazar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {mensaje && (
         <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2 shadow-sm animate-fade-in">
@@ -1666,7 +1868,7 @@ export default function ParcelasView() {
                   </h3>
                 </div>
                 <div className="flex items-center gap-1.5 relative">
-                  {puedeGestionar && (
+                  {puedeCrearOEditar && (
                     <div className="relative">
                       <button
                         type="button"
@@ -1695,18 +1897,20 @@ export default function ParcelasView() {
                             <i className="fa-solid fa-pen text-amber-700 w-3.5 text-center"></i>
                             <span>Editar Parcela</span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMenuAccionesAbierto(false);
-                              manejarEliminarParcela(parcelaSeleccionada.id, parcelaSeleccionada.nombre);
-                            }}
-                            disabled={procesando}
-                            className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors cursor-pointer"
-                          >
-                            <i className="fa-solid fa-trash-can w-3.5 text-center"></i>
-                            <span>Eliminar Parcela</span>
-                          </button>
+                          {puedeGestionar && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMenuAccionesAbierto(false);
+                                manejarEliminarParcela(parcelaSeleccionada.id, parcelaSeleccionada.nombre);
+                              }}
+                              disabled={procesando}
+                              className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors cursor-pointer"
+                            >
+                              <i className="fa-solid fa-trash-can w-3.5 text-center"></i>
+                              <span>Eliminar Parcela</span>
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1857,7 +2061,7 @@ export default function ParcelasView() {
                 <h3 className="font-bold font-['Fraunces',serif] text-lg text-[#182920]">
                   Parcelas Delimitadas ({potreros.length})
                 </h3>
-                {puedeGestionar && !modoTrazado && (
+                {puedeCrearOEditar && !modoTrazado && (
                   <button
                     type="button"
                     onClick={activarModoTrazado}
@@ -1915,10 +2119,10 @@ export default function ParcelasView() {
                   <div>
                     <p className="font-bold text-sm text-[#182920]">Sin parcelas delimitadas</p>
                     <p className="text-xs text-[#6b7c6d] mt-1 max-w-xs mx-auto">
-                      Aún no has delimitado zonas en el mapa. Haz clic en "Trazar Parcela en Mapa" para marcar tu primer potrero.
+                      Aún no has delimitado zonas en el mapa. Haz clic en "Trazar Parcela en Mapa" para marcar tu primera parcela de ganado.
                     </p>
                   </div>
-                  {puedeGestionar && (
+                  {puedeCrearOEditar && (
                     <button
                       type="button"
                       onClick={activarModoTrazado}
@@ -1973,12 +2177,12 @@ export default function ParcelasView() {
             <form onSubmit={manejarGuardarZona} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#182920] uppercase mb-1">
-                  Nombre de la Parcela / Potrero *
+                  Nombre de la Parcela / Ganado *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="Ej: Potrero 1 - Los Eucaliptos, Lote Norte..."
+                  placeholder="Ej: Lote 1 - Los Eucaliptos, Ganado Norte..."
                   value={formularioZona.nombre}
                   onChange={(e) => setFormularioZona({ ...formularioZona, nombre: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-[#ded7c4] text-sm focus:outline-none focus:ring-2 focus:ring-[#8fb56b]"
@@ -2181,7 +2385,7 @@ export default function ParcelasView() {
                         </span>
                       </div>
                       <span className="text-[10px] text-[#6b7c6d]">
-                        {g.potrero || "Sin potrero"}
+                        {g.potrero || "Sin asignar"}
                       </span>
                     </label>
                   );
@@ -2213,6 +2417,75 @@ export default function ParcelasView() {
                   className="px-5 py-2 rounded-xl bg-[#8fb56b] hover:bg-[#a1c97c] text-[#182920] text-xs font-extrabold uppercase shadow-sm cursor-pointer"
                 >
                   Confirmar Traslado
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Modal: Solicitar Permiso al Dueño (Administrador) */}
+      {modalSolicitarPermiso && (
+        <div className="fixed inset-0 z-50 bg-[#182920]/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-[#ded7c4] space-y-4 animate-scale-up">
+            <div className="flex items-center justify-between border-b border-[#ded7c4] pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                  <i className="fa-solid fa-user-shield"></i>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#182920]">
+                    Solicitar permiso al Dueño
+                  </h3>
+                  <p className="text-[11px] text-[#6b7c6d]">
+                    Autorización requerida para{" "}
+                    {modalSolicitarPermiso.accion === "EDITAR"
+                      ? `editar "${modalSolicitarPermiso.parcelaNombre || "la parcela"}"`
+                      : modalSolicitarPermiso.accion === "AGREGAR"
+                      ? "agregar parcelas"
+                      : "agregar y editar parcelas"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalSolicitarPermiso(null)}
+                className="text-stone-400 hover:text-stone-700 cursor-pointer"
+                aria-label="Cerrar modal de solicitud"
+              >
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+
+            <form onSubmit={manejarEnviarSolicitudPermiso} className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-bold uppercase text-[#6b7c6d] mb-1">
+                  Motivo de la modificación (opcional)
+                </label>
+                <textarea
+                  rows={3}
+                  value={motivoPermiso}
+                  onChange={(e) => setMotivoPermiso(e.target.value)}
+                  placeholder="Ej: Actualizar límites de parcela de ganado o agregar nueva subdivisión..."
+                  maxLength={300}
+                  aria-label="Motivo de permiso para parcelas"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#ded7c4] text-sm text-[#182920] bg-[#fcfbf7] focus:bg-white focus:border-[#182920] outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#ded7c4]">
+                <button
+                  type="button"
+                  onClick={() => setModalSolicitarPermiso(null)}
+                  className="px-4 py-2 rounded-xl border border-[#ded7c4] text-xs font-bold text-[#6b7c6d] cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={procesandoPermiso}
+                  className="px-5 py-2 rounded-xl bg-[#182920] hover:bg-[#33512f] text-[#f1ecdd] text-xs font-extrabold uppercase shadow-sm cursor-pointer disabled:opacity-50"
+                >
+                  {procesandoPermiso ? "Enviando..." : "Enviar Solicitud al Dueño"}
                 </button>
               </div>
             </form>

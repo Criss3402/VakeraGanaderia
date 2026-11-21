@@ -1,11 +1,16 @@
 export default function Hero() {
   return (
     <section id="inicio" className="hero">
-      <img
-        src="/hero-bg.jpg"
-        alt="Entorno ganadero Vakera"
-        className="hero__fondo-img"
-      />
+      <picture>
+        <source srcSet="/hero-bg.webp" type="image/webp" />
+        <img
+          src="/hero-bg.jpg"
+          alt="Entorno ganadero Vakera"
+          className="hero__fondo-img"
+          fetchPriority="high"
+          decoding="async"
+        />
+      </picture>
       <div className="hero__velo" aria-hidden="true" />
 
       <div className="hero__contenido contenedor">

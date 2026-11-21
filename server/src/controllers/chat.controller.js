@@ -1,5 +1,11 @@
-const { ChatModel, MATRIZ_CHAT_ROLES, ETIQUETAS_ROL_CHAT } = require("../models/chat.model");
+const {
+  ChatModel,
+  MATRIZ_CHAT_ROLES,
+  MATRIZ_SOLICITUD_CHAT_ROLES,
+  ETIQUETAS_ROL_CHAT,
+} = require("../models/chat.model");
 const { exito, error } = require("../utils/apiResponse");
+const { emitirEventoRealtime } = require("../services/realtime.service");
 
 class ChatController {
   /**
@@ -18,6 +24,7 @@ class ChatController {
       return exito(res, {
         ...resultado,
         matrizChat: MATRIZ_CHAT_ROLES,
+        matrizSolicitudesChat: MATRIZ_SOLICITUD_CHAT_ROLES,
         etiquetasRoles: ETIQUETAS_ROL_CHAT,
       });
     } catch (err) {
@@ -68,6 +75,16 @@ class ChatController {
         contenido,
       });
 
+      emitirEventoRealtime({
+        targetUserIds: [remitenteId, destinatarioId],
+        payload: {
+          event: "chat_message",
+          remitenteId,
+          destinatarioId,
+          mensajeId: nuevoMensaje?.id,
+        },
+      });
+
       return exito(res, nuevoMensaje, "Mensaje enviado correctamente.", 201);
     } catch (err) {
       return error(res, err.message || "Error al enviar el mensaje.", err.status || 400);
@@ -111,6 +128,70 @@ class ChatController {
       return exito(res, resultado, "Contactos restaurados en la vista activa.");
     } catch (err) {
       return error(res, err.message || "No se pudieron restaurar los contactos.", err.status || 400);
+    }
+  }
+
+  /**
+   * POST /api/chat/solicitudes
+   * Permite a un Peón enviar una solicitud para chatear con Administración o Dueño.
+   */
+  static async solicitarChat(req, res) {
+    try {
+      const solicitanteId = req.usuario?.id;
+      const { destinatarioId, motivo } = req.body || {};
+
+      if (!destinatarioId) {
+        return error(res, "Debe indicar el contacto al que solicita chatear.", 400);
+      }
+
+      const solicitud = await ChatModel.solicitarChat({
+        solicitanteId,
+        destinatarioId,
+        motivo,
+      });
+
+      return exito(
+        res,
+        solicitud,
+        solicitud.estado === "APROBADA"
+          ? "La conversación ya se encuentra habilitada."
+          : "Solicitud de chat enviada correctamente.",
+        201
+      );
+    } catch (err) {
+      return error(res, err.message || "No se pudo enviar la solicitud de chat.", err.status || 400);
+    }
+  }
+
+  /**
+   * PATCH /api/chat/solicitudes/:solicitudId
+   * Permite al Dueño o Administrador aprobar o rechazar una solicitud de chat de un Peón.
+   */
+  static async responderSolicitud(req, res) {
+    try {
+      const revisorId = req.usuario?.id;
+      const { solicitudId } = req.params;
+      const { estado } = req.body || {};
+
+      if (!solicitudId) {
+        return error(res, "Debe indicar la solicitud a responder.", 400);
+      }
+
+      const actualizada = await ChatModel.responderSolicitud({
+        solicitudId,
+        revisorId,
+        estado,
+      });
+
+      return exito(
+        res,
+        actualizada,
+        actualizada.estado === "APROBADA"
+          ? "Solicitud de chat aprobada. Ya podés conversar con el peón."
+          : "Solicitud de chat rechazada."
+      );
+    } catch (err) {
+      return error(res, err.message || "No se pudo responder la solicitud de chat.", err.status || 400);
     }
   }
 }

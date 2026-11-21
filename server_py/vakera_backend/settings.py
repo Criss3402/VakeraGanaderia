@@ -25,9 +25,12 @@ ALLOWED_HOSTS = ["*"]
 # Clave compartida para verificar tokens emitidos por Node.js / Express
 JWT_SECRET = os.getenv("JWT_SECRET", "vakera_super_secret_jwt_key_2026")
 JWT_ALGORITHM = "HS256"
+INTERNAL_WS_SECRET = os.getenv("INTERNAL_WS_SECRET", JWT_SECRET)
 
 INSTALLED_APPS = [
+    "daphne",
     "django.contrib.staticfiles",
+    "channels",
     "corsheaders",
     "rest_framework",
     "core",
@@ -58,6 +61,23 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "vakera_backend.wsgi.application"
+ASGI_APPLICATION = "vakera_backend.asgi.application"
+
+# Channel Layer (Clase 9/10): Redis si REDIS_URL está configurado, sino InMemoryChannelLayer
+_redis_url = os.getenv("REDIS_URL", "").strip()
+if _redis_url:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {"hosts": [_redis_url]},
+        }
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        }
+    }
 
 # -----------------------------------------------------------------------------
 # Base de Datos: Conexión con PostgreSQL (Gestionado principalmente por Prisma)

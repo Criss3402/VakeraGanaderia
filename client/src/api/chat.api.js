@@ -43,3 +43,23 @@ export async function restaurarContactosChat(contactoId = null) {
     body: JSON.stringify(contactoId ? { contactoId } : {}),
   });
 }
+
+/**
+ * Permite que un Peón solicite permiso para chatear con Administración o Dueño.
+ */
+export async function solicitarChat({ destinatarioId, motivo = "" }) {
+  return request("/chat/solicitudes", {
+    method: "POST",
+    body: JSON.stringify({ destinatarioId, motivo }),
+  });
+}
+
+/**
+ * Permite al Dueño o Administrador aprobar o rechazar la solicitud de chat de un Peón.
+ */
+export async function responderSolicitudChat(solicitudId, estado) {
+  return request(`/chat/solicitudes/${solicitudId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ estado }),
+  });
+}

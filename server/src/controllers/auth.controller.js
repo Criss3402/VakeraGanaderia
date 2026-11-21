@@ -5,8 +5,48 @@ const UsuarioModel = require("../models/usuario.model");
 const emailService = require("../services/email.service");
 const { exito, error } = require("../utils/apiResponse");
 
+const { ROLES } = require("../utils/roles.constants");
+
 const JWT_SECRET = process.env.JWT_SECRET || "vakera_dev_secret_no_usar_en_produccion";
 const JWT_EXPIRES_IN = "8h";
+const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
+const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+const GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
+const estadosOAuthGoogle = new Map();
+
+const CARGOS_POR_ROL = {
+  [ROLES.DUENO]: "Propietario / Director",
+  [ROLES.CAPATAZ]: "Capataz de Campo",
+  [ROLES.PEON]: "Operario de Campo",
+  [ROLES.OFICINA]: "Administrador / Compras",
+  [ROLES.VETERINARIO]: "Médico Veterinario",
+};
+
+function limpiarEstadosOAuthExpirados() {
+  const ahora = Date.now();
+  for (const [clave, valor] of estadosOAuthGoogle.entries()) {
+    if (!valor || valor.expira <= ahora) {
+      estadosOAuthGoogle.delete(clave);
+    }
+  }
+}
+
+function obtenerFrontendUrl(req) {
+  return (
+    process.env.FRONTEND_URL ||
+    req?.headers?.origin ||
+    "http://localhost:5173"
+  ).replace(/\/+$/, "");
+}
+
+function obtenerGoogleRedirectUri(req) {
+  if (process.env.GOOGLE_REDIRECT_URI) {
+    return process.env.GOOGLE_REDIRECT_URI;
+  }
+  const host = req?.get?.("host") || "localhost:4000";
+  const proto = req?.protocol || "http";
+  return `${proto}://${host}/api/auth/google/callback`;
+}
 
 function generarToken(usuario) {
   return jwt.sign(
@@ -315,6 +355,216 @@ class AuthController {
     }
     return exito(res, { usuario: req.usuario });
   }
+
+  static estadoGoogle(req, res) {
+    const clientId = process.env.GOOGLE_CLIENT_ID || "";
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET || "";
+    return exito(res, {
+      configurado: Boolean(clientId && clientSecret),
+      redirectUri: obtenerGoogleRedirectUri(req),
+    });
+  }
+
+  static iniciarGoogle(req, res) {
+    const clientId = process.env.GOOGLE_CLIENT_ID || "";
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET || "";
+    const frontendUrl = obtenerFrontendUrl(req);
+    const modo = req.query?.modo === "registro" ? "registro" : "login";
+    const rolSolicitado = String(req.query?.rol || ROLES.DUENO).toLowerCase().trim();
+    const rolValido = Object.values(ROLES).includes(rolSolicitado) ? rolSolicitado : ROLES.DUENO;
+    const establecimiento = String(req.query?.establecimiento || "").trim().slice(0, 120);
+
+    if (!clientId || !clientSecret) {
+      const msg = "El acceso con Google aún no está configurado en el servidor (faltan GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET).";
+      return res.redirect(`${frontendUrl}/?ruta=${modo}&googleError=${encodeURIComponent(msg)}`);
+    }
+
+    limpiarEstadosOAuthExpirados();
+    const state = crypto.randomBytes(24).toString("hex");
+    const redirectUri = obtenerGoogleRedirectUri(req);
+
+    estadosOAuthGoogle.set(state, {
+      frontendUrl,
+      redirectUri,
+      modo,
+      rol: rolValido,
+      establecimiento,
+      expira: Date.now() + 10 * 60 * 1000,
+    });
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: "code",
+      scope: "openid email profile",
+      state,
+      prompt: "select_account",
+    });
+
+    return res.redirect(`${GOOGLE_AUTH_URL}?${params.toString()}`);
+  }
+
+  static async callbackGoogle(req, res) {
+    const { code, state, error: oauthError } = req.query || {};
+    const registroEstado = state ? estadosOAuthGoogle.get(String(state)) : null;
+    if (state) {
+      estadosOAuthGoogle.delete(String(state));
+    }
+
+    const frontendUrl = registroEstado?.frontendUrl || obtenerFrontendUrl(req);
+    const rutaError = registroEstado?.modo === "registro" ? "registro" : "login";
+
+    const redirigirConError = (mensaje) =>
+      res.redirect(`${frontendUrl}/?ruta=${rutaError}&googleError=${encodeURIComponent(mensaje)}`);
+
+    if (oauthError) {
+      return redirigirConError("Se canceló la autenticación con Google.");
+    }
+
+    if (!registroEstado || registroEstado.expira <= Date.now()) {
+      return redirigirConError("La sesión de autorización con Google expiró o es inválida (state). Intentá nuevamente.");
+    }
+
+    if (!code) {
+      return redirigirConError("Google no devolvió un código de autorización válido.");
+    }
+
+    const clientId = process.env.GOOGLE_CLIENT_ID || "";
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET || "";
+    if (!clientId || !clientSecret) {
+      return redirigirConError("Faltan credenciales de Google OAuth en el servidor.");
+    }
+
+    try {
+      const bodyToken = new URLSearchParams({
+        code: String(code),
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: registroEstado.redirectUri,
+        grant_type: "authorization_code",
+      });
+
+      const respToken = await fetch(GOOGLE_TOKEN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: bodyToken.toString(),
+      });
+
+      const dataToken = await respToken.json().catch(() => null);
+      if (!respToken.ok || !dataToken?.access_token) {
+        return redirigirConError("No se pudo validar el código de autorización con Google.");
+      }
+
+      const respPerfil = await fetch(GOOGLE_USERINFO_URL, {
+        headers: { Authorization: `Bearer ${dataToken.access_token}` },
+      });
+
+      const perfil = await respPerfil.json().catch(() => null);
+      if (!respPerfil.ok || !perfil?.email) {
+        return redirigirConError("No se pudo obtener el correo electrónico desde Google.");
+      }
+
+      if (perfil.email_verified === false) {
+        return redirigirConError("Tu cuenta de Google no tiene el correo electrónico verificado.");
+      }
+
+      let usuario = await UsuarioModel.buscarPorEmailConPassword(perfil.email);
+      if (!usuario) {
+        if (registroEstado.modo !== "registro") {
+          const msgNoCuenta =
+            "No se encontró ninguna cuenta vinculada a esta plataforma con este correo. Por favor registrá una cuenta válida.";
+          return res.redirect(
+            `${frontendUrl}/?ruta=login&googleNoRegistrado=1&googleEmail=${encodeURIComponent(
+              perfil.email
+            )}&googleError=${encodeURIComponent(msgNoCuenta)}`
+          );
+        }
+
+        const setupToken = jwt.sign(
+          {
+            tipo: "google_registro_pendiente",
+            email: perfil.email,
+            nombre: perfil.name || perfil.given_name || perfil.email.split("@")[0],
+          },
+          JWT_SECRET,
+          { expiresIn: "15m" }
+        );
+        return res.redirect(
+          `${frontendUrl}/?ruta=google-completar&setupToken=${encodeURIComponent(setupToken)}`
+        );
+      }
+
+      if (usuario.emailVerificado === false) {
+        usuario = await UsuarioModel.marcarEmailVerificado(usuario.id);
+      }
+
+      const token = generarToken(usuario);
+      return res.redirect(`${frontendUrl}/?ruta=google-callback&token=${encodeURIComponent(token)}`);
+    } catch (err) {
+      console.error("[AuthController.callbackGoogle] Error:", err.message);
+      return redirigirConError("Ocurrió un error al autenticar con Google.");
+    }
+  }
+
+  static async completarRegistroGoogle(req, res) {
+    const { setupToken, nombre, establecimiento, rol, cargo } = req.body || {};
+
+    if (!setupToken) {
+      return error(res, "Falta el token de verificación de Google.", 400);
+    }
+
+    let payload;
+    try {
+      payload = jwt.verify(setupToken, JWT_SECRET);
+    } catch {
+      return error(res, "La sesión de registro con Google expiró. Volvé a intentarlo.", 401);
+    }
+
+    if (!payload || payload.tipo !== "google_registro_pendiente" || !payload.email) {
+      return error(res, "Token de registro de Google inválido.", 400);
+    }
+
+    const nombreLimpio = String(nombre || payload.nombre || "").trim();
+    const establecimientoLimpio = String(establecimiento || "").trim();
+    const rolNorm = String(rol || ROLES.PEON).toLowerCase().trim();
+    const rolValido = Object.values(ROLES).includes(rolNorm) ? rolNorm : ROLES.PEON;
+
+    if (!nombreLimpio || !establecimientoLimpio) {
+      return error(res, "El nombre completo y el nombre del establecimiento son obligatorios.", 400);
+    }
+
+    try {
+      let usuario = await UsuarioModel.buscarPorEmailConPassword(payload.email);
+      if (!usuario) {
+        usuario = await UsuarioModel.crear({
+          nombre: nombreLimpio,
+          email: payload.email,
+          password: crypto.randomBytes(32).toString("hex"),
+          rol: rolValido,
+          cargo: cargo || CARGOS_POR_ROL[rolValido] || "Colaborador",
+          establecimiento: establecimientoLimpio,
+          emailVerificado: true,
+        });
+      } else if (usuario.emailVerificado === false) {
+        usuario = await UsuarioModel.marcarEmailVerificado(usuario.id);
+      }
+
+      const token = generarToken(usuario);
+      return exito(
+        res,
+        {
+          token,
+          usuario: UsuarioModel.sanitizarUsuario(usuario),
+        },
+        "Cuenta registrada con Google exitosamente.",
+        201
+      );
+    } catch (err) {
+      return error(res, err.message || "No se pudo completar el registro con Google.", 400);
+    }
+  }
 }
+
+AuthController._estadosOAuthGoogle = estadosOAuthGoogle;
 
 module.exports = AuthController;

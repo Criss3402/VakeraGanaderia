@@ -3,10 +3,11 @@ import {
   login as apiLogin,
   registro as apiRegistro,
   verificarEmail as apiVerificarEmail,
+  completarRegistroGoogle as apiCompletarRegistroGoogle,
   obtenerUsuarioActual,
   logout as apiLogout,
 } from "../api/auth.api.js";
-import { getToken } from "../api/client.js";
+import { getToken, setToken } from "../api/client.js";
 
 const AuthContext = createContext(null);
 const USER_CACHE_KEY = "vakera_usuario_cache";
@@ -103,6 +104,34 @@ export function AuthProvider({ children }) {
     return res?.data;
   }
 
+  async function iniciarSesionConToken(jwtToken) {
+    if (!jwtToken) {
+      throw new Error("Token de Google OAuth inválido.");
+    }
+    setToken(jwtToken);
+    const res = await obtenerUsuarioActual();
+    if (res?.data?.usuario) {
+      setUsuario(res.data.usuario);
+      guardarUsuarioCache(res.data.usuario);
+      setTokenState(jwtToken);
+      return res.data.usuario;
+    }
+    apiLogout();
+    guardarUsuarioCache(null);
+    throw new Error("No se pudo validar la sesión de Google.");
+  }
+
+  async function completarRegistroConGoogle(datos) {
+    const res = await apiCompletarRegistroGoogle(datos);
+    if (res?.data?.usuario && res?.data?.token) {
+      setUsuario(res.data.usuario);
+      guardarUsuarioCache(res.data.usuario);
+      setTokenState(res.data.token);
+      return res.data.usuario;
+    }
+    throw new Error("No se pudo completar el registro con Google.");
+  }
+
   function cerrarSesion() {
     apiLogout();
     guardarUsuarioCache(null);
@@ -119,6 +148,8 @@ export function AuthProvider({ children }) {
         estaAutenticado: Boolean(usuario),
         cargando,
         iniciarSesion,
+        iniciarSesionConToken,
+        completarRegistroConGoogle,
         registrarse,
         verificarEmailConToken,
         cerrarSesion,

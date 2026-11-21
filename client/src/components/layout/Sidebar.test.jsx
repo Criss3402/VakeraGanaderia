@@ -94,7 +94,7 @@ describe("Barra Lateral de Navegación (Sidebar.jsx)", () => {
     expect(alCerrarMenu).toHaveBeenCalled();
   });
 
-  it("despliega el menú de perfil y permite cerrar sesión", async () => {
+  it("despliega el menú de perfil, muestra confirmación centrada '¿Seguro?' con 'Cancelar' y cierra sesión al confirmar", async () => {
     const cerrarSesion = vi.fn();
     vi.spyOn(AuthContextModule, "useAuth").mockReturnValue({
       usuario: { nombre: "Cristian Joaquín" },
@@ -108,11 +108,19 @@ describe("Barra Lateral de Navegación (Sidebar.jsx)", () => {
     const perfilCard = screen.getByTitle("Opciones de cuenta");
     await userEvent.click(perfilCard);
 
-    // Aparece el botón Cerrar Sesión
-    const btnCerrarSesion = screen.getByRole("button", { name: /Cerrar Sesión/i });
-    expect(btnCerrarSesion).toBeInTheDocument();
+    // Clic en Cerrar Sesión abre el modal de confirmación centrado
+    const btnCerrarSesionMenu = screen.getByRole("button", { name: /Cerrar Sesión/i });
+    await userEvent.click(btnCerrarSesionMenu);
 
-    await userEvent.click(btnCerrarSesion);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText("¿Seguro?")).toBeInTheDocument();
+    const btnCancelar = screen.getByRole("button", { name: /Cancelar/i });
+    expect(btnCancelar).toBeInTheDocument();
+    expect(cerrarSesion).not.toHaveBeenCalled();
+
+    // Confirmar en el modal ejecuta cerrarSesion
+    const botonesConfirmar = screen.getAllByRole("button", { name: /Cerrar Sesión/i });
+    await userEvent.click(botonesConfirmar[botonesConfirmar.length - 1]);
     expect(cerrarSesion).toHaveBeenCalledTimes(1);
   });
 });

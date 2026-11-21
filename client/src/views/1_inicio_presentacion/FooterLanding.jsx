@@ -40,7 +40,7 @@ export default function FooterLanding({ alIniciarSesion }) {
           ) : (
             <a href="#inicio">Portal Web</a>
           )}
-          <a href="mailto:contacto@vakera.com">contacto@vakera.com</a>
+          <a href="mailto:vakera.soporte@gmail.com">vakera.soporte@gmail.com</a>
         </div>
       </div>
 

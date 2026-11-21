@@ -296,7 +296,7 @@ export default function PanelVeterinario({ alCambiarVista }) {
 
           <div className="mt-4 pt-3 border-t border-[#ded7c4]">
             <p className="text-[11px] text-[#6b7c6d] italic">
-              * El cambio de estado sanitario se sincroniza en vivo con la tabla PostgreSQL del rodeo.
+              * El cambio de estado sanitario se sincroniza en vivo con el registro del rodeo.
             </p>
           </div>
         </div>

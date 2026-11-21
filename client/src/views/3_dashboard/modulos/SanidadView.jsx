@@ -374,7 +374,7 @@ export default function SanidadView() {
                   </select>
                 </div>
                 <div>
-                  <label className="block font-bold text-[#182920] mb-1">Lote / Potrero</label>
+                  <label className="block font-bold text-[#182920] mb-1">Lote / Ganado</label>
                   <input
                     type="text"
                     value={nuevoEvento.lote}

@@ -6,6 +6,7 @@ import Servicios from "./Servicios";
 import Faq from "./Faq";
 import Contacto from "./Contacto";
 import FooterLanding from "./FooterLanding";
+import AuthModal from "./AuthModal";
 
 export default function LandingView({
   alIniciarSesion,
@@ -13,33 +14,50 @@ export default function LandingView({
   alIrARecuperar,
   alIrAVerificar,
   alIrAlDashboard,
+  googleSetup = null,
+  googleNoRegistrado = false,
+  googleError = "",
 }) {
-  const [loginAbierto, setLoginAbierto] = useState(false);
+  const [modalAuth, setModalAuth] = useState(() =>
+    googleSetup?.setupToken
+      ? { abierto: true, modo: "google-completar" }
+      : googleNoRegistrado
+      ? { abierto: true, modo: "google-no-registrado" }
+      : { abierto: false, modo: "login" }
+  );
 
-  function abrirLogin() {
-    setLoginAbierto(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  function abrirModal(modo = "login") {
+    setModalAuth({ abierto: true, modo });
   }
 
   return (
     <div className="landing-view">
       <NavbarLanding
-        alIniciarSesion={abrirLogin}
-        alRegistrarse={alRegistrarse}
+        alIniciarSesion={() => abrirModal("login")}
+        alRegistrarse={() => abrirModal("registro")}
         alIrARecuperar={alIrARecuperar}
         alIrAVerificar={alIrAVerificar}
         alIrAlDashboard={alIrAlDashboard}
-        loginAbierto={loginAbierto}
-        setLoginAbierto={setLoginAbierto}
       />
       <main>
-        <Hero alIniciarSesion={abrirLogin} />
+        <Hero alIniciarSesion={() => abrirModal("login")} />
         <QuienesSomos />
         <Servicios />
         <Faq />
         <Contacto />
       </main>
-      <FooterLanding alIniciarSesion={abrirLogin} />
+      <FooterLanding alIniciarSesion={() => abrirModal("login")} />
+
+      <AuthModal
+        abierto={modalAuth.abierto}
+        modoInicial={modalAuth.modo}
+        googleSetup={googleSetup}
+        errorInicial={modalAuth.modo === "google-no-registrado" ? googleError : ""}
+        alCerrar={() => setModalAuth((prev) => ({ ...prev, abierto: false }))}
+        alIrARecuperar={alIrARecuperar}
+        alIrAVerificar={alIrAVerificar}
+        alExito={alIrAlDashboard}
+      />
     </div>
   );
 }

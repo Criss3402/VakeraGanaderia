@@ -7,6 +7,8 @@ import {
   enviarMensajeChat,
   ocultarContactoChat,
   restaurarContactosChat,
+  solicitarChat,
+  responderSolicitudChat,
 } from "../../../api/chat.api.js";
 
 /**
@@ -31,19 +33,23 @@ export function normalizarRolChat(rol) {
 }
 
 /**
- * MATRIZ ESTRICTA DE PERMISOS DE CHAT POR ROL DE ESTANCIA:
- * - PEÓN: Solo puede enviar y recibir mensajes del CAPATAZ.
+ * MATRIZ DE PERMISOS DE CHAT POR ROL DE ESTANCIA:
+ * - PEÓN: Chat directo con CAPATAZ; requiere solicitud aprobada para ADMINISTRADOR y DUEÑO.
  * - CAPATAZ: Puede chatear con el ADMINISTRADOR (oficina), PEÓN y VETERINARIO.
  * - VETERINARIO: Puede chatear con el DUEÑO, ADMINISTRADOR (oficina) y CAPATAZ.
- * - ADMINISTRADOR (oficina): Puede chatear con el CAPATAZ, VETERINARIO y DUEÑO.
- * - DUEÑO: Puede chatear con el VETERINARIO y ADMINISTRADOR (oficina).
+ * - ADMINISTRADOR (oficina): Puede chatear con CAPATAZ, VETERINARIO, DUEÑO y PEÓN.
+ * - DUEÑO: Puede chatear con VETERINARIO, ADMINISTRADOR (oficina) y PEÓN.
  */
 export const MATRIZ_CHAT_ROLES = {
   peon: ["capataz"],
   capataz: ["oficina", "peon", "veterinario"],
   veterinario: ["dueno", "oficina", "capataz"],
-  oficina: ["capataz", "veterinario", "dueno"],
-  dueno: ["veterinario", "oficina"],
+  oficina: ["capataz", "veterinario", "dueno", "peon"],
+  dueno: ["veterinario", "oficina", "peon"],
+};
+
+export const MATRIZ_SOLICITUD_CHAT_ROLES = {
+  peon: ["oficina", "dueno"],
 };
 
 export const ETIQUETAS_ROLES_CHAT = {
@@ -63,7 +69,7 @@ const SUGERENCIAS_INICIO = [
 const LIMITE_CARACTERES_MENSAJE = 2000;
 
 /**
- * Filtro defensivo estricto de contactos por rol permitido y pertenencia al mismo espacio (campo).
+ * Filtro defensivo estricto de contactos por rol permitido (directo o con solicitud) y mismo espacio (campo).
  */
 export function filtrarContactosPermitidos(contactos, usuarioActual, idsOcultosLocal = new Set()) {
   if (!usuarioActual || !usuarioActual.establecimientoId || !Array.isArray(contactos)) {
@@ -71,6 +77,7 @@ export function filtrarContactosPermitidos(contactos, usuarioActual, idsOcultosL
   }
   const rolUsuario = normalizarRolChat(usuarioActual.rol);
   const rolesPermitidos = MATRIZ_CHAT_ROLES[rolUsuario] || [];
+  const rolesConSolicitud = MATRIZ_SOLICITUD_CHAT_ROLES[rolUsuario] || [];
 
   return contactos.filter((c) => {
     if (!c || c.id === usuarioActual.id) return false;
@@ -79,7 +86,7 @@ export function filtrarContactosPermitidos(contactos, usuarioActual, idsOcultosL
       return false;
     }
     const rolContacto = normalizarRolChat(c.rol);
-    return rolesPermitidos.includes(rolContacto);
+    return rolesPermitidos.includes(rolContacto) || rolesConSolicitud.includes(rolContacto);
   });
 }
 
@@ -208,6 +215,7 @@ export default function ChatView({ abiertoInicial = false }) {
   const [contactosColapsado, setContactosColapsado] = useState(false);
 
   const [contactos, setContactos] = useState([]);
+  const [solicitudesPendientes, setSolicitudesPendientes] = useState([]);
   const [usuarioChatInfo, setUsuarioChatInfo] = useState(null);
   const [idsOcultosLocal, setIdsOcultosLocal] = useState(() => new Set());
   const [ocultosCount, setOcultosCount] = useState(0);
@@ -215,10 +223,12 @@ export default function ChatView({ abiertoInicial = false }) {
   const [contactoActivo, setContactoActivo] = useState(null);
   const [mensajes, setMensajes] = useState([]);
   const [textoMensaje, setTextoMensaje] = useState("");
+  const [motivoSolicitud, setMotivoSolicitud] = useState("");
 
   const [cargandoContactos, setCargandoContactos] = useState(false);
   const [cargandoMensajes, setCargandoMensajes] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [procesandoSolicitud, setProcesandoSolicitud] = useState(false);
   const [ocultandoId, setOcultandoId] = useState(null);
   const [restaurando, setRestaurando] = useState(false);
   const [error, setError] = useState(null);
@@ -305,7 +315,11 @@ export default function ChatView({ abiertoInicial = false }) {
   const usuarioEfectivo = usuarioChatInfo || usuario;
   const rolNorm = normalizarRolChat(usuarioEfectivo?.rol || "peon");
   const rolesPermitidos = MATRIZ_CHAT_ROLES[rolNorm] || [];
+  const rolesConSolicitud = MATRIZ_SOLICITUD_CHAT_ROLES[rolNorm] || [];
   const nombresRolesPermitidos = rolesPermitidos.map(
+    (r) => ETIQUETAS_ROLES_CHAT[r] || r.toUpperCase()
+  );
+  const nombresRolesConSolicitud = rolesConSolicitud.map(
     (r) => ETIQUETAS_ROLES_CHAT[r] || r.toUpperCase()
   );
 
@@ -318,6 +332,7 @@ export default function ChatView({ abiertoInicial = false }) {
           const usrServidor = res.data.usuarioActual || usuario;
           setUsuarioChatInfo(usrServidor);
           setContactos(res.data.contactos || []);
+          setSolicitudesPendientes(res.data.solicitudesPendientes || []);
           setOcultosCount(res.data.ocultosCount || 0);
         }
       } catch (err) {
@@ -344,7 +359,15 @@ export default function ChatView({ abiertoInicial = false }) {
           );
         }
         setContactos((prev) =>
-          prev.map((c) => (c.id === idContacto ? { ...c, mensajesNoLeidos: 0 } : c))
+          prev.map((c) =>
+            c.id === idContacto
+              ? {
+                  ...c,
+                  ...(res.data.contacto || {}),
+                  mensajesNoLeidos: 0,
+                }
+              : c
+          )
         );
       }
     } catch (err) {
@@ -361,12 +384,9 @@ export default function ChatView({ abiertoInicial = false }) {
     cargarContactos(!abierto);
   }, [abierto, cargarContactos]);
 
-  // Polling ligero pausado cuando la pestaña está oculta y evitando llamadas solapadas
+  // Polling ligero de respaldo + refresco inmediato por WebSocket (Django Channels)
   useEffect(() => {
-    const timer = setInterval(async () => {
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
-        return;
-      }
+    async function sincronizarChat() {
       if (pollingEnCursoRef.current) return;
       pollingEnCursoRef.current = true;
       try {
@@ -377,8 +397,26 @@ export default function ChatView({ abiertoInicial = false }) {
       } finally {
         pollingEnCursoRef.current = false;
       }
+    }
+
+    function manejarEventoRealtime(e) {
+      if (e?.detail?.event === "chat_message") {
+        sincronizarChat();
+      }
+    }
+    window.addEventListener("vakera:realtime-evento", manejarEventoRealtime);
+
+    const timer = setInterval(async () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+      await sincronizarChat();
     }, 6000);
-    return () => clearInterval(timer);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("vakera:realtime-evento", manejarEventoRealtime);
+    };
   }, [abierto, cargarContactos, cargarConversacion, contactoActivo?.id]);
 
   const desplazarAlFinal = useCallback((comportamiento = "smooth") => {
@@ -622,8 +660,120 @@ export default function ChatView({ abiertoInicial = false }) {
     }
   }
 
+  async function manejarSolicitarChat(e) {
+    if (e) e.preventDefault();
+    if (!contactoActivo?.id || procesandoSolicitud) return;
+    setProcesandoSolicitud(true);
+    setError(null);
+    try {
+      const res = await solicitarChat({
+        destinatarioId: contactoActivo.id,
+        motivo: motivoSolicitud,
+      });
+      if (res?.data) {
+        const nuevoEstado = res.data.estado || "PENDIENTE";
+        const habilitado = nuevoEstado === "APROBADA";
+        setContactoActivo((prev) =>
+          prev
+            ? {
+                ...prev,
+                estadoSolicitud: nuevoEstado,
+                solicitudId: res.data.id,
+                motivoSolicitud: res.data.motivo,
+                chatHabilitado: habilitado,
+              }
+            : prev
+        );
+        setContactos((prev) =>
+          prev.map((c) =>
+            c.id === contactoActivo.id
+              ? {
+                  ...c,
+                  estadoSolicitud: nuevoEstado,
+                  solicitudId: res.data.id,
+                  motivoSolicitud: res.data.motivo,
+                  chatHabilitado: habilitado,
+                }
+              : c
+          )
+        );
+        setMotivoSolicitud("");
+        mostrarNotificacionTemporal({
+          texto:
+            res.mensaje ||
+            `Solicitud enviada a ${contactoActivo.nombre}. Esperando su aprobación.`,
+        });
+      }
+    } catch (err) {
+      setError(err.message || "No se pudo enviar la solicitud de chat.");
+    } finally {
+      setProcesandoSolicitud(false);
+    }
+  }
+
+  async function manejarResponderSolicitud(solicitudId, estado, nombreSolicitante = "el peón") {
+    if (!solicitudId || procesandoSolicitud) return;
+    setProcesandoSolicitud(true);
+    setError(null);
+    try {
+      const res = await responderSolicitudChat(solicitudId, estado);
+      setSolicitudesPendientes((prev) => prev.filter((s) => s.id !== solicitudId));
+      setContactos((prev) =>
+        prev.map((c) =>
+          c.solicitudEntrante?.id === solicitudId
+            ? {
+                ...c,
+                solicitudEntrante: { ...c.solicitudEntrante, estado },
+              }
+            : c
+        )
+      );
+      if (contactoActivo?.solicitudEntrante?.id === solicitudId) {
+        setContactoActivo((prev) =>
+          prev
+            ? {
+                ...prev,
+                solicitudEntrante: { ...prev.solicitudEntrante, estado },
+              }
+            : prev
+        );
+      }
+      mostrarNotificacionTemporal({
+        texto:
+          res?.mensaje ||
+          (estado === "APROBADA"
+            ? `Chat habilitado con ${nombreSolicitante}.`
+            : `Solicitud de ${nombreSolicitante} rechazada.`),
+      });
+      await cargarContactos(true);
+    } catch (err) {
+      setError(err.message || "No se pudo responder la solicitud de chat.");
+    } finally {
+      setProcesandoSolicitud(false);
+    }
+  }
+
   const hayBusquedaActiva = busqueda.trim().length > 0;
   const longitudActual = textoMensaje.length;
+  const badgeGlobalTotal = totalNoLeidos + solicitudesPendientes.length;
+
+  const contactoActivoRequiereSolicitud = Boolean(
+    contactoActivo &&
+      (contactoActivo.requiereSolicitud ??
+        (rolNorm === "peon" &&
+          (normalizarRolChat(contactoActivo.rol) === "oficina" ||
+            normalizarRolChat(contactoActivo.rol) === "dueno")))
+  );
+  const superiorEnvioMensajeActivo = Boolean(
+    contactoActivo &&
+      mensajes.some((m) => !esMensajePropio(m, usuarioEfectivo?.id))
+  );
+  const contactoActivoChatHabilitado =
+    !contactoActivoRequiereSolicitud ||
+    Boolean(contactoActivo?.chatHabilitado) ||
+    contactoActivo?.estadoSolicitud === "APROBADA" ||
+    superiorEnvioMensajeActivo;
+  const contactoActivoEstadoSol = contactoActivo?.estadoSolicitud || "NINGUNA";
 
   return (
     <>
@@ -710,8 +860,64 @@ export default function ChatView({ abiertoInicial = false }) {
                     {etiquetaRol}
                   </span>
                 ))}
+                {nombresRolesConSolicitud.length > 0 && (
+                  <>
+                    <span className="chat-aviso-espacio__label">· Con solicitud:</span>
+                    {nombresRolesConSolicitud.map((etiquetaSol) => (
+                      <span key={`sol-${etiquetaSol}`} className="chat-rol-pill chat-rol-pill--solicitud">
+                        {etiquetaSol}
+                      </span>
+                    ))}
+                  </>
+                )}
               </div>
             </div>
+
+            {/* Banner de solicitudes entrantes de peones para Dueño / Administrador */}
+            {(rolNorm === "dueno" || rolNorm === "oficina") && solicitudesPendientes.length > 0 && (
+              <div className="chat-solicitudes-banner" data-testid="chat-solicitudes-pendientes">
+                <div className="chat-solicitudes-banner__titulo">
+                  <i className="fa-solid fa-user-clock" aria-hidden="true" />
+                  <span>
+                    Solicitudes de Peones pendientes ({solicitudesPendientes.length})
+                  </span>
+                </div>
+                <div className="chat-solicitudes-banner__lista">
+                  {solicitudesPendientes.map((sol) => (
+                    <div key={sol.id} className="chat-solicitud-item-banner">
+                      <div className="chat-solicitud-item-banner__info">
+                        <strong>{sol.solicitanteNombre}</strong>
+                        <span className="chat-solicitud-item-banner__motivo">
+                          {sol.motivo || "Solicita chatear"}
+                        </span>
+                      </div>
+                      <div className="chat-solicitud-item-banner__acciones">
+                        <button
+                          type="button"
+                          disabled={procesandoSolicitud}
+                          onClick={() =>
+                            manejarResponderSolicitud(sol.id, "APROBADA", sol.solicitanteNombre)
+                          }
+                          className="chat-btn-solicitud chat-btn-solicitud--aprobar"
+                        >
+                          Aprobar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={procesandoSolicitud}
+                          onClick={() =>
+                            manejarResponderSolicitud(sol.id, "RECHAZADA", sol.solicitanteNombre)
+                          }
+                          className="chat-btn-solicitud chat-btn-solicitud--rechazar"
+                        >
+                          Rechazar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {notificacion && (
               <div className="chat-alerta-wrapper">
@@ -966,6 +1172,30 @@ export default function ChatView({ abiertoInicial = false }) {
                                   <span className={`chat-contacto-rol-badge ${claseRol}`}>
                                     {etiquetaRol}
                                   </span>
+                                  {contacto.requiereSolicitud &&
+                                    !contacto.chatHabilitado &&
+                                    !(contacto.ultimoMensaje && !contacto.ultimoMensaje.esMio) && (
+                                    <span
+                                      className={`chat-contacto-estado-sol ${
+                                        contacto.estadoSolicitud === "PENDIENTE"
+                                          ? "chat-contacto-estado-sol--pendiente"
+                                          : contacto.estadoSolicitud === "RECHAZADA"
+                                          ? "chat-contacto-estado-sol--rechazada"
+                                          : "chat-contacto-estado-sol--ninguna"
+                                      }`}
+                                    >
+                                      {contacto.estadoSolicitud === "PENDIENTE"
+                                        ? "Sol. pendiente"
+                                        : contacto.estadoSolicitud === "RECHAZADA"
+                                        ? "Rechazada"
+                                        : "Requiere solicitud"}
+                                    </span>
+                                  )}
+                                  {contacto.solicitudEntrante?.estado === "PENDIENTE" && (
+                                    <span className="chat-contacto-estado-sol chat-contacto-estado-sol--pendiente">
+                                      Solicitó chat
+                                    </span>
+                                  )}
                                   {tieneNoLeidos && (
                                     <span
                                       className="chat-badge-no-leidos"
@@ -1079,6 +1309,50 @@ export default function ChatView({ abiertoInicial = false }) {
                       </button>
                     </header>
 
+                    {/* Barra de aprobación inline para Dueño / Administrador cuando el peón tiene solicitud pendiente */}
+                    {(rolNorm === "dueno" || rolNorm === "oficina") &&
+                      contactoActivo.solicitudEntrante?.estado === "PENDIENTE" && (
+                        <div className="chat-solicitud-inline">
+                          <div className="chat-solicitud-inline__texto">
+                            <i className="fa-solid fa-user-clock" aria-hidden="true" />
+                            <span>
+                              <strong>{contactoActivo.nombre}</strong> solicitó permiso para responder:{" "}
+                              <em>"{contactoActivo.solicitudEntrante.motivo || "Solicita chatear"}"</em>
+                            </span>
+                          </div>
+                          <div className="chat-solicitud-item-banner__acciones">
+                            <button
+                              type="button"
+                              disabled={procesandoSolicitud}
+                              onClick={() =>
+                                manejarResponderSolicitud(
+                                  contactoActivo.solicitudEntrante.id,
+                                  "APROBADA",
+                                  contactoActivo.nombre
+                                )
+                              }
+                              className="chat-btn-solicitud chat-btn-solicitud--aprobar"
+                            >
+                              Aprobar chat
+                            </button>
+                            <button
+                              type="button"
+                              disabled={procesandoSolicitud}
+                              onClick={() =>
+                                manejarResponderSolicitud(
+                                  contactoActivo.solicitudEntrante.id,
+                                  "RECHAZADA",
+                                  contactoActivo.nombre
+                                )
+                              }
+                              className="chat-btn-solicitud chat-btn-solicitud--rechazar"
+                            >
+                              Rechazar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                     {/* Historial de mensajes */}
                     <div className="chat-mensajes-wrapper">
                       <div
@@ -1186,46 +1460,109 @@ export default function ChatView({ abiertoInicial = false }) {
                       )}
                     </div>
 
-                    {/* Barra inferior de envío de mensaje */}
-                    <form onSubmit={manejarEnviarMensaje} className="chat-input-barra">
-                      <div className="chat-input-compositor">
-                        <textarea
-                          ref={inputMensajeRef}
-                          rows={1}
-                          value={textoMensaje}
-                          onChange={(e) => setTextoMensaje(e.target.value)}
-                          onKeyDown={manejarTeclaCompositor}
-                          placeholder={`Escribir mensaje a ${contactoActivo.nombre}...`}
-                          className="chat-input-texto"
-                          maxLength={LIMITE_CARACTERES_MENSAJE}
-                          disabled={enviando}
-                          aria-label="Escribir mensaje"
-                        />
-                        {longitudActual >= 1600 && (
-                          <span
-                            className={`chat-contador-caracteres ${
-                              longitudActual >= 1950 ? "chat-contador-caracteres--limite" : ""
-                            }`}
-                          >
-                            {longitudActual}/{LIMITE_CARACTERES_MENSAJE}
-                          </span>
+                    {/* Barra inferior de envío de mensaje o panel de solicitud para Peón -> Admin/Dueño */}
+                    {contactoActivoRequiereSolicitud && !contactoActivoChatHabilitado ? (
+                      <div className="chat-solicitud-compositor" data-testid="chat-panel-solicitud-peon">
+                        {contactoActivoEstadoSol === "PENDIENTE" ? (
+                          <div className="chat-solicitud-pendiente-estado">
+                            <i className="fa-solid fa-hourglass-half" aria-hidden="true" />
+                            <div>
+                              <strong>Solicitud enviada y pendiente de aprobación</strong>
+                              <p>
+                                Esperando que {contactoActivo.nombre} (
+                                {contactoActivo.rolEtiqueta ||
+                                  ETIQUETAS_ROLES_CHAT[normalizarRolChat(contactoActivo.rol)]}
+                                ) apruebe la conversación para poder enviar mensajes.
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <form onSubmit={manejarSolicitarChat} className="chat-solicitud-form">
+                            <div className="chat-solicitud-form__info">
+                              <i className="fa-solid fa-lock" aria-hidden="true" />
+                              <span>
+                                {contactoActivoEstadoSol === "RECHAZADA"
+                                  ? `Tu solicitud anterior fue rechazada por ${contactoActivo.nombre}. Podés enviar una nueva solicitud:`
+                                  : `Para chatear con ${contactoActivo.nombre} (${
+                                      contactoActivo.rolEtiqueta ||
+                                      ETIQUETAS_ROLES_CHAT[normalizarRolChat(contactoActivo.rol)]
+                                    }), primero debés enviar una solicitud:`}
+                              </span>
+                            </div>
+                            <div className="chat-solicitud-form__controles">
+                              <input
+                                type="text"
+                                value={motivoSolicitud}
+                                onChange={(e) => setMotivoSolicitud(e.target.value)}
+                                placeholder="Motivo de la solicitud (opcional)..."
+                                maxLength={300}
+                                className="chat-solicitud-form__input"
+                                aria-label="Motivo de solicitud de chat"
+                              />
+                              <button
+                                type="submit"
+                                disabled={procesandoSolicitud}
+                                className="chat-btn-enviar"
+                              >
+                                <i
+                                  className={`fa-solid ${
+                                    procesandoSolicitud ? "fa-spinner fa-spin" : "fa-paper-plane"
+                                  }`}
+                                  aria-hidden="true"
+                                />
+                                <span>
+                                  {procesandoSolicitud
+                                    ? "Enviando..."
+                                    : contactoActivoEstadoSol === "RECHAZADA"
+                                    ? "Volver a solicitar"
+                                    : "Solicitar chat"}
+                                </span>
+                              </button>
+                            </div>
+                          </form>
                         )}
                       </div>
+                    ) : (
+                      <form onSubmit={manejarEnviarMensaje} className="chat-input-barra">
+                        <div className="chat-input-compositor">
+                          <textarea
+                            ref={inputMensajeRef}
+                            rows={1}
+                            value={textoMensaje}
+                            onChange={(e) => setTextoMensaje(e.target.value)}
+                            onKeyDown={manejarTeclaCompositor}
+                            placeholder={`Escribir mensaje a ${contactoActivo.nombre}...`}
+                            className="chat-input-texto"
+                            maxLength={LIMITE_CARACTERES_MENSAJE}
+                            disabled={enviando}
+                            aria-label="Escribir mensaje"
+                          />
+                          {longitudActual >= 1600 && (
+                            <span
+                              className={`chat-contador-caracteres ${
+                                longitudActual >= 1950 ? "chat-contador-caracteres--limite" : ""
+                              }`}
+                            >
+                              {longitudActual}/{LIMITE_CARACTERES_MENSAJE}
+                            </span>
+                          )}
+                        </div>
 
-                      <button
-                        type="submit"
-                        disabled={enviando || !textoMensaje.trim()}
-                        className="chat-btn-enviar"
-                      >
-                        <i
-                          className={`fa-solid ${
-                            enviando ? "fa-spinner fa-spin" : "fa-paper-plane"
-                          }`}
-                          aria-hidden="true"
-                        />
-                        <span>{enviando ? "Enviando..." : "Enviar"}</span>
-                      </button>
-                    </form>
+                        <button
+                          type="submit"
+                          disabled={enviando || !textoMensaje.trim()}
+                          className="chat-btn-enviar"
+                        >
+                          <i
+                            className={`fa-solid ${
+                              enviando ? "fa-spinner fa-spin" : "fa-paper-plane"
+                            }`}
+                            aria-hidden="true"
+                          />
+                          <span>{enviando ? "Enviando..." : "Enviar"}</span>
+                        </button>
+                      </form>
+                    )}
                   </>
                 )}
               </section>
@@ -1247,12 +1584,12 @@ export default function ChatView({ abiertoInicial = false }) {
             alt="Icono de Chat Vakera"
             className="chat-flotante-icono-img"
           />
-          {totalNoLeidos > 0 && (
+          {badgeGlobalTotal > 0 && (
             <span
               className="chat-flotante-badge-global"
-              title={`${totalNoLeidos} mensaje(s) sin leer`}
+              title={`${totalNoLeidos} mensaje(s) sin leer y ${solicitudesPendientes.length} solicitud(es) pendiente(s)`}
             >
-              {totalNoLeidos > 99 ? "99+" : totalNoLeidos}
+              {badgeGlobalTotal > 99 ? "99+" : badgeGlobalTotal}
             </span>
           )}
         </button>

@@ -62,10 +62,18 @@ Se introdujo una capa de caché ligera en memoria con invalidación automática:
 ### 2.8 Cabeceras HTTP de Caché en Rutas Estáticas
 - En `server/src/controllers/presentacion.controller.js` (`/api/servicios`) y `server/src/controllers/permisos.controller.js` (`/api/permisos/roles`), se inyectó la cabecera `Cache-Control: public, max-age=3600, stale-while-revalidate=600`, permitiendo que el navegador resuelva estas consultas desde su propia caché local sin tráfico de red durante 1 hora.
 
+### 2.9 Aislamiento del Panel Privado (`PrivateLayout`, `ChatView`) y Agregaciones en Reportes
+- **Diferimiento de Shell Privado y Chat:** Se configuró carga perezosa (`React.lazy`) para `PrivateLayout` en `client/src/App.jsx` y para `ChatView` en `client/src/components/layout/PrivateLayout.jsx`, reduciendo el bundle inicial `index.js` de `82.84 kB` a **`33.67 kB`** (gzip: **`11.19 kB`**) para visitantes públicos.
+- **Agregaciones en Reportes (`obtenerReportes()`):** Se incorporaron `GanadoModel.obtenerSumaPesoKg()` (`aggregate({ _sum })`) y `ParteDiarioModel.obtenerResumen()` (`count()` en paralelo) en PostgreSQL para evitar cálculos de totales y conteos en memoria de Node.js.
+
 ### 2.10 Sustitución de Tailwind Play CDN por Compilación PostCSS en Tiempo de Build
 - **Eliminación Total de `cdn.tailwindcss.com`:** Se removió el compilador JIT en tiempo de ejecución del archivo `index.html`. El navegador ya no necesita descargar ~350 kB de compilador ni procesar el DOM en cada render.
 - **Integración con PostCSS y Vite (`tailwind.config.js` y `postcss.config.js`):** Se integró `@tailwindcss/postcss` de modo que todos los estilos utilitarios y los tokens de color (`vakera-profundo`, `vakera-brote`, etc.) son generados y optimizados estáticamente durante el proceso de compilación (`vite build`).
-- **HTML Ultraligero:** El archivo base `index.html` pasó de 3.11 kB a solo **1.63 kB** (gzip: **0.73 kB**).
+- **HTML Ultraligero:** El archivo base `index.html` pasó de 3.11 kB a **`2.04 kB`** (gzip: **`0.81 kB`**).
+
+### 2.11 Modo Rural y PWA (Service Worker + Cola Offline)
+- **Manifiesto y Service Worker (`client/public/manifest.webmanifest` y `client/public/sw.js`):** Caché del shell de la aplicación, activos estáticos y respaldo *network-first* para lecturas `GET` de la API ante pérdida de conectividad rural.
+- **Cola Offline de Partes Diarios (`client/src/api/offlineQueue.js` y `PartesView.jsx`):** Si el operario carga un parte sin señal, se almacena en `localStorage` y se sincroniza automáticamente al recuperar conexión.
 
 ---
 
@@ -73,30 +81,24 @@ Se introdujo una capa de caché ligera en memoria con invalidación automática:
 
 | Métrica / Archivo | Antes (Línea Base) | Después de Optimización | Mejora Relativa |
 | :--- | :--- | :--- | :--- |
-| **Entrada Principal JS (`index.js`)** | 1,490.73 kB | **24.16 kB** (gzip: 8.02 kB) | **-98.4%** |
+| **Entrada Principal JS (`index.js`)** | 1,490.73 kB | **33.67 kB** (gzip: 11.19 kB) | **-97.7%** |
 | **Núcleo React en Caché (`vendor-react.js`)** | Embebido en index | **140.87 kB** (gzip: 45.26 kB) | Modularizado |
 | **Mapeo Geoespacial (`vendor-maps.js`)** | Embebido en index | **1,079.38 kB** (Bajo demanda) | Aislado a Parcelas |
-| **Landing Page inicial (`LandingView.js`)** | Embebido en index | **19.39 kB** (gzip: 6.41 kB) | Carga instantánea |
-| **HTML Principal (`index.html`)** | 3.11 kB | **1.63 kB** (gzip: 0.73 kB) | **-47.5%** |
+| **Layout Privado y Chat (`PrivateLayout` + `ChatView`)** | Embebido en index | **17.10 kB** + **29.42 kB** (Bajo demanda) | Aislados post-login |
+| **HTML Principal (`index.html`)** | 3.11 kB | **2.04 kB** (gzip: 0.81 kB) | **-34.4%** |
 | **Compilador Tailwind en Runtime** | Activo (consumo alto CPU) | **Eliminado (Compilación estática)** | 0ms costo CPU |
 | **Imagen Principal Hero** | 440.77 kB (JPEG) | **156.05 kB (WebP `<picture>`)** | **-65.0%** |
 | **Scripts Bloqueantes en `<head>`** | Chart.js (~250 kB) + CSS síncrono | **Eliminado + CSS diferido** | FCP ultra-rápido |
 | **Respuestas API (Node.js)** | Sin comprimir | **Gzip / Deflate activado** | -75% peso de red |
-| **Consultas de Métricas en Servidor** | Carga completa en memoria | **PostgreSQL COUNT / AVG nativo** | Escalamiento 100x |
+| **Consultas de Métricas y Reportes** | Carga completa en memoria | **PostgreSQL COUNT / AVG / SUM nativo** | Escalamiento 100x |
 | **Catálogos de Servicios y Roles** | Petición en cada visita | **Cache-Control: 1 hora** | 0 peticiones de red |
 | **Navegación Interna en Dashboard** | 5 peticiones HTTP por cambio | **Caché en cliente (0ms)** | Instantánea |
 
 ---
 
-## 4. Hoja de Ruta para Optimizaciones Futuras
-
-### Fase 4: Modo Rural y PWA (Progressive Web App)
-Dado que el entorno de uso es agropecuario (lotes y mangas con conectividad 3G/4G inestable):
-1. **Service Worker (Vite PWA / Workbox):**
-   - Cachear en disco el shell de la aplicación (código JS, CSS y logos).
-   - Permitir la visualización del último rodeo cargado aún sin señal.
-2. **Cola de Partes Diarios Offline:**
-   - Permitir al peón redactar el parte diario en el campo y sincronizarlo automáticamente cuando recupere señal Wi-Fi/4G.
+## 4. Estado de Fase 4 (Modo Rural y PWA)
+1. **Service Worker y Manifiesto PWA:** Implementado en `client/public/sw.js`, `client/public/manifest.webmanifest` y registrado en `client/src/main.jsx`.
+2. **Cola de Partes Diarios Offline:** Implementada en `client/src/api/offlineQueue.js` e integrada en `client/src/views/3_dashboard/modulos/PartesView.jsx` con sincronización automática al recuperar señal.
 
 
 

@@ -80,6 +80,18 @@ describe("Vista de Parcelas y Potreros (ParcelasView.jsx)", () => {
       }),
       http.get("*/api/dashboard/ganado", () => {
         return HttpResponse.json({ ok: true, data: [] });
+      }),
+      http.get("*/api/dashboard/potreros/permisos", () => {
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            puedeAgregar: true,
+            puedeEditar: true,
+            requiereSolicitud: false,
+            solicitudActual: null,
+            solicitudesPendientes: [],
+          },
+        });
       })
     );
   });
@@ -171,6 +183,92 @@ describe("Vista de Parcelas y Potreros (ParcelasView.jsx)", () => {
       expect(capturedPatch).toBeTruthy();
       expect(capturedPatch.nombre).toBe("Potrero La Loma");
       expect(screen.getAllByText("Potrero La Loma").length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  it("Administrador (oficina) debe solicitar permiso al Dueño antes de agregar o editar una parcela", async () => {
+    vi.spyOn(AuthContextModule, "useAuth").mockReturnValue({
+      usuario: {
+        id: "usr-oficina-1",
+        nombre: "Valeria Admin",
+        email: "oficina@vakera.com",
+        rol: "oficina",
+        establecimientoId: "est-el-rancho",
+      },
+      rol: "oficina",
+    });
+
+    let solicitudEnviada = null;
+
+    server.use(
+      http.get("*/api/dashboard/potreros", () => {
+        return HttpResponse.json({
+          ok: true,
+          data: [
+            {
+              id: "pot-1",
+              nombre: "Parcela 1",
+              superficieHas: 5.7,
+              color: "#ea580c",
+              coordinates: [[-59.25, -29.14], [-59.24, -29.14], [-59.24, -29.15]],
+              totalAnimales: 0,
+            },
+          ],
+        });
+      }),
+      http.get("*/api/dashboard/ganado", () => {
+        return HttpResponse.json({ ok: true, data: [] });
+      }),
+      http.get("*/api/dashboard/potreros/permisos", () => {
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            puedeAgregar: false,
+            puedeEditar: false,
+            requiereSolicitud: true,
+            solicitudActual: solicitudEnviada
+              ? { id: "sol-p-1", estado: "PENDIENTE", motivo: solicitudEnviada.motivo }
+              : null,
+            solicitudesPendientes: [],
+          },
+        });
+      }),
+      http.post("*/api/dashboard/potreros/permisos/solicitar", async ({ request }) => {
+        solicitudEnviada = await request.json();
+        return HttpResponse.json(
+          {
+            ok: true,
+            data: {
+              id: "sol-p-1",
+              estado: "PENDIENTE",
+              accion: solicitudEnviada.accion,
+              motivo: solicitudEnviada.motivo,
+            },
+          },
+          { status: 201 }
+        );
+      })
+    );
+
+    render(<ParcelasView />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/debés solicitar permiso al Dueño \(un permiso por modificación\)/i)
+      ).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: /Trazar Parcela en Mapa/i }));
+
+    const inputMotivo = await screen.findByLabelText("Motivo de permiso para parcelas");
+    await userEvent.type(inputMotivo, "Agregar subdivisión sur");
+    await userEvent.click(screen.getByRole("button", { name: /Enviar Solicitud al Dueño/i }));
+
+    await waitFor(() => {
+      expect(solicitudEnviada).toMatchObject({
+        accion: "AGREGAR",
+        motivo: "Agregar subdivisión sur",
+      });
     });
   });
 });

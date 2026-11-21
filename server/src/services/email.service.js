@@ -200,6 +200,84 @@ class EmailService {
 
     return { enviado: true, modo: "emulado", token, link: linkRecuperacion };
   }
+
+  /**
+   * Envía al equipo de soporte (soporte.vakera@gmail.com) el mensaje recibido desde el formulario de contacto.
+   */
+  async enviarEmailContacto({
+    nombre,
+    email,
+    telefono = null,
+    mensaje,
+    destino = process.env.CONTACTO_DESTINO_EMAIL || "soporte.vakera@gmail.com",
+  }) {
+    this.inicializarTransporte();
+    const escapar = (val) =>
+      String(val || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+
+    const remitente =
+      process.env.SMTP_FROM ||
+      (process.env.SMTP_USER
+        ? `"Vakera Ganadería" <${process.env.SMTP_USER}>`
+        : '"Vakera Ganadería" <no-reply@vakera.com>');
+    const asunto = `[Contacto Vakera] Nuevo mensaje de ${nombre}`;
+
+    const contenidoHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #ffffff;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h1 style="color: #2e7d32; margin: 0; font-size: 22px; letter-spacing: 1px;">VAKERA GANADERÍA</h1>
+          <p style="color: #64748b; font-size: 13px; margin-top: 4px;">Nuevo mensaje desde el formulario de contacto</p>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 14px; color: #334155;">
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold; width: 110px;">Nombre:</td>
+            <td style="padding: 8px 0;">${escapar(nombre)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold;">Correo:</td>
+            <td style="padding: 8px 0;"><a href="mailto:${escapar(email)}" style="color: #2e7d32;">${escapar(email)}</a></td>
+          </tr>
+          ${
+            telefono
+              ? `<tr><td style="padding: 8px 0; font-weight: bold;">Teléfono:</td><td style="padding: 8px 0;">${escapar(telefono)}</td></tr>`
+              : ""
+          }
+        </table>
+
+        <div style="background: #f8fafc; border-left: 4px solid #8fb56b; padding: 14px 16px; border-radius: 6px; color: #1e293b; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">${escapar(mensaje)}</div>
+      </div>
+    `;
+
+    if (!this.modoEmulado && this.transporter) {
+      try {
+        await this.transporter.sendMail({
+          from: remitente,
+          to: destino,
+          replyTo: email,
+          subject: asunto,
+          html: contenidoHtml,
+        });
+        console.log(`✓ Mensaje de contacto enviado a ${destino} (de: ${email})`);
+        return { enviado: true, modo: "smtp", destino };
+      } catch (err) {
+        console.warn(`! Fallo al enviar contacto por Gmail/SMTP (${err.message}). Registrando en consola:`);
+      }
+    }
+
+    console.log("\n==================================================================");
+    console.log(" [CORREO VAKERA] MENSAJE DE CONTACTO");
+    console.log(` Para: ${destino}`);
+    console.log(` De: ${nombre} <${email}>`);
+    console.log(` Mensaje: ${mensaje}`);
+    console.log("==================================================================\n");
+
+    return { enviado: true, modo: "emulado", destino };
+  }
 }
 
 module.exports = new EmailService();

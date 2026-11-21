@@ -32,8 +32,8 @@ const OPCIONES_ROL = [
     id: "peon",
     icono: "fa-tractor",
     titulo: "Peón de Campo",
-    cargoSugerido: "Operario de Potrero",
-    desc: "Carga de partes operativos, novedades de potrero y tareas diarias",
+    cargoSugerido: "Operario de Ganado",
+    desc: "Carga de partes operativos, novedades de ganado y tareas diarias",
   },
   {
     id: "oficina",
@@ -489,7 +489,7 @@ export default function GestionUsuariosView() {
                   ? "Ej: Capataz General de Manga"
                   : formulario.rol === "oficina"
                   ? "Ej: Administración & Liquidaciones"
-                  : "Ej: Operario de Potrero Norte"
+                  : "Ej: Operario de Ganado Norte"
               }
               className="campo-formulario__input"
               style={{
