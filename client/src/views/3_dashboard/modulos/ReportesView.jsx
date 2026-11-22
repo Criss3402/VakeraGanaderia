@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { obtenerReportes, obtenerDolar } from "../../../api/dashboard.api";
+import { descargarPdfHaciendaPy } from "../../../api/reportesPy.api";
 import { useAuth } from "../../../context/AuthContext";
 import ParcelaDetalleReporte from "./ParcelaDetalleReporte.jsx";
 
@@ -18,7 +19,19 @@ export default function ReportesView() {
   const [tipoDolar, setTipoDolar] = useState("oficial");
   const [menuDolarAbierto, setMenuDolarAbierto] = useState(false);
   const [parcelaSeleccionada, setParcelaSeleccionada] = useState(null);
+  const [descargandoPdf, setDescargandoPdf] = useState(false);
   const menuDolarRef = useRef(null);
+
+  const manejarDescargarPdf = async () => {
+    try {
+      setDescargandoPdf(true);
+      await descargarPdfHaciendaPy();
+    } catch (err) {
+      console.error("Error al exportar reporte PDF:", err);
+    } finally {
+      setDescargandoPdf(false);
+    }
+  };
 
   useEffect(() => {
     const manejarClickAfuera = (e) => {
@@ -212,10 +225,14 @@ export default function ReportesView() {
 
           <button
             type="button"
-            onClick={() => window.print()}
-            className="bg-[#8fb56b] hover:bg-[#a1c97c] text-[#182920] font-bold text-xs uppercase px-5 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-2"
+            disabled={descargandoPdf}
+            onClick={manejarDescargarPdf}
+            className={`bg-[#8fb56b] hover:bg-[#a1c97c] text-[#182920] font-bold text-xs uppercase px-5 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-2 ${
+              descargandoPdf ? "opacity-75 cursor-not-allowed" : ""
+            }`}
           >
-            <i className="fa-solid fa-print"></i> Imprimir / Exportar Reporte
+            <i className={`fa-solid ${descargandoPdf ? "fa-spinner fa-spin" : "fa-print"}`}></i>
+            {descargandoPdf ? "Exportando..." : "Imprimir / Exportar Reporte"}
           </button>
         </div>
       </div>
