@@ -68,17 +68,17 @@ export function conectarRealtime({
   return () => {
     cerradoAProposito = true;
     if (timerReconexion) clearTimeout(timerReconexion);
-      if (socket) {
-        if (socket.readyState === WebSocket.OPEN) {
-          socket.close(1000);
-        } else if (socket.readyState === WebSocket.CONNECTING) {
-          // No llamar close() aquí: el handshake todavía no terminó.
-          // Solo "apagar" los handlers para que no disparen nada.
-          socket.onopen = null;
-          socket.onmessage = null;
-          socket.onclose = null;
-          socket.onerror = null;
-        }
+    if (socket) {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.close(1000);
+      } else if (socket.readyState === WebSocket.CONNECTING) {
+        // No llamar close() aquí: el handshake todavía no terminó.
+        // Solo "apagar" los handlers para que no disparen nada.
+        socket.onopen = null;
+        socket.onmessage = null;
+        socket.onclose = null;
+        socket.onerror = null;
       }
-    };
-  }
+    }
+  };
+}
