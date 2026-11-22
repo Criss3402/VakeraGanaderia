@@ -9,7 +9,7 @@ from legacy_models.models import Ganado, Insumo, ParteDiario, SanidadEvento
 from rest_framework.views import APIView
 
 from reportes.services.excel_service import generar_excel_inventario
-from reportes.services.pdf_service import generar_pdf_hacienda
+from reportes.services.pdf_service import generar_pdf_hacienda, generar_pdf_margen_bruto
 
 
 def _obtener_datos_hacienda(establecimiento_id=None):
@@ -165,3 +165,26 @@ class ExportarExcelStockView(APIView):
             return response
         except Exception as e:
             return api_error(mensaje=f"Error al generar Excel: {e!s}", status_code=500)
+
+
+class ExportarPdfMargenBrutoView(APIView):
+    """
+    POST /api/py/reportes/exportar-margen-bruto
+    Genera y descarga la planilla PDF de Margen Bruto Ganadero (ciclo completo).
+    """
+    permission_classes = [CanAccessReports]
+
+    def post(self, request):
+        try:
+            datos = dict(request.data) if isinstance(request.data, dict) else {}
+            if not datos.get("generadoPor") and getattr(request, "user", None):
+                nombre = getattr(request.user, "nombre", None) or getattr(request.user, "email", "Usuario")
+                rol = (getattr(request.user, "rol", "") or "").upper()
+                datos["generadoPor"] = f"{nombre} ({rol})" if rol else nombre
+            pdf_buffer = generar_pdf_margen_bruto(datos)
+
+            response = HttpResponse(pdf_buffer.getvalue(), content_type="application/pdf")
+            response["Content-Disposition"] = 'attachment; filename="vakera_margen_bruto.pdf"'
+            return response
+        except Exception as e:
+            return api_error(mensaje=f"Error al generar PDF de Margen Bruto: {e!s}", status_code=500)

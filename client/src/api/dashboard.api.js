@@ -296,3 +296,46 @@ export async function eliminarPartesDiariosMasivo(ids) {
 export async function obtenerReportes() {
   return request("/dashboard/reportes");
 }
+
+// Reproducción y Preñez (Sub-módulo de Ganado)
+export async function obtenerReproduccion() {
+  return request("/dashboard/reproduccion");
+}
+
+export async function registrarReproduccion(datos) {
+  return request("/dashboard/reproduccion", {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export async function eliminarReproduccion(id) {
+  return request(`/dashboard/reproduccion/${id}`, {
+    method: "DELETE",
+  });
+}
+
+// Costos y Finanzas
+export async function obtenerFinanzas() {
+  return request("/dashboard/finanzas");
+}
+
+export async function registrarCostoFinanzas(datos) {
+  return request("/dashboard/finanzas/costos", {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export async function eliminarCostoFinanzas(id) {
+  return request(`/dashboard/finanzas/costos/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function guardarParametrosFinanzas(datos) {
+  return request("/dashboard/finanzas/parametros", {
+    method: "PUT",
+    body: JSON.stringify(datos),
+  });
+}

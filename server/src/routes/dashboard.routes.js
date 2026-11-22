@@ -202,4 +202,39 @@ router.get(
   DashboardController.obtenerReportes
 );
 
+// 8. Reproducción y Preñez (Sub-módulo de Ganado)
+router.get("/reproduccion", DashboardController.obtenerReproduccion);
+router.post(
+  "/reproduccion",
+  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ, ROLES.VETERINARIO),
+  DashboardController.registrarReproduccion
+);
+router.delete(
+  "/reproduccion/:id",
+  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ, ROLES.VETERINARIO),
+  DashboardController.eliminarReproduccion
+);
+
+// 9. Costos y Finanzas
+router.get(
+  "/finanzas",
+  rbacMiddleware(ROLES.DUENO, ROLES.OFICINA, ROLES.CAPATAZ, ROLES.VETERINARIO),
+  DashboardController.obtenerFinanzas
+);
+router.post(
+  "/finanzas/costos",
+  rbacMiddleware(ROLES.DUENO, ROLES.OFICINA),
+  DashboardController.registrarCostoFinanzas
+);
+router.delete(
+  "/finanzas/costos/:id",
+  rbacMiddleware(ROLES.DUENO, ROLES.OFICINA),
+  DashboardController.eliminarCostoFinanzas
+);
+router.put(
+  "/finanzas/parametros",
+  rbacMiddleware(ROLES.DUENO, ROLES.OFICINA),
+  DashboardController.guardarParametrosFinanzas
+);
+
 module.exports = router;

@@ -7,10 +7,15 @@ import Button from "../ui/Button";
 const PREFETCH_MODULOS = {
   metricas: () => import("../../views/3_dashboard/DashboardView.jsx"),
   ganado: () => import("../../views/3_dashboard/modulos/GanadoView.jsx"),
+  "ganado-lotes": () => import("../../views/3_dashboard/modulos/GanadoView.jsx"),
+  "ganado-potreros": () => import("../../views/3_dashboard/modulos/GanadoView.jsx"),
+  "ganado-reproduccion": () => import("../../views/3_dashboard/modulos/GanadoView.jsx"),
   parcelas: () => import("../../views/3_dashboard/modulos/ParcelasView.jsx"),
   partes: () => import("../../views/3_dashboard/modulos/PartesView.jsx"),
   sanidad: () => import("../../views/3_dashboard/modulos/SanidadView.jsx"),
   insumos: () => import("../../views/3_dashboard/modulos/InsumosView.jsx"),
+  finanzas: () => import("../../views/3_dashboard/modulos/FinanzasView.jsx"),
+  "finanzas-parametros": () => import("../../views/3_dashboard/modulos/FinanzasView.jsx"),
   reportes: () => import("../../views/3_dashboard/modulos/ReportesView.jsx"),
   tambo: () => import("../../views/3_dashboard/modulos/TamboLecheView.jsx"),
   "tambo-vacas-ordenadas": () => import("../../views/3_dashboard/modulos/TamboLecheView.jsx"),
@@ -88,7 +93,16 @@ export default function Sidebar({
   const enlaces = [
     { id: "metricas", etiqueta: "Panel General", icono: "fa-house" },
     { id: "parcelas", etiqueta: "Parcelas", icono: "fa-draw-polygon" },
-    { id: "ganado", etiqueta: "Ganado", icono: "fa-cow" },
+    {
+      id: "ganado",
+      etiqueta: "Ganado",
+      icono: "fa-cow",
+      subEnlaces: [
+        { id: "ganado-lotes", etiqueta: "Lotes y Traslados", icono: "fa-layer-group" },
+        { id: "ganado-potreros", etiqueta: "Zonificación", icono: "fa-map" },
+        { id: "ganado-reproduccion", etiqueta: "Reproducción y Preñez", icono: "fa-heart-pulse" },
+      ],
+    },
     {
       id: "tambo",
       etiqueta: "Tambo y Leche",
@@ -100,6 +114,15 @@ export default function Sidebar({
     { id: "insumos", etiqueta: "Insumos y Stock", icono: "fa-boxes-stacked" },
     { id: "sanidad", etiqueta: "Sanidad y Vacunas", icono: "fa-syringe" },
     { id: "partes", etiqueta: "Partes de Campo", icono: "fa-clipboard-list" },
+    {
+      id: "finanzas",
+      etiqueta: "Costos y Finanzas",
+      icono: "fa-coins",
+      visible: rol !== "peon",
+      subEnlaces: [
+        { id: "finanzas-parametros", etiqueta: "Parámetros Modelo", icono: "fa-sliders" },
+      ],
+    },
     { id: "reportes", etiqueta: "Reportes", icono: "fa-chart-simple" },
     { id: "permisos", etiqueta: "Usuarios y Roles", icono: "fa-shield-halved", visible: esDueno },
   ];

@@ -5,6 +5,8 @@ const ParteDiarioModel = require("../models/parteDiario.model");
 const ParcelaPermisoModel = require("../models/parcelaPermiso.model");
 const TamboConfigModel = require("../models/tamboConfig.model");
 const OrdenieModel = require("../models/ordenie.model");
+const ReproduccionModel = require("../models/reproduccion.model");
+const FinanzasModel = require("../models/finanzas.model");
 const WeatherService = require("../services/weather.service");
 const CotizacionService = require("../services/cotizacion.service");
 const DolarService = require("../services/dolar.service");
@@ -813,6 +815,13 @@ class DashboardController {
         totalPartes: partes.length,
         partesAprobados: partes.filter((p) => (p.estado || "").toUpperCase() === "APROBADO").length,
         partesPendientes: partes.filter((p) => (p.estado || "").toUpperCase() === "PENDIENTE").length,
+        reproduccionResumen: ReproduccionModel.obtenerResumen(
+          estId,
+          pesoPorCategoria
+            .filter((item) => String(item.categoria || "").toLowerCase().includes("vaca"))
+            .reduce((acc, item) => acc + (Number(item.cabezas) || 0), 0)
+        ),
+        finanzasResumen: FinanzasModel.obtenerResumen(estId),
         fechaGeneracion: new Date().toISOString(),
       };
 
@@ -911,6 +920,83 @@ class DashboardController {
       });
     } catch (err) {
       return error(res, "Error al consultar notificaciones: " + err.message, 500);
+    }
+  }
+
+  // 10. Reproducción y Preñez (Sub-módulo de Ganado)
+  static async obtenerReproduccion(req, res) {
+    try {
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const pesoPorCategoria = await GanadoModel.obtenerPesoPorCategoria(estId);
+      const totalVientres = pesoPorCategoria
+        .filter((item) => String(item.categoria || "").toLowerCase().includes("vaca"))
+        .reduce((acc, item) => acc + (Number(item.cabezas) || 0), 0);
+      return exito(res, {
+        eventos: ReproduccionModel.listar(estId),
+        resumen: ReproduccionModel.obtenerResumen(estId, totalVientres),
+      });
+    } catch (err) {
+      return error(res, err.message, err.status || 500);
+    }
+  }
+
+  static registrarReproduccion(req, res) {
+    try {
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const creado = ReproduccionModel.registrar(estId, req.body || {});
+      return exito(res, creado, "Evento reproductivo registrado exitosamente.", 201);
+    } catch (err) {
+      return error(res, err.message, err.status || 400);
+    }
+  }
+
+  static eliminarReproduccion(req, res) {
+    try {
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const eliminado = ReproduccionModel.eliminar(req.params.id, estId);
+      return exito(res, eliminado, "Evento reproductivo eliminado.");
+    } catch (err) {
+      return error(res, err.message, err.status || 400);
+    }
+  }
+
+  // 11. Costos y Finanzas
+  static obtenerFinanzas(req, res) {
+    try {
+      const { estId } = obtenerEstablecimientoContexto(req);
+      return exito(res, FinanzasModel.obtenerResumen(estId));
+    } catch (err) {
+      return error(res, err.message, err.status || 500);
+    }
+  }
+
+  static registrarCostoFinanzas(req, res) {
+    try {
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const creado = FinanzasModel.registrarCosto(estId, req.body || {});
+      return exito(res, creado, "Costo operativo registrado exitosamente.", 201);
+    } catch (err) {
+      return error(res, err.message, err.status || 400);
+    }
+  }
+
+  static eliminarCostoFinanzas(req, res) {
+    try {
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const eliminado = FinanzasModel.eliminarCosto(req.params.id, estId);
+      return exito(res, eliminado, "Costo operativo eliminado.");
+    } catch (err) {
+      return error(res, err.message, err.status || 400);
+    }
+  }
+
+  static guardarParametrosFinanzas(req, res) {
+    try {
+      const { estId } = obtenerEstablecimientoContexto(req);
+      const guardado = FinanzasModel.guardarParametros(estId, req.body || {});
+      return exito(res, guardado, "Parámetros productivos guardados.");
+    } catch (err) {
+      return error(res, err.message, err.status || 400);
     }
   }
 }

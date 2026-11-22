@@ -147,9 +147,6 @@ export default function VacasOrdenadasView({
         <div className="flex-1 bg-[#182920] rounded-2xl p-6 text-white border border-[#33512f] shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-1">
-              <span className="bg-[#8fb56b] text-[#182920] text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full">
-                Sub-módulo de Ordeñe Diario
-              </span>
               <span className="text-xs text-[#ded7c4]">
                 {vacasLecheras.length} vacas lecheras disponibles
               </span>

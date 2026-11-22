@@ -21,6 +21,7 @@ const InsumosView = lazy(() => import("./views/3_dashboard/modulos/InsumosView.j
 const ReportesView = lazy(() => import("./views/3_dashboard/modulos/ReportesView.jsx"));
 const TamboLecheView = lazy(() => import("./views/3_dashboard/modulos/TamboLecheView.jsx"));
 const ParcelasView = lazy(() => import("./views/3_dashboard/modulos/ParcelasView.jsx"));
+const FinanzasView = lazy(() => import("./views/3_dashboard/modulos/FinanzasView.jsx"));
 const GestionUsuariosView = lazy(() => import("./views/4_permisos/GestionUsuariosView.jsx"));
 
 function VistaCargando() {
@@ -36,10 +37,15 @@ function VistaCargando() {
 const PATH_A_APP = {
   "/dashboard": "metricas",
   "/ganado": "ganado",
+  "/ganado/lotes": "ganado-lotes",
+  "/ganado/zonificacion": "ganado-potreros",
+  "/ganado/reproduccion": "ganado-reproduccion",
   "/parcelas": "parcelas",
   "/partes": "partes",
   "/sanidad": "sanidad",
   "/insumos": "insumos",
+  "/finanzas": "finanzas",
+  "/finanzas/parametros": "finanzas-parametros",
   "/reportes": "reportes",
   "/tambo": "tambo",
   "/tambo/vacas-ordenadas": "tambo-vacas-ordenadas",
@@ -201,8 +207,13 @@ function AppContenido() {
   const titulosVistas = {
     metricas: "Panel de Control Ganadero",
     ganado: "Gestión de Rodeo y Ganado",
+    "ganado-lotes": "Manejo por Lotes y Traslados",
+    "ganado-potreros": "Zonificación de Ganado",
+    "ganado-reproduccion": "Reproducción, Tacto y Preñez",
     parcelas: "Mapeo Geoespacial de Parcelas y Ganado",
     partes: "Partes Diarios de Novedades de Campo",
+    finanzas: "Costos Operativos y Finanzas",
+    "finanzas-parametros": "Parámetros Productivos del Modelo",
     sanidad: "Calendario y Tratamientos Sanitarios",
     insumos: "Control de Insumos y Stock Crítico",
     reportes: "Reportes Contables y Auditoría",
@@ -311,11 +322,26 @@ function AppContenido() {
               </ProtectedRoute>
             )}
 
-            {subVistaApp === "ganado" && <GanadoView />}
+            {subVistaApp === "ganado" && <GanadoView subModuloInicial="rodeo" alVolverGanado={() => navegarA("app", "ganado")} />}
+            {subVistaApp === "ganado-lotes" && <GanadoView subModuloInicial="lotes" alVolverGanado={() => navegarA("app", "ganado")} />}
+            {subVistaApp === "ganado-potreros" && <GanadoView subModuloInicial="potreros" alVolverGanado={() => navegarA("app", "ganado")} />}
+            {subVistaApp === "ganado-reproduccion" && <GanadoView subModuloInicial="reproduccion" alVolverGanado={() => navegarA("app", "ganado")} />}
             {subVistaApp === "parcelas" && <ParcelasView />}
             {subVistaApp === "partes" && <PartesView />}
             {subVistaApp === "sanidad" && <SanidadView />}
             {subVistaApp === "insumos" && <InsumosView />}
+            {subVistaApp === "finanzas" && (
+              <FinanzasView
+                vistaSubModulo="costos"
+                alCambiarSubModulo={(tab) => navegarA("app", tab === "parametros" ? "finanzas-parametros" : "finanzas")}
+              />
+            )}
+            {subVistaApp === "finanzas-parametros" && (
+              <FinanzasView
+                vistaSubModulo="parametros"
+                alCambiarSubModulo={(tab) => navegarA("app", tab === "parametros" ? "finanzas-parametros" : "finanzas")}
+              />
+            )}
             {subVistaApp === "reportes" && <ReportesView />}
             {subVistaApp === "tambo" && (
               <TamboLecheView

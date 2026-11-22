@@ -11,15 +11,20 @@ import {
   obtenerFichaAnimal,
 } from "../../../api/dashboard.api";
 import { useAuth } from "../../../context/AuthContext";
+import ReproduccionSubModulo from "./ReproduccionSubModulo.jsx";
 
-export default function GanadoView() {
+export default function GanadoView({ subModuloInicial = "rodeo", alVolverGanado }) {
   const { rol } = useAuth();
   const [ganado, setGanado] = useState([]);
   const [potreros, setPotreros] = useState([]);
   const [cargando, setCargando] = useState(true);
 
   // Vistas internas del módulo
-  const [pestaña, setPestaña] = useState("rodeo"); // 'rodeo' | 'lotes' | 'potreros'
+  const [pestaña, setPestaña] = useState(subModuloInicial); // 'rodeo' | 'lotes' | 'potreros' | 'reproduccion'
+
+  useEffect(() => {
+    if (subModuloInicial) setPestaña(subModuloInicial);
+  }, [subModuloInicial]);
 
   // Filtros y Búsqueda
   const [busqueda, setBusqueda] = useState("");
@@ -279,13 +284,25 @@ export default function GanadoView() {
 
   return (
     <div className="space-y-6">
-      {/* Banner Principal */}
-      <div className="bg-[#182920] rounded-2xl p-6 text-white border border-[#33512f] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      {/* Banner Principal (con flecha atrás cuando está en un sub-módulo) */}
+      <div className={pestaña !== "rodeo" ? "flex items-stretch gap-3" : ""}>
+        {pestaña !== "rodeo" && (
+          <button
+            type="button"
+            onClick={() => {
+              setPestaña("rodeo");
+              if (alVolverGanado) alVolverGanado();
+            }}
+            title="Volver a Ganado"
+            aria-label="Volver a Ganado"
+            className="bg-[#8fb56b] hover:bg-[#a1c97c] text-[#182920] rounded-2xl px-4 flex items-center justify-center shadow-sm transition-all shrink-0"
+          >
+            <i className="fa-solid fa-arrow-left text-lg"></i>
+          </button>
+        )}
+        <div className="flex-1 bg-[#182920] rounded-2xl p-6 text-white border border-[#33512f] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="bg-[#8fb56b] text-[#182920] text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full">
-              Fase 4: Gestión Integral de Ganado y Animal
-            </span>
             <span className="text-xs text-[#8fb56b]">Sistema Sincronizado</span>
           </div>
           <h2 className="text-2xl font-bold font-['Fraunces',serif] text-[#f1ecdd]">
@@ -319,6 +336,7 @@ export default function GanadoView() {
             </button>
           </div>
         )}
+        </div>
       </div>
 
       {mensaje && (
@@ -372,6 +390,18 @@ export default function GanadoView() {
         >
           <i className="fa-solid fa-map"></i>
           <span>Zonificación de Ganado ({potreros.length})</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setPestaña("reproduccion")}
+          className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all ${
+            pestaña === "reproduccion"
+              ? "bg-[#182920] text-[#f1ecdd] shadow-sm"
+              : "bg-white text-[#4a5c4e] border border-[#ded7c4] hover:bg-[#e7dfcb]"
+          }`}
+        >
+          <i className="fa-solid fa-heart-pulse"></i>
+          <span>Reproducción y Preñez</span>
         </button>
       </div>
 
@@ -807,6 +837,13 @@ export default function GanadoView() {
             })}
           </div>
         </div>
+      )}
+
+      {pestaña === "reproduccion" && (
+        <ReproduccionSubModulo
+          ganado={ganado}
+          puedeGestionar={puedeGestionar || rol === "veterinario"}
+        />
       )}
 
       {/* ========================================================= */}

@@ -126,9 +126,6 @@ export default function TamboLecheView({
       <div className="bg-[#182920] rounded-2xl p-6 text-white border border-[#33512f] shadow-sm flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="bg-[#8fb56b] text-[#182920] text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full">
-              Módulo Lechero · OCLA / SIGLeA
-            </span>
             <span className="text-xs text-[#8fb56b]">
               {datos?.esEnVivo ? "Datos en vivo" : "Valores de referencia"} · Período {datos?.periodo || "oct/2026"}
             </span>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { obtenerReportes, obtenerDolar } from "../../../api/dashboard.api";
-import { descargarPdfHaciendaPy } from "../../../api/reportesPy.api";
+import { descargarPdfMargenBrutoPy } from "../../../api/reportesPy.api";
 import { useAuth } from "../../../context/AuthContext";
 import ParcelaDetalleReporte from "./ParcelaDetalleReporte.jsx";
 
@@ -11,7 +11,7 @@ const DOLAR_FALLBACK = {
 };
 
 export default function ReportesView() {
-  const { rol } = useAuth();
+  const { rol, usuario } = useAuth();
   const [datos, setDatos] = useState(null);
   const [dolarExtra, setDolarExtra] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -19,17 +19,111 @@ export default function ReportesView() {
   const [tipoDolar, setTipoDolar] = useState("oficial");
   const [menuDolarAbierto, setMenuDolarAbierto] = useState(false);
   const [parcelaSeleccionada, setParcelaSeleccionada] = useState(null);
-  const [descargandoPdf, setDescargandoPdf] = useState(false);
+  const [descargandoMargen, setDescargandoMargen] = useState(false);
+  const [errorMargen, setErrorMargen] = useState("");
   const menuDolarRef = useRef(null);
 
-  const manejarDescargarPdf = async () => {
+  const manejarDescargarMargenBruto = async () => {
+    setErrorMargen("");
     try {
-      setDescargandoPdf(true);
-      await descargarPdfHaciendaPy();
+      setDescargandoMargen(true);
+      const dolarVenta = Number(dolarSeleccionado?.venta) || 1;
+      const supTotalHa = potreros.reduce((acc, p) => acc + (Number(p.superficieHas) || 0), 0);
+      const totalCabezasReal = Number(resumen.totalCabezas) || hacienda.length || 0;
+      const pesoTotalKg =
+        Number(resumen.pesoTotalKg) ||
+        hacienda.reduce((acc, g) => acc + (Number(g.pesoKg) || 0), 0);
+      const pesoPromedioKg =
+        Number(resumen.pesoPromedioKg) || (totalCabezasReal > 0 ? pesoTotalKg / totalCabezasReal : 0);
+
+      const categoriasMkt = Array.isArray(cotizacionesMercado?.categorias)
+        ? cotizacionesMercado.categorias
+        : Object.values(cotizacionesMercado?.categorias || {});
+      const novilloCat = categoriasMkt.find((c) =>
+        String(c?.categoria || c?.nombre || c?.label || "").toLowerCase().includes("novillo")
+      );
+      const novilloArsKg = Number(novilloCat?.precioKg || novilloCat?.precioPromedio || novilloCat?.promedio || 0);
+      const novilloUsdKg = novilloArsKg > 0 ? novilloArsKg / dolarVenta : 0;
+
+      const vientresCount =
+        valuacionCategorias
+          .filter((c) => String(c.categoria || "").toLowerCase().includes("vaca"))
+          .reduce((acc, c) => acc + (Number(c.cabezas) || 0), 0) ||
+        totalCabezasReal;
+
+      const torosCount = valuacionCategorias
+        .filter((c) => String(c.categoria || "").toLowerCase().includes("toro"))
+        .reduce((acc, c) => acc + (Number(c.cabezas) || 0), 0);
+      const torosPctAuto = totalCabezasReal > 0 ? (torosCount / totalCabezasReal) * 100 : 0;
+
+      const repro = datos?.reproduccionResumen || {};
+      const fin = datos?.finanzasResumen || {};
+      const rubrosFin = fin?.porRubroUsd || {};
+      const paramsFin = fin?.parametros || {};
+
+      const generadoPor = usuario?.nombre
+        ? `${usuario.nombre}${rol ? ` (${String(rol).toUpperCase()})` : ""}`
+        : usuario?.email || "Usuario Vakera";
+
+      const payload = {
+        titulo: "Balance y Valuación Ganadera — Datos en Vivo",
+        establecimiento: usuario?.establecimiento || "Establecimiento Vakera",
+        generadoPor,
+        fechaElaboracion: new Date().toLocaleDateString("es-AR", { month: "long", year: "numeric" }),
+        dolar: dolarVenta,
+        novilloUsdKg,
+        indicadores: {
+          totalCabezas: totalCabezasReal,
+          vientres: vientresCount,
+          torosPct: torosPctAuto,
+          pesoTotalKg,
+          pesoPromedioKg,
+          produccionCarneKgHa: supTotalHa > 0 ? pesoTotalKg / supTotalHa : 0,
+          tasaSanitariaPct: Number(resumen.tasaSanitaria ?? resumen.porcentajeSaludable ?? 100),
+          mortandadPct: Number(paramsFin.mortandadPct || resumen.tasaMortalidad || 0),
+          evaluadas: Number(repro.evaluadas || 0),
+          prenezPct: Number(repro.prenezPct || 0),
+          destetes: Number(repro.destetes || 0),
+          destetePct: Number(repro.destetePct || 0),
+          edadPrimerServicioMeses: repro.edadPrimerServicioMeses || paramsFin.edadPrimerServicioMeses || null,
+          reposicionHembrasPct: Number(paramsFin.reposicionHembrasPct || 0),
+          reposicionTorosPct: Number(paramsFin.reposicionTorosPct || 0),
+          vacasLecheras: Number(tamboLeche?.vacasLecheras || 0),
+          precioLecheUsdL: Number(tamboLeche?.precioLitroArs || 0) / dolarVenta,
+        },
+        superficies: potreros.map((p) => ({
+          nombre: p.pastura ? `${p.nombre} (${p.pastura})` : p.nombre,
+          ha: Number(p.superficieHas) || 0,
+          usoPct: 100,
+        })),
+        categoriasIngreso: valuacionCategorias.map((c) => {
+          const cab = Number(c.cabezas) || 0;
+          const pesoCab = cab > 0 ? (Number(c.pesoPromedioKg) || (Number(c.pesoTotalKg) || 0) / cab) : 0;
+          const ingresoUsd = (Number(c.valorEstimadoArs) || 0) / dolarVenta;
+          const precioUsdKg = (Number(c.precioKgArs) || 0) / dolarVenta || (cab * pesoCab > 0 ? ingresoUsd / (cab * pesoCab) : 0);
+          return {
+            categoria: c.categoria,
+            cabezas: cab,
+            pesoKgCab: pesoCab,
+            precioUsdKg,
+            ingresoUsd,
+          };
+        }),
+        costos: {
+          compraTorosUsd: Number(rubrosFin.compraTorosUsd || 0),
+          comercializacionUsd: Number(rubrosFin.comercializacionUsd || 0),
+          personalUsd: Number(rubrosFin.personalUsd || 0),
+          sanidadUsd: Number(rubrosFin.sanidadUsd || 0),
+          alimentacionUsd: Number(rubrosFin.alimentacionUsd || 0),
+          amortizacionesUsd: Number(rubrosFin.amortizacionesUsd || 0),
+        },
+      };
+
+      await descargarPdfMargenBrutoPy(payload);
     } catch (err) {
-      console.error("Error al exportar reporte PDF:", err);
+      setErrorMargen(err.message || "No se pudo generar el PDF de Margen Bruto.");
     } finally {
-      setDescargandoPdf(false);
+      setDescargandoMargen(false);
     }
   };
 
@@ -115,9 +209,6 @@ export default function ReportesView() {
       <div className="bg-[#182920] rounded-2xl p-6 text-white border border-[#33512f] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="bg-[#8fb56b] text-[#182920] text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full">
-              Módulo de Reportes & Trazabilidad
-            </span>
             <span className="text-xs text-[#8fb56b]">Auditoría Contable y Ganadera</span>
           </div>
           <h2 className="text-2xl font-bold font-['Fraunces',serif] text-[#f1ecdd]">
@@ -225,19 +316,25 @@ export default function ReportesView() {
 
           <button
             type="button"
-            disabled={descargandoPdf}
-            onClick={manejarDescargarPdf}
+            disabled={descargandoMargen}
+            onClick={manejarDescargarMargenBruto}
             className={`bg-[#8fb56b] hover:bg-[#a1c97c] text-[#182920] font-bold text-xs uppercase px-5 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-2 ${
-              descargandoPdf ? "opacity-75 cursor-not-allowed" : ""
+              descargandoMargen ? "opacity-75 cursor-not-allowed" : ""
             }`}
           >
-            <i className={`fa-solid ${descargandoPdf ? "fa-spinner fa-spin" : "fa-print"}`}></i>
-            {descargandoPdf ? "Exportando..." : "Imprimir / Exportar Reporte"}
+            <i className={`fa-solid ${descargandoMargen ? "fa-spinner fa-spin" : "fa-print"}`}></i>
+            {descargandoMargen ? "Exportando..." : "Imprimir / Exportar Reporte"}
           </button>
         </div>
       </div>
 
       {/* KPI Cards Ejecutivos */}
+      {errorMargen && (
+        <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 font-semibold flex items-center justify-between">
+          <span>{errorMargen}</span>
+          <button type="button" onClick={() => setErrorMargen("")} className="font-bold px-2">×</button>
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-2xl p-5 border border-[#ded7c4] shadow-sm">
           <p className="text-[11px] font-bold text-[#6b7c6d] uppercase">Valuación Hacienda Ref.</p>

@@ -355,6 +355,12 @@ const db = {
   configuracionesTambo: [],
 
   registrosOrdenie: [],
+
+  eventosReproductivos: [],
+
+  costosFinanzas: [],
+
+  parametrosModelo: [],
 };
 
 module.exports = db;

@@ -22,18 +22,18 @@ export default defineConfig({
     proxy: {
       // Reenvía WebSockets /ws al servidor ASGI (Daphne / Django Channels)
       "/ws": {
-        target: "http://localhost:8000",
+        target: "http://127.0.0.1:8000",
         ws: true,
         changeOrigin: true,
       },
       // Reenvía llamadas analíticas /api/py al backend de Python (Django)
       "/api/py": {
-        target: "http://localhost:8000",
+        target: "http://127.0.0.1:8000",
         changeOrigin: true,
       },
       // Reenvía las llamadas operativas /api al backend de Node.js (Express)
       "/api": {
-        target: "http://localhost:4000",
+        target: "http://127.0.0.1:4000",
         changeOrigin: true,
       },
     },

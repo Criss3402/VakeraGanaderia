@@ -80,3 +80,22 @@ class ReportesTestCase(TestCase):
         data = response.json()
         self.assertTrue(data["ok"])
         self.assertIn("hacienda", data["data"])
+
+    def test_endpoint_dueno_puede_exportar_margen_bruto_pdf(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.token_dueno}")
+        payload = {
+            "titulo": "Ganadería bovina de ciclo completo",
+            "establecimiento": "El Rancho",
+            "dolar": 1600,
+            "novilloUsdKg": 1.8,
+            "indicadores": {"vientres": 100, "prenezPct": 90, "destetePct": 80},
+            "superficies": [{"nombre": "Pastura", "ha": 26, "usoPct": 100}],
+            "categoriasIngreso": [
+                {"categoria": "Novillos", "cabezas": 39, "pesoKgCab": 390, "precioUsdKg": 1.8}
+            ],
+            "costos": {"personalUsd": 3905, "sanidadUsd": 2115},
+        }
+        response = self.client.post("/api/py/reportes/exportar-margen-bruto", payload, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertTrue(response.content.startswith(b"%PDF-"))

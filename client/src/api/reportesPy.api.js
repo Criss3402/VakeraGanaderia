@@ -76,3 +76,30 @@ export async function descargarExcelStockPy() {
   window.URL.revokeObjectURL(url);
   return true;
 }
+
+export async function descargarPdfMargenBrutoPy(payload) {
+  const token = getToken();
+  const res = await fetch("/api/py/reportes/exportar-margen-bruto", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(payload || {}),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Error al generar Margen Bruto PDF (${res.status})`);
+  }
+
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "vakera_margen_bruto.pdf";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+  return true;
+}
