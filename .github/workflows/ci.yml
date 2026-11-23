@@ -14,6 +14,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - run: npm ci
       - run: npm --prefix server ci
       - run: npx prisma generate --schema=prisma/schema.prisma
       - run: npm --prefix server audit --omit=dev --audit-level=high
@@ -21,6 +22,9 @@ jobs:
 
   python-backend:
     runs-on: ubuntu-latest
+    env:
+      DJANGO_DEBUG: "True"
+      DJANGO_TEST_DB: "sqlite"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
