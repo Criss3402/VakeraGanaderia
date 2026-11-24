@@ -254,7 +254,7 @@ describe("Vista de Parcelas y Potreros (ParcelasView.jsx)", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/debés solicitar permiso al Dueño \(un permiso por modificación\)/i)
+        screen.getByText(/debés solicitar permiso al Dueño o Administrador \(un permiso por modificación\)/i)
       ).toBeInTheDocument();
     });
 
