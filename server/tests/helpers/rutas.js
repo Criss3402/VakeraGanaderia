@@ -213,7 +213,7 @@ const MATRIZ_RBAC_ESPERADA = [
     metodo: "GET",
     ruta: "/api/dashboard/finanzas",
     requiereAuth: true,
-    rolesPermitidos: [ROLES.DUENO, ROLES.OFICINA, ROLES.CAPATAZ, ROLES.VETERINARIO],
+    rolesPermitidos: [ROLES.DUENO, ROLES.OFICINA],
   },
   {
     modulo: "dashboard",
@@ -301,14 +301,14 @@ const MATRIZ_RBAC_ESPERADA = [
     metodo: "GET",
     ruta: "/api/dashboard/potreros/permisos",
     requiereAuth: true,
-    rolesPermitidos: [ROLES.DUENO, ROLES.OFICINA, ROLES.CAPATAZ],
+    rolesPermitidos: [ROLES.DUENO, ROLES.OFICINA, ROLES.CAPATAZ, ROLES.PEON],
   },
   {
     modulo: "dashboard",
     metodo: "POST",
     ruta: "/api/dashboard/potreros/permisos/solicitar",
     requiereAuth: true,
-    rolesPermitidos: [ROLES.OFICINA],
+    rolesPermitidos: [ROLES.OFICINA, ROLES.CAPATAZ, ROLES.PEON],
     bodyEjemplo: { accion: "AGREGAR", motivo: "Test" },
   },
   {
@@ -316,7 +316,7 @@ const MATRIZ_RBAC_ESPERADA = [
     metodo: "PATCH",
     ruta: "/api/dashboard/potreros/permisos/:solicitudId",
     requiereAuth: true,
-    rolesPermitidos: [ROLES.DUENO],
+    rolesPermitidos: [ROLES.DUENO, ROLES.OFICINA],
     bodyEjemplo: { estado: "APROBADA" },
   },
   {
@@ -324,7 +324,7 @@ const MATRIZ_RBAC_ESPERADA = [
     metodo: "PATCH",
     ruta: "/api/dashboard/potreros/:id",
     requiereAuth: true,
-    rolesPermitidos: [ROLES.DUENO, ROLES.CAPATAZ],
+    rolesPermitidos: [ROLES.DUENO],
     bodyEjemplo: { nombre: "Potrero Editado" },
   },
   {
@@ -398,7 +398,7 @@ const MATRIZ_RBAC_ESPERADA = [
     metodo: "POST",
     ruta: "/api/dashboard/potreros",
     requiereAuth: true,
-    rolesPermitidos: [ROLES.DUENO, ROLES.CAPATAZ],
+    rolesPermitidos: [ROLES.DUENO],
     bodyEjemplo: { nombre: "Potrero Test", superficieHectareas: 25 },
   },
   {
@@ -406,7 +406,7 @@ const MATRIZ_RBAC_ESPERADA = [
     metodo: "DELETE",
     ruta: "/api/dashboard/potreros/:id",
     requiereAuth: true,
-    rolesPermitidos: [ROLES.DUENO, ROLES.CAPATAZ],
+    rolesPermitidos: [ROLES.DUENO],
   },
   {
     modulo: "dashboard",
@@ -589,7 +589,7 @@ const MATRIZ_RBAC_ESPERADA = [
     metodo: "GET",
     ruta: "/api/dashboard/reportes",
     requiereAuth: true,
-    rolesPermitidos: [ROLES.DUENO, ROLES.OFICINA, ROLES.CAPATAZ, ROLES.VETERINARIO],
+    rolesPermitidos: [ROLES.DUENO, ROLES.OFICINA],
   },
 
   // ===================== AUTH (8 rutas) =====================

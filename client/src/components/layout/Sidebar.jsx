@@ -118,12 +118,12 @@ export default function Sidebar({
       id: "finanzas",
       etiqueta: "Costos y Finanzas",
       icono: "fa-coins",
-      visible: rol !== "peon",
+      visible: rol === "dueno" || rol === "oficina",
       subEnlaces: [
         { id: "finanzas-parametros", etiqueta: "Parámetros Modelo", icono: "fa-sliders" },
       ],
     },
-    { id: "reportes", etiqueta: "Reportes", icono: "fa-chart-simple" },
+    { id: "reportes", etiqueta: "Reportes", icono: "fa-chart-simple", visible: rol === "dueno" || rol === "oficina" },
     { id: "permisos", etiqueta: "Usuarios y Roles", icono: "fa-shield-halved", visible: esDueno },
   ];
 

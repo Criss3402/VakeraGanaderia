@@ -63,11 +63,11 @@ class IsVeterinario(BasePermission):
 
 
 class CanAccessReports(BasePermission):
-    """Permiso para reportes y balances: Dueño, Oficina, Capataz y Veterinario."""
+    """Permiso para reportes y balances: únicamente Dueño y Oficina."""
     message = "Acceso denegado: rol no autorizado para consultar reportes."
 
     def has_permission(self, request, view):
         if not request.user or not getattr(request.user, "is_authenticated", False):
             return False
         user_rol = getattr(request.user, "rol", "").lower()
-        return user_rol in [ROLES["DUENO"], ROLES["OFICINA"], ROLES["CAPATAZ"], ROLES["VETERINARIO"]]
+        return user_rol in [ROLES["DUENO"], ROLES["OFICINA"]]

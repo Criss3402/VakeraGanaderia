@@ -35,32 +35,32 @@ router.get("/ganado/:id", DashboardController.obtenerFichaAnimal);
 router.get("/potreros", DashboardController.obtenerPotreros);
 router.get(
   "/potreros/permisos",
-  rbacMiddleware(ROLES.DUENO, ROLES.OFICINA, ROLES.CAPATAZ),
+  rbacMiddleware(ROLES.DUENO, ROLES.OFICINA, ROLES.CAPATAZ, ROLES.PEON),
   DashboardController.obtenerPermisosParcelas
 );
 router.post(
   "/potreros/permisos/solicitar",
-  rbacMiddleware(ROLES.OFICINA),
+  rbacMiddleware(ROLES.OFICINA, ROLES.CAPATAZ, ROLES.PEON),
   DashboardController.solicitarPermisoParcelas
 );
 router.patch(
   "/potreros/permisos/:solicitudId",
-  rbacMiddleware(ROLES.DUENO),
+  rbacMiddleware(ROLES.DUENO, ROLES.OFICINA),
   DashboardController.responderPermisoParcelas
 );
 router.post(
   "/potreros",
-  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ, ROLES.OFICINA),
+  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ, ROLES.OFICINA, ROLES.PEON),
   DashboardController.registrarPotrero
 );
 router.patch(
   "/potreros/:id",
-  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ, ROLES.OFICINA),
+  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ, ROLES.OFICINA, ROLES.PEON),
   DashboardController.actualizarPotrero
 );
 router.delete(
   "/potreros/:id",
-  rbacMiddleware(ROLES.DUENO, ROLES.CAPATAZ),
+  rbacMiddleware(ROLES.DUENO),
   DashboardController.eliminarPotrero
 );
 router.post(
@@ -195,10 +195,10 @@ router.delete(
   DashboardController.eliminarParteDiario
 );
 
-// 7. Reportes y Balances (Dueño y Oficina, Capataz y Veterinario en lectura)
+// 7. Reportes y Balances (Solo Dueño y Oficina)
 router.get(
   "/reportes",
-  rbacMiddleware(ROLES.DUENO, ROLES.OFICINA, ROLES.CAPATAZ, ROLES.VETERINARIO),
+  rbacMiddleware(ROLES.DUENO, ROLES.OFICINA),
   DashboardController.obtenerReportes
 );
 
@@ -215,10 +215,10 @@ router.delete(
   DashboardController.eliminarReproduccion
 );
 
-// 9. Costos y Finanzas
+// 9. Costos y Finanzas (Solo Dueño y Oficina)
 router.get(
   "/finanzas",
-  rbacMiddleware(ROLES.DUENO, ROLES.OFICINA, ROLES.CAPATAZ, ROLES.VETERINARIO),
+  rbacMiddleware(ROLES.DUENO, ROLES.OFICINA),
   DashboardController.obtenerFinanzas
 );
 router.post(

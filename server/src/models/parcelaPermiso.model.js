@@ -67,10 +67,11 @@ class ParcelaPermisoModel {
    */
   static async tienePermisoParaAccion({ usuarioId, rol, establecimientoId, accion, parcelaId = null }) {
     const rolNorm = String(rol || "").toLowerCase();
-    if (rolNorm === ROLES.DUENO || rolNorm === ROLES.CAPATAZ) {
+    if (rolNorm === ROLES.DUENO) {
       return { autorizado: true, solicitudId: null };
     }
-    if (rolNorm !== ROLES.OFICINA || !usuarioId || !establecimientoId) {
+    const rolesConSolicitud = [ROLES.OFICINA, ROLES.CAPATAZ, ROLES.PEON];
+    if (!rolesConSolicitud.includes(rolNorm) || !usuarioId || !establecimientoId) {
       return { autorizado: false, solicitudId: null };
     }
 
@@ -142,19 +143,6 @@ class ParcelaPermisoModel {
       };
     }
 
-    if (rolNorm === ROLES.CAPATAZ) {
-      return {
-        puedeAgregar: true,
-        puedeEditar: true,
-        requiereSolicitud: false,
-        solicitudActual: null,
-        solicitudesPendientes: [],
-        solicitudes: [],
-        permisoAgregarEstado: "APROBADA",
-        permisosEditarPorParcela: {},
-      };
-    }
-
     const mias = serializadas.filter((s) => s.solicitanteId === usuarioId);
     const activas = mias.filter((s) => s.estado !== "USADA");
 
@@ -166,13 +154,17 @@ class ParcelaPermisoModel {
       }
     }
 
+    const pendientesDeCampo = rolNorm === ROLES.OFICINA
+      ? serializadas.filter((s) => s.estado === "PENDIENTE" && s.solicitanteId !== usuarioId)
+      : [];
+
     return {
       puedeAgregar: solAgregar?.estado === "APROBADA",
       puedeEditar: Object.values(permisosEditarPorParcela).includes("APROBADA"),
-      requiereSolicitud: rolNorm === ROLES.OFICINA,
+      requiereSolicitud: [ROLES.OFICINA, ROLES.CAPATAZ, ROLES.PEON].includes(rolNorm),
       solicitudActual: activas[0] || mias[0] || null,
       solicitudesActivas: activas,
-      solicitudesPendientes: [],
+      solicitudesPendientes: pendientesDeCampo,
       solicitudes: mias,
       permisoAgregarEstado: solAgregar?.estado || "NINGUNA",
       permisosEditarPorParcela,
@@ -312,6 +304,12 @@ class ParcelaPermisoModel {
         throw forbidden;
       }
 
+      if (solicitud.solicitanteId && revisorId && solicitud.solicitanteId === revisorId) {
+        const forbidden = new Error("No podés aprobar o rechazar tu propia solicitud.");
+        forbidden.status = 403;
+        throw forbidden;
+      }
+
       const actualizada = await prisma.solicitudPermisoParcela.update({
         where: { id: solicitudId },
         data: {
@@ -336,6 +334,12 @@ class ParcelaPermisoModel {
 
       if (solicitud.establecimientoId !== establecimientoId) {
         const forbidden = new Error("No tenés permisos para responder solicitudes de otro establecimiento.");
+        forbidden.status = 403;
+        throw forbidden;
+      }
+
+      if (solicitud.solicitanteId && revisorId && solicitud.solicitanteId === revisorId) {
+        const forbidden = new Error("No podés aprobar o rechazar tu propia solicitud.");
         forbidden.status = 403;
         throw forbidden;
       }

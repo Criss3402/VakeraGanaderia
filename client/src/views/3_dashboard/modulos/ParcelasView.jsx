@@ -453,13 +453,15 @@ export default function ParcelasView() {
   const esDueno = rolNorm === "dueno";
   const esCapataz = rolNorm === "capataz";
   const esOficina = rolNorm === "oficina";
-  const puedeGestionar = esDueno || esCapataz;
+  const esPeon = rolNorm === "peon";
+  const puedeGestionar = esDueno;
+  const requiereSolicitudParcelas = esOficina || esCapataz || esPeon;
   const permisoAgregarEstado = permisoParcelas?.permisoAgregarEstado || "NINGUNA";
-  const permisoAgregarAprobado = !esOficina || permisoAgregarEstado === "APROBADA";
+  const permisoAgregarAprobado = !requiereSolicitudParcelas || permisoAgregarEstado === "APROBADA";
   const permisosEditarPorParcela = permisoParcelas?.permisosEditarPorParcela || {};
   const obtenerEstadoPermisoEditar = (parcelaId) =>
     permisosEditarPorParcela[parcelaId] || "NINGUNA";
-  const puedeCrearOEditar = puedeGestionar || esOficina;
+  const puedeCrearOEditar = puedeGestionar || requiereSolicitudParcelas;
 
   // Actualizar coordenadas de proyección SVG en pantalla (parcelas guardadas + trazado activo)
   const actualizarSvgOverlay = useCallback(() => {
@@ -653,7 +655,7 @@ export default function ParcelasView() {
   }
 
   const cargarPermisosParcelas = useCallback(async () => {
-    if (!esDueno && !esOficina) return;
+    if (!esDueno && !requiereSolicitudParcelas) return;
     try {
       const res = await obtenerPermisosParcelas();
       if (res?.data) {
@@ -662,7 +664,7 @@ export default function ParcelasView() {
     } catch (err) {
       console.warn("[ParcelasView] No se pudieron cargar permisos de parcelas:", err.message);
     }
-  }, [esDueno, esOficina]);
+  }, [esDueno, requiereSolicitudParcelas]);
 
   useEffect(() => {
     setParcelaSeleccionada(null);
@@ -976,12 +978,12 @@ export default function ParcelasView() {
 
   // Activar modo delimitación de zona en el mapa (nueva parcela)
   function activarModoTrazado() {
-    if (esOficina && !permisoAgregarAprobado) {
+    if (requiereSolicitudParcelas && !permisoAgregarAprobado) {
       setMenuMetricaAbierto(false);
       setMenuAccionesAbierto(false);
       if (permisoAgregarEstado === "PENDIENTE") {
         mostrarNotificacion(
-          "Ya enviaste una solicitud para agregar una parcela. Esperando aprobación del Dueño."
+          "Ya enviaste una solicitud para agregar una parcela. Esperando aprobación del Dueño o Administración."
         );
         return;
       }
@@ -1006,12 +1008,12 @@ export default function ParcelasView() {
     if (!parcela) return;
     setMenuMetricaAbierto(false);
     setMenuAccionesAbierto(false);
-    if (esOficina) {
+    if (requiereSolicitudParcelas) {
       const estadoEdit = obtenerEstadoPermisoEditar(parcela.id);
       if (estadoEdit !== "APROBADA") {
         if (estadoEdit === "PENDIENTE") {
           mostrarNotificacion(
-            `Ya enviaste una solicitud para editar "${parcela.nombre}". Esperando aprobación del Dueño.`
+            `Ya enviaste una solicitud para editar "${parcela.nombre}". Esperando aprobación del Dueño o Administración.`
           );
           return;
         }
@@ -1251,7 +1253,7 @@ export default function ParcelasView() {
         marcadoresVerticesRef.current = [];
 
         setParcelaSeleccionada(parcelaActualizada);
-        if (esOficina) {
+        if (requiereSolicitudParcelas) {
           await cargarPermisosParcelas();
           window.dispatchEvent(new CustomEvent("vakera:notificaciones-actualizar"));
         }
@@ -1329,7 +1331,7 @@ export default function ParcelasView() {
       marcadoresVerticesRef.current.forEach((m) => m.remove());
       marcadoresVerticesRef.current = [];
 
-      if (esOficina) {
+      if (requiereSolicitudParcelas) {
         await cargarPermisosParcelas();
         window.dispatchEvent(new CustomEvent("vakera:notificaciones-actualizar"));
       }
@@ -1499,14 +1501,14 @@ export default function ParcelasView() {
         </div>
       </div>
 
-      {/* Banner de Permiso de Parcelas para Administrador */}
-      {esOficina && (
+      {/* Banner de Permiso de Parcelas */}
+      {requiereSolicitudParcelas && (
         <div className="px-4 py-3 rounded-2xl border text-xs font-medium flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm bg-stone-50 border-[#ded7c4] text-[#182920]">
           <div className="flex items-center gap-2.5">
             <i className="fa-solid fa-user-shield text-amber-700 text-base"></i>
             <span>
               Cada vez que necesites <strong>agregar una parcela</strong> o{" "}
-              <strong>editar una parcela</strong>, debés solicitar permiso al Dueño (un permiso por modificación).
+              <strong>editar una parcela</strong>, debés solicitar permiso al Dueño o Administrador (un permiso por modificación).
               {permisoAgregarAprobado && (
                 <strong className="ml-1.5 text-emerald-700">
                   • Autorizado para agregar 1 nueva parcela.
@@ -1522,8 +1524,8 @@ export default function ParcelasView() {
         </div>
       )}
 
-      {/* Banner de Solicitudes Pendientes de Administrador para el Dueño */}
-      {esDueno && (permisoParcelas?.solicitudesPendientes || []).length > 0 && (
+      {/* Banner de Solicitudes Pendientes para Dueño / Administración */}
+      {(esDueno || esOficina) && (permisoParcelas?.solicitudesPendientes || []).length > 0 && (
         <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 space-y-2.5 shadow-sm">
           <div className="flex items-center gap-2 text-xs font-extrabold uppercase text-amber-900">
             <i className="fa-solid fa-user-shield text-amber-700"></i>

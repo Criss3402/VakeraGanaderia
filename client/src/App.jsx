@@ -331,18 +331,26 @@ function AppContenido() {
             {subVistaApp === "sanidad" && <SanidadView />}
             {subVistaApp === "insumos" && <InsumosView />}
             {subVistaApp === "finanzas" && (
-              <FinanzasView
-                vistaSubModulo="costos"
-                alCambiarSubModulo={(tab) => navegarA("app", tab === "parametros" ? "finanzas-parametros" : "finanzas")}
-              />
+              <ProtectedRoute rolesPermitidos={["dueno", "oficina"]} alIrALogin={() => navegarA("login")}>
+                <FinanzasView
+                  vistaSubModulo="costos"
+                  alCambiarSubModulo={(tab) => navegarA("app", tab === "parametros" ? "finanzas-parametros" : "finanzas")}
+                />
+              </ProtectedRoute>
             )}
             {subVistaApp === "finanzas-parametros" && (
-              <FinanzasView
-                vistaSubModulo="parametros"
-                alCambiarSubModulo={(tab) => navegarA("app", tab === "parametros" ? "finanzas-parametros" : "finanzas")}
-              />
+              <ProtectedRoute rolesPermitidos={["dueno", "oficina"]} alIrALogin={() => navegarA("login")}>
+                <FinanzasView
+                  vistaSubModulo="parametros"
+                  alCambiarSubModulo={(tab) => navegarA("app", tab === "parametros" ? "finanzas-parametros" : "finanzas")}
+                />
+              </ProtectedRoute>
             )}
-            {subVistaApp === "reportes" && <ReportesView />}
+            {subVistaApp === "reportes" && (
+              <ProtectedRoute rolesPermitidos={["dueno", "oficina"]} alIrALogin={() => navegarA("login")}>
+                <ReportesView />
+              </ProtectedRoute>
+            )}
             {subVistaApp === "tambo" && (
               <TamboLecheView
                 vistaSubModulo="resumen"
