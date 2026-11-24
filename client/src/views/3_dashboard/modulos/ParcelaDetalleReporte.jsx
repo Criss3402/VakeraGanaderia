@@ -1,4 +1,6 @@
 import { useState, useMemo } from "react";
+import { descargarPdfMargenBrutoPy } from "../../../api/reportesPy.api";
+import { useAuth } from "../../../context/AuthContext";
 
 function resolverPrecioCategoriaLocal(categoriaNombre, cotizacionesCategorias, inmagFallback) {
   const cats = cotizacionesCategorias || {};
@@ -33,8 +35,11 @@ export default function ParcelaDetalleReporte({
   formatearMonto,
   alVolver,
 }) {
+  const { usuario, rol } = useAuth();
   const [busqueda, setBusqueda] = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState("TODAS");
+  const [descargandoPdf, setDescargandoPdf] = useState(false);
+  const [errorPdf, setErrorPdf] = useState("");
 
   const animalesParcela = useMemo(() => {
     return hacienda.filter((g) => {
@@ -111,6 +116,79 @@ export default function ParcelaDetalleReporte({
   const superficie = Number(parcela?.superficieHas) || 0;
   const densidad = superficie > 0 ? (totalCabezas / superficie).toFixed(2) : "0.00";
 
+  const manejarDescargarPdfSector = async () => {
+    setErrorPdf("");
+    try {
+      setDescargandoPdf(true);
+      const dolarVenta = Number(dolarSeleccionado?.venta) || 1;
+      const novilloUsdKg = resolverPrecioCategoriaLocal("Novillos", categoriasCot, inmag) / dolarVenta;
+
+      const vientresSector = animalesConValor.filter((a) =>
+        String(a.categoria || "").toLowerCase().includes("vaca")
+      ).length || totalCabezas;
+      const torosSector = animalesConValor.filter((a) =>
+        String(a.categoria || "").toLowerCase().includes("toro")
+      ).length;
+      const vacasLecherasSector = animalesConValor.filter((a) =>
+        String(a.categoria || "").toLowerCase().includes("lecher")
+      ).length;
+
+      const generadoPor = usuario?.nombre
+        ? `${usuario.nombre}${rol ? ` (${String(rol).toUpperCase()})` : ""}`
+        : usuario?.email || "Usuario Vakera";
+
+      const payload = {
+        titulo: `Reporte de Sector: ${parcela?.nombre || "Parcela"}`,
+        establecimiento: usuario?.establecimiento || "Establecimiento Vakera",
+        generadoPor,
+        fechaElaboracion: new Date().toLocaleDateString("es-AR", { month: "long", year: "numeric" }),
+        dolar: dolarVenta,
+        novilloUsdKg,
+        indicadores: {
+          totalCabezas,
+          vientres: vientresSector,
+          torosPct: totalCabezas > 0 ? (torosSector / totalCabezas) * 100 : 0,
+          pesoTotalKg,
+          pesoPromedioKg: pesoPromedio,
+          produccionCarneKgHa: superficie > 0 ? pesoTotalKg / superficie : 0,
+          tasaSanitariaPct: totalCabezas > 0 ? (saludables / totalCabezas) * 100 : 100,
+          mortandadPct: 0,
+          vacasLecheras: vacasLecherasSector,
+          precioLecheUsdL: Number(tamboLeche?.precioLitroArs || 0) / dolarVenta,
+        },
+        superficies: [
+          {
+            nombre: parcela?.pastura
+              ? `${parcela.nombre} (${parcela.pastura})`
+              : (parcela?.nombre || "Sector seleccionado"),
+            ha: superficie,
+            usoPct: 100,
+          },
+        ],
+        categoriasIngreso: resumenPorCategoria.map((c) => {
+          const cab = Number(c.cabezas) || 0;
+          const pesoCab = cab > 0 ? (Number(c.pesoTotalKg) || 0) / cab : 0;
+          const ingresoUsd = (Number(c.valorEstimadoArs) || 0) / dolarVenta;
+          const precioUsdKg = (Number(c.precioKgVivo) || 0) / dolarVenta;
+          return {
+            categoria: c.categoria,
+            cabezas: cab,
+            pesoKgCab: pesoCab,
+            precioUsdKg,
+            ingresoUsd,
+          };
+        }),
+        costos: {},
+      };
+
+      await descargarPdfMargenBrutoPy(payload);
+    } catch (err) {
+      setErrorPdf(err.message || "No se pudo generar el PDF del sector.");
+    } finally {
+      setDescargandoPdf(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Banner de Parcela con flecha atrás al costado */}
@@ -175,14 +253,25 @@ export default function ParcelaDetalleReporte({
 
           <button
             type="button"
-            onClick={() => window.print()}
-            className="bg-[#8fb56b] hover:bg-[#a1c97c] text-[#182920] font-bold text-xs uppercase px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-2"
+            disabled={descargandoPdf}
+            onClick={manejarDescargarPdfSector}
+            className={`bg-[#8fb56b] hover:bg-[#a1c97c] text-[#182920] font-bold text-xs uppercase px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-2 ${
+              descargandoPdf ? "opacity-75 cursor-not-allowed" : ""
+            }`}
           >
-            <i className="fa-solid fa-print"></i> Imprimir
+            <i className={`fa-solid ${descargandoPdf ? "fa-spinner fa-spin" : "fa-print"}`}></i>
+            {descargandoPdf ? "Exportando..." : "Imprimir / Exportar Reporte"}
           </button>
         </div>
         </div>
       </div>
+
+      {errorPdf && (
+        <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 font-semibold flex items-center justify-between">
+          <span>{errorPdf}</span>
+          <button type="button" onClick={() => setErrorPdf("")} className="font-bold px-2">×</button>
+        </div>
+      )}
 
       {/* KPIs de la Parcela */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
