@@ -38,6 +38,9 @@ ALLOWED_HOSTS = [
     for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver").split(",")
     if h.strip()
 ]
+_render_host = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+if _render_host and _render_host not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_render_host)
 
 JWT_ALGORITHM = "HS256"
 INTERNAL_WS_SECRET = os.getenv("INTERNAL_WS_SECRET", JWT_SECRET)
@@ -121,8 +124,15 @@ if _modo_test_db == "sqlite" or (_corriendo_tests and _modo_test_db != "postgres
 else:
     try:
         parsed_url = urllib.parse.urlparse(database_url)
+        query_params = urllib.parse.parse_qs(parsed_url.query)
         db_engine = "django.db.backends.postgresql" if "postgres" in parsed_url.scheme else "django.db.backends.sqlite3"
         db_name = parsed_url.path.lstrip("/").split("?")[0] if parsed_url.path else "vakera_db"
+        db_host = parsed_url.hostname or "localhost"
+        db_options = {}
+        if "sslmode" in query_params:
+            db_options["sslmode"] = query_params["sslmode"][0]
+        elif db_host not in ("localhost", "127.0.0.1", "postgres"):
+            db_options["sslmode"] = "require"
 
         DATABASES = {
             "default": {
@@ -130,9 +140,10 @@ else:
                 "NAME": db_name,
                 "USER": parsed_url.username or "postgres",
                 "PASSWORD": parsed_url.password or "postgres",
-                "HOST": parsed_url.hostname or "localhost",
-                "PORT": str(parsed_url.port or 5433),
+                "HOST": db_host,
+                "PORT": str(parsed_url.port or (5432 if db_host not in ("localhost", "127.0.0.1") else 5433)),
                 "CONN_MAX_AGE": 60,
+                **({"OPTIONS": db_options} if db_options else {}),
             }
         }
     except Exception:

@@ -1,0 +1,51 @@
+services:
+  # 1. API Operativa (Node.js + Express + Prisma)
+  - type: web
+    name: vakera-node-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm --prefix server ci && npx prisma generate --schema=prisma/schema.prisma
+    startCommand: node server/src/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: INTERNAL_WS_SECRET
+        sync: false
+      - key: PYTHON_WS_EMIT_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+
+  # 2. API Analítica, PDF/Excel y WebSockets (Python + Django + Daphne)
+  - type: web
+    name: vakera-python-api
+    runtime: python
+    rootDir: server_py
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: daphne -b 0.0.0.0 -p $PORT vakera_backend.asgi:application
+    healthCheckPath: /api/py/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_SECURE_SSL_REDIRECT
+        value: "False"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: DJANGO_SECRET_KEY
+        sync: false
+      - key: INTERNAL_WS_SECRET
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false

@@ -20,6 +20,11 @@ export function conectarRealtime({
   let cerradoAProposito = false;
 
   const construirUrl = (token) => {
+    const wsBase = import.meta.env.VITE_WS_URL;
+    if (wsBase) {
+      const baseLimpia = wsBase.replace(/\/+$/, "");
+      return `${baseLimpia}/ws/realtime/?token=${encodeURIComponent(token)}`;
+    }
     const protocolo = window.location.protocol === "https:" ? "wss:" : "ws:";
     return `${protocolo}//${window.location.host}/ws/realtime/?token=${encodeURIComponent(token)}`;
   };
