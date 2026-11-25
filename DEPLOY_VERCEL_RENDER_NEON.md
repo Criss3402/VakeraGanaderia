@@ -6,7 +6,7 @@
 3. Desde tu terminal local (en la raíz del proyecto), aplicá las tablas y datos iniciales contra Neon:
    ```powershell
    $env:DATABASE_URL="TU_CONNECTION_STRING_DE_NEON"
-   npx prisma migrate deploy
+   npx prisma db push
    npx prisma db seed
    ```
 
