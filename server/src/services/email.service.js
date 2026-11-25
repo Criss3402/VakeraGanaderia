@@ -26,9 +26,16 @@ class EmailService {
       try {
         const esGmail = SMTP_SERVICE === "gmail" || (SMTP_USER && SMTP_USER.includes("@gmail.com"));
 
+        const timeouts = {
+          connectionTimeout: 5000,
+          greetingTimeout: 5000,
+          socketTimeout: 5000,
+        };
+
         const configTransporte = esGmail
           ? {
               service: "gmail",
+              ...timeouts,
               auth: {
                 user: SMTP_USER.trim(),
                 pass: SMTP_PASS.trim(),
@@ -38,6 +45,7 @@ class EmailService {
               host: SMTP_HOST || "smtp.gmail.com",
               port: Number(SMTP_PORT) || 587,
               secure: Number(SMTP_PORT) === 465,
+              ...timeouts,
               auth: {
                 user: SMTP_USER.trim(),
                 pass: SMTP_PASS.trim(),
@@ -53,6 +61,40 @@ class EmailService {
     } else {
       this.transporter = null;
       this.modoEmulado = true;
+    }
+  }
+
+  /**
+   * Envía correo vía API HTTP de Resend (puerto 443, compatible con Render Free).
+   */
+  async _enviarViaResend({ from, to, subject, html }) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey || !apiKey.trim()) return false;
+
+    try {
+      const resp = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey.trim()}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: process.env.RESEND_FROM || "Vakera Ganadería <onboarding@resend.dev>",
+          to: [to],
+          subject,
+          html,
+        }),
+        signal: AbortSignal.timeout(6000),
+      });
+      if (!resp.ok) {
+        const detalle = await resp.text().catch(() => "");
+        console.warn(`! Fallo al enviar por Resend (${resp.status}): ${detalle}`);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.warn(`! Error de red enviando por Resend: ${err.message}`);
+      return false;
     }
   }
 
@@ -102,6 +144,11 @@ class EmailService {
         </p>
       </div>
     `;
+
+    if (await this._enviarViaResend({ from: remitente, to: email, subject: asunto, html: contenidoHtml })) {
+      console.log(`✓ Correo de activación despachado por Resend a: ${email}`);
+      return { enviado: true, modo: "resend", link: linkVerificacion };
+    }
 
     if (!this.modoEmulado && this.transporter) {
       try {
@@ -175,6 +222,11 @@ class EmailService {
         </p>
       </div>
     `;
+
+    if (await this._enviarViaResend({ from: remitente, to: email, subject: asunto, html: contenidoHtml })) {
+      console.log(`✓ Correo de recuperación despachado por Resend a: ${email}`);
+      return { enviado: true, modo: "resend", link: linkRecuperacion };
+    }
 
     if (!this.modoEmulado && this.transporter) {
       try {
@@ -252,6 +304,11 @@ class EmailService {
         <div style="background: #f8fafc; border-left: 4px solid #8fb56b; padding: 14px 16px; border-radius: 6px; color: #1e293b; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">${escapar(mensaje)}</div>
       </div>
     `;
+
+    if (await this._enviarViaResend({ from: remitente, to: destino, subject: asunto, html: contenidoHtml })) {
+      console.log(`✓ Mensaje de contacto enviado por Resend a ${destino} (de: ${email})`);
+      return { enviado: true, modo: "resend", destino };
+    }
 
     if (!this.modoEmulado && this.transporter) {
       try {
