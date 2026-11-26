@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import {
   login as apiLogin,
   registro as apiRegistro,
@@ -7,14 +7,34 @@ import {
   obtenerUsuarioActual,
   logout as apiLogout,
 } from "../api/auth.api.js";
-import { getToken, setToken } from "../api/client.js";
+import {
+  getToken,
+  setToken,
+  LAST_ACTIVITY_KEY,
+  registrarActividad,
+  sesionExpiradaPorInactividad,
+  tokenJwtExpirado,
+} from "../api/client.js";
 
 const AuthContext = createContext(null);
 const USER_CACHE_KEY = "vakera_usuario_cache";
+const THROTTLE_ACTIVIDAD_MS = 10_000;
+const INTERVALO_CONTROL_MS = 15_000;
+
+function obtenerTokenActivo() {
+  const token = getToken();
+  if (!token) return null;
+  if (sesionExpiradaPorInactividad() || tokenJwtExpirado(token)) {
+    apiLogout();
+    guardarUsuarioCache(null);
+    return null;
+  }
+  return token;
+}
 
 function leerUsuarioCache() {
   try {
-    if (!getToken()) return null;
+    if (!obtenerTokenActivo()) return null;
     const raw = localStorage.getItem(USER_CACHE_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch {
@@ -36,13 +56,23 @@ function guardarUsuarioCache(usr) {
 
 export function AuthProvider({ children }) {
   const [usuario, setUsuario] = useState(() => leerUsuarioCache());
-  const [token, setTokenState] = useState(() => getToken());
+  const [token, setTokenState] = useState(() => obtenerTokenActivo());
   // Si ya hay usuario cacheado con token, evitamos bloquear la UI (Stale-While-Revalidate)
-  const [cargando, setCargando] = useState(() => Boolean(getToken() && !leerUsuarioCache()));
+  const [cargando, setCargando] = useState(() => Boolean(obtenerTokenActivo() && !leerUsuarioCache()));
+
+  const cerrarSesion = useCallback(() => {
+    apiLogout();
+    guardarUsuarioCache(null);
+    setUsuario(null);
+    setTokenState(null);
+  }, []);
 
   useEffect(() => {
-    const tokenGuardado = getToken();
+    const tokenGuardado = obtenerTokenActivo();
     if (tokenGuardado) {
+      if (!localStorage.getItem(LAST_ACTIVITY_KEY)) {
+        registrarActividad();
+      }
       obtenerUsuarioActual()
         .then((res) => {
           if (res?.data?.usuario) {
@@ -50,17 +80,11 @@ export function AuthProvider({ children }) {
             guardarUsuarioCache(res.data.usuario);
             setTokenState(tokenGuardado);
           } else {
-            apiLogout();
-            guardarUsuarioCache(null);
-            setUsuario(null);
-            setTokenState(null);
+            cerrarSesion();
           }
         })
         .catch(() => {
-          apiLogout();
-          guardarUsuarioCache(null);
-          setUsuario(null);
-          setTokenState(null);
+          cerrarSesion();
         })
         .finally(() => {
           setCargando(false);
@@ -69,7 +93,52 @@ export function AuthProvider({ children }) {
       guardarUsuarioCache(null);
       setCargando(false);
     }
-  }, []);
+  }, [cerrarSesion]);
+
+  // Cierre automático de sesión tras 30 minutos en reposo (inactividad o JWT vencido)
+  useEffect(() => {
+    if (!token) return undefined;
+
+    let ultimoRegistro = Date.now();
+    const marcarActividad = () => {
+      const ahora = Date.now();
+      if (ahora - ultimoRegistro >= THROTTLE_ACTIVIDAD_MS) {
+        ultimoRegistro = ahora;
+        registrarActividad(ahora);
+      }
+    };
+
+    const verificarExpiracion = () => {
+      if (sesionExpiradaPorInactividad() || tokenJwtExpirado(token)) {
+        cerrarSesion();
+      }
+    };
+
+    const eventos = ["mousemove", "mousedown", "keydown", "scroll", "touchstart", "click"];
+    eventos.forEach((ev) => window.addEventListener(ev, marcarActividad, { passive: true }));
+
+    const manejarVisibilidad = () => {
+      if (document.visibilityState === "visible") {
+        verificarExpiracion();
+      }
+    };
+    const manejarStorage = (e) => {
+      if (e.key === "vakera_token" && !e.newValue) {
+        cerrarSesion();
+      }
+    };
+
+    document.addEventListener("visibilitychange", manejarVisibilidad);
+    window.addEventListener("storage", manejarStorage);
+    const timer = window.setInterval(verificarExpiracion, INTERVALO_CONTROL_MS);
+
+    return () => {
+      eventos.forEach((ev) => window.removeEventListener(ev, marcarActividad));
+      document.removeEventListener("visibilitychange", manejarVisibilidad);
+      window.removeEventListener("storage", manejarStorage);
+      window.clearInterval(timer);
+    };
+  }, [token, cerrarSesion]);
 
   async function iniciarSesion(email, password) {
     const res = await apiLogin(email, password);
@@ -130,13 +199,6 @@ export function AuthProvider({ children }) {
       return res.data.usuario;
     }
     throw new Error("No se pudo completar el registro con Google.");
-  }
-
-  function cerrarSesion() {
-    apiLogout();
-    guardarUsuarioCache(null);
-    setUsuario(null);
-    setTokenState(null);
   }
 
   return (

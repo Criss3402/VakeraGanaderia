@@ -1,4 +1,45 @@
 const BASE_URL = "/api";
+export const LAST_ACTIVITY_KEY = "vakera_ultima_actividad";
+export const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
+
+export function registrarActividad(ahora = Date.now()) {
+  try {
+    localStorage.setItem(LAST_ACTIVITY_KEY, String(ahora));
+  } catch {
+    // Ignorar cuota de almacenamiento excedida
+  }
+}
+
+export function sesionExpiradaPorInactividad(ahora = Date.now()) {
+  try {
+    const raw = localStorage.getItem(LAST_ACTIVITY_KEY);
+    if (!raw) return false;
+    const ultima = Number(raw);
+    if (!Number.isFinite(ultima)) return false;
+    return ahora - ultima >= INACTIVITY_TIMEOUT_MS;
+  } catch {
+    return false;
+  }
+}
+
+export function tokenJwtExpirado(token, ahora = Date.now()) {
+  if (!token || typeof token !== "string") return false;
+  const partes = token.split(".");
+  if (partes.length !== 3) return false;
+  try {
+    const base64 = partes[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => `%${(`00${c.charCodeAt(0).toString(16)}`).slice(-2)}`)
+        .join("")
+    );
+    const payload = JSON.parse(json);
+    return typeof payload?.exp === "number" && payload.exp * 1000 <= ahora;
+  } catch {
+    return false;
+  }
+}
 
 export function getToken() {
   return localStorage.getItem("vakera_token") || null;
@@ -23,8 +64,10 @@ export function setToken(token) {
   limpiarCacheApi();
   if (token) {
     localStorage.setItem("vakera_token", token);
+    registrarActividad();
   } else {
     localStorage.removeItem("vakera_token");
+    localStorage.removeItem(LAST_ACTIVITY_KEY);
   }
 }
 
@@ -45,6 +88,9 @@ export async function request(endpoint, options = {}) {
   }
 
   const token = getToken();
+  if (token) {
+    registrarActividad();
+  }
   const headers = {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),

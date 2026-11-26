@@ -170,4 +170,62 @@ describe("Contexto de Autenticación (AuthContext.jsx)", () => {
     expect(localStorage.getItem("vakera_token")).toBeNull();
     expect(localStorage.getItem("vakera_usuario_cache")).toBeNull();
   });
+
+  it("si pasaron más de 30 minutos en reposo al abrir la página, purga el token y no hidrata usuario", () => {
+    const usuarioMock = { id: 8, rol: "dueno", nombre: "Dueño Inactivo" };
+    localStorage.setItem("vakera_token", "jwt-viejo");
+    localStorage.setItem("vakera_usuario_cache", JSON.stringify(usuarioMock));
+    localStorage.setItem("vakera_ultima_actividad", String(Date.now() - 31 * 60 * 1000));
+
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+
+    expect(result.current.estaAutenticado).toBe(false);
+    expect(result.current.usuario).toBeNull();
+    expect(result.current.token).toBeNull();
+    expect(localStorage.getItem("vakera_token")).toBeNull();
+    expect(localStorage.getItem("vakera_usuario_cache")).toBeNull();
+    expect(localStorage.getItem("vakera_ultima_actividad")).toBeNull();
+  });
+
+  it("si el JWT guardado ya expiró (exp en el pasado), purga la sesión sincrónicamente", () => {
+    const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+    const payload = btoa(JSON.stringify({ id: 9, exp: Math.floor(Date.now() / 1000) - 60 }));
+    localStorage.setItem("vakera_token", `${header}.${payload}.firma`);
+    localStorage.setItem("vakera_usuario_cache", JSON.stringify({ id: 9, rol: "dueno" }));
+
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+
+    expect(result.current.estaAutenticado).toBe(false);
+    expect(result.current.token).toBeNull();
+    expect(localStorage.getItem("vakera_token")).toBeNull();
+  });
+
+  it("cierra la sesión automáticamente tras 30 minutos de inactividad con la página abierta", async () => {
+    vi.useFakeTimers();
+    try {
+      const usuarioMock = { id: 11, rol: "capataz", nombre: "Capataz Activo" };
+      localStorage.setItem("vakera_token", "jwt-activo");
+      localStorage.setItem("vakera_usuario_cache", JSON.stringify(usuarioMock));
+      localStorage.setItem("vakera_ultima_actividad", String(Date.now()));
+
+      server.use(
+        http.get("*/api/auth/me", () => {
+          return HttpResponse.json({ ok: true, data: { usuario: usuarioMock } });
+        })
+      );
+
+      const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+      expect(result.current.estaAutenticado).toBe(true);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30 * 60 * 1000 + 20_000);
+      });
+
+      expect(result.current.estaAutenticado).toBe(false);
+      expect(result.current.token).toBeNull();
+      expect(localStorage.getItem("vakera_token")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
